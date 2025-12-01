@@ -11,7 +11,7 @@ Fullscreen React display interface for the Smart Mirror with dark glass aestheti
   - ⏰ **TimeDate** - Large centered clock with date (system time, offline-capable)
   - 🌤️ **WeatherTemp** - Current weather, temperature, sunrise/sunset (OpenWeather API)
   - 📅 **GoogleCalendar** - Upcoming events from Google Calendar (OAuth 2.0)
-  - 📸 **Photos** - Photo slideshow from Google Photos with metadata
+  - 📸 **Photos** - Local photo slideshow with drag-drop ordering
 - **Standby Mode** - Black screen overlay for power saving
 - **Message Overlay** - Display notifications and alerts
 - **Auto Layout Updates** - Responds to settings changes from PWA

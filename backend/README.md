@@ -9,7 +9,7 @@ Node.js Express backend for Raspberry Pi 5 Smart Mirror with real-time sensor da
 - **DHT22 Sensor Integration** - Proxy to Python Flask sensor service (Port 5555)
 - **Weather Service** - OpenWeather API with caching
 - **Google Calendar** - OAuth 2.0 authentication and event sync
-- **Google Photos** - Photo management and metadata
+- **Local Photos** - Photo file management with metadata and ordering
 - **Display Power Control** - LCD backlight via wlr-randr (Wayland), DPMS, vcgencmd fallbacks
 - **WiFi Provisioning** - NetworkManager D-Bus integration for scanning and connecting
 - **Settings Management** - JSON-based persistent storage in `/app/data/settings.json`
@@ -25,8 +25,8 @@ Node.js Express backend for Raspberry Pi 5 Smart Mirror with real-time sensor da
 - **Network**: NetworkManager for WiFi control
 - **APIs**:
   - OpenWeather API key (free at https://openweathermap.org/api)
-  - Google Cloud Console project with Calendar & Photos APIs enabled
-  - OAuth 2.0 credentials for Google services
+  - Google Cloud Console project with Calendar API enabled
+  - OAuth 2.0 credentials for Google Calendar
 
 ## Installation
 
@@ -96,11 +96,11 @@ npm start
 - `GET /api/calendar/auth-status` - Check if calendar is authorized
 - `POST /api/calendar/clear-token` - Clear OAuth token
 
-### Google Photos
-- `GET /api/photos` - Get photos metadata
+### Local Photos
+- `GET /api/photos` - Get photos metadata from local directory
 - `POST /api/photos/order` - Update photo display order
-- `POST /api/photos/refresh` - Refresh photos from Google Photos
-- `POST /api/photos/clear-cache` - Clear photos cache
+- `POST /api/photos/refresh` - Rescan local photos directory
+- `POST /api/photos/upload` - Upload new photo (multipart/form-data)
 
 ### Display Power Control
 - `POST /api/display/power` - Control LCD backlight
@@ -149,7 +149,7 @@ Connect to `ws://your-pi-ip:3001` using Socket.IO client
 - `weather_data` - Weather updates (every 5 minutes)
 - `settings_update` - Settings changed notification
 - `calendar_update` - Calendar events updated
-- `photos_update` - Photos metadata updated
+- `photos_update` - Local photos metadata updated
 
 ### Client to Server Events
 - `ping` - Keep-alive ping
@@ -207,14 +207,22 @@ Default settings structure:
 }
 ```
 
-### Google OAuth Setup
+### Google Calendar OAuth Setup
 
 1. Create a project in [Google Cloud Console](https://console.cloud.google.com/)
-2. Enable Google Calendar API and Google Photos Library API
+2. Enable Google Calendar API
 3. Create OAuth 2.0 credentials (Desktop app type)
 4. Download credentials and save as `backend/data/calendar-credentials.json`
 5. Run `node backend/authorize-calendar.js` to generate OAuth token
 6. Token will be saved to `backend/data/calendar-token.json`
+
+### Local Photos Setup
+
+1. Photos are stored in `backend/data/photos/` directory
+2. Supported formats: JPG, JPEG, PNG, GIF, WebP
+3. Add photos by copying files to the directory or using the PWA upload feature
+4. Metadata (order, filenames) stored in `backend/data/photos-metadata.json`
+5. Use PWA Photos tab to reorder photos with drag-and-drop
 
 ## Display Power Control
 
@@ -282,12 +290,19 @@ When no known WiFi network is available, the system can create a hotspot:
 - Verify Wayland socket is mounted: `ls -la /run/user/1000/wayland-0`
 - Test manually: `wlr-randr --output HDMI-A-1 --off`
 
-**Google Calendar/Photos not syncing:**
+**Google Calendar not syncing:**
 - Check OAuth credentials exist in `data/calendar-credentials.json`
 - Verify token file exists: `data/calendar-token.json`
 - Re-run authorization: `node authorize-calendar.js`
-- Check API is enabled in Google Cloud Console
+- Check Calendar API is enabled in Google Cloud Console
 - Verify OAuth consent screen is configured
+
+**Photos not showing:**
+- Verify photos exist in `backend/data/photos/` directory
+- Check supported formats: .jpg, .jpeg, .png, .gif, .webp
+- Ensure metadata file is not corrupted: `data/photos-metadata.json`
+- Refresh photos from PWA Photos tab
+- Check photos service logs: `docker compose logs backend | grep -i photo`
 
 **WiFi commands fail:**
 - Ensure D-Bus socket is mounted in Docker

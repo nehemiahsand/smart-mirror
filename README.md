@@ -6,7 +6,7 @@ A modern, modular smart mirror built with React, Node.js, and Raspberry Pi 5.
 
 - 🌤️ **Weather Display** - Real-time weather with OpenWeather API and sunrise/sunset times
 - 📅 **Calendar Integration** - Google Calendar sync with OAuth authentication
-- 📸 **Photo Slideshow** - Drag-and-drop photo management with auto-save
+- 📸 **Photo Slideshow** - Local photo management with drag-and-drop ordering and auto-save
 - 🌡️ **DHT22 Sensor** - Temperature & humidity monitoring via dedicated Python service
 - 📱 **Mobile PWA** - Control your mirror from anywhere with React-based web app
 - 💤 **Standby Mode** - LCD backlight control via wlr-randr (Wayland)
@@ -92,7 +92,7 @@ If the mirror can't connect to a known network, it automatically:
 - **Display Control**: wlr-randr (Wayland), DPMS fallback
 - **Calendar**: Google Calendar API v3 with OAuth 2.0
 - **Weather**: OpenWeather API
-- **Photos**: Google Photos API
+- **Photos**: Local filesystem storage
 
 ## Auto-Start on Boot
 
@@ -139,7 +139,7 @@ sudo systemctl status smart-mirror.service
 │  │  ├─ /api/settings - Persistent JSON storage           │
 │  │  ├─ /api/weather - OpenWeather integration            │
 │  │  ├─ /api/calendar - Google Calendar OAuth             │
-│  │  ├─ /api/photos - Google Photos management            │
+│  │  ├─ /api/photos - Local photo file management         │
 │  │  ├─ /api/wifi - NetworkManager control                │
 │  │  ├─ /api/sensor - DHT22 proxy                         │
 │  │  ├─ /api/display/power - wlr-randr control            │
@@ -152,7 +152,7 @@ sudo systemctl status smart-mirror.service
 │     ├─ Display Service (wlr-randr, vcgencmd, DPMS)       │
 │     ├─ Weather Service (OpenWeather cache)               │
 │     ├─ Calendar Service (Google OAuth tokens)            │
-│     ├─ Photos Service (Google Photos API)                │
+│     ├─ Photos Service (local filesystem + metadata)      │
 │     ├─ WiFi Service (NetworkManager D-Bus)               │
 │     └─ Settings Service (JSON persistence)               │
 ├──────────────────────────────────────────────────────────┤
@@ -176,7 +176,7 @@ sudo systemctl status smart-mirror.service
 1. **TimeDate**: System clock and date (no API required, offline-capable)
 2. **WeatherTemp**: Current weather, temperature, sunrise/sunset from OpenWeather
 3. **GoogleCalendar**: Upcoming events from Google Calendar via OAuth
-4. **Photos**: Photo slideshow from Google Photos with drag-drop ordering
+4. **Photos**: Local photo slideshow with drag-drop ordering and metadata
 
 ## Tailscale Configuration
 
