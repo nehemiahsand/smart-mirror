@@ -1,0 +1,17 @@
+.layout-container {
+  position: absolute;
+  will-change: left, top, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Ensure smooth transitions */
+.layout-container > .widget {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Prevent layout shift during animations */
+.layout-container.animating {
+  z-index: 10;
+}

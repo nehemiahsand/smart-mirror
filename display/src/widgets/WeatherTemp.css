@@ -1,0 +1,80 @@
+.weathertemp-widget {
+    width: 100%;
+}
+
+.weathertemp-container {
+    display: flex;
+    gap: 3rem;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.weathertemp-section {
+    flex: 1;
+    max-width: 300px;
+    text-align: center;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+    backdrop-filter: blur(10px);
+}
+
+.section-label {
+    font-size: 1.2rem;
+    font-weight: 500;
+    opacity: 0.7;
+    margin-bottom: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+}
+
+.section-icon {
+    font-size: 4rem;
+    margin: 0.5rem 0;
+}
+
+.section-temp {
+    font-size: 3.5rem;
+    font-weight: 300;
+    margin: 0.5rem 0;
+}
+
+.section-desc {
+    font-size: 1.3rem;
+    opacity: 0.8;
+    margin-bottom: 0.8rem;
+    text-transform: capitalize;
+}
+
+.section-details {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    font-size: 1rem;
+    opacity: 0.7;
+}
+
+.section-details span {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+@media (max-width: 768px) {
+    .weathertemp-container {
+        flex-direction: column;
+        gap: 1.5rem;
+    }
+    
+    .weathertemp-section {
+        max-width: 100%;
+    }
+    
+    .section-temp {
+        font-size: 2.5rem;
+    }
+    
+    .section-icon {
+        font-size: 3rem;
+    }
+}

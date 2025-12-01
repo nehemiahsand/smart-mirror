@@ -1,0 +1,118 @@
+.widgets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.widget-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+}
+
+.widget-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.order-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.order-btn {
+  width: 28px;
+  height: 28px;
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  border-radius: 6px;
+  color: #6366f1;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.order-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.order-btn:active:not(:disabled) {
+  transform: scale(0.95);
+  background: rgba(99, 102, 241, 0.15);
+}
+
+.widget-icon {
+  font-size: 28px;
+}
+
+.widget-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.toggle-btn {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 1px solid #2d2d44;
+  font-size: 24px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-btn.enabled {
+  background: rgba(34, 197, 94, 0.1);
+  border-color: rgba(34, 197, 94, 0.2);
+}
+
+.toggle-btn.disabled {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.2);
+  opacity: 0.6;
+}
+
+.toggle-btn:active {
+  transform: scale(0.95);
+}
+
+.save-btn {
+  width: 100%;
+  padding: 16px;
+  background: #6366f1;
+  border: none;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-btn:active:not(:disabled) {
+  transform: scale(0.98);
+  background: #5558e3;
+}

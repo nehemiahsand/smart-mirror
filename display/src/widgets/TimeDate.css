@@ -1,0 +1,46 @@
+.timedate-widget {
+    text-align: center;
+}
+
+.timedate-time {
+    font-size: 5rem;
+    font-weight: 300;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+}
+
+.timedate-seconds {
+    font-size: 1em; /* match main time size */
+    margin-left: 0.25rem;
+    opacity: 0.6;
+}
+
+.timedate-period {
+    font-size: 2rem;
+    margin-left: 0.5rem;
+    opacity: 0.8;
+}
+
+.timedate-date {
+    font-size: 1.8rem;
+    font-weight: 300;
+    opacity: 0.9;
+    letter-spacing: 0.02em;
+}
+
+@media (max-width: 768px) {
+    .timedate-time {
+        font-size: 3rem;
+    }
+    
+    .timedate-seconds { font-size: 1em; }
+    
+    .timedate-period {
+        font-size: 1.5rem;
+    }
+    
+    .timedate-date {
+        font-size: 1.2rem;
+    }
+}

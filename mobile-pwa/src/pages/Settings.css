@@ -1,0 +1,88 @@
+/* Settings Page Spacing */
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.setting-label {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.setting-value {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.actions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.action-button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid #2d2d44;
+  border-radius: 12px;
+  color: #fff;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-button span:first-child {
+  font-size: 24px;
+}
+
+.action-button:active {
+  transform: scale(0.98);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.setting-value.small {
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+}
+
+.danger-card {
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.danger-note {
+  margin: 16px 0 0 0;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 8px;
+  font-size: 13px;
+  color: #fca5a5;
+  line-height: 1.5;
+}
+
+.action-button.danger {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.action-button.danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+}

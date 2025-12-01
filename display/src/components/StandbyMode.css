@@ -1,0 +1,6 @@
+.standby-mode {
+    width: 100vw;
+    height: 100vh;
+    background: #000;
+    /* Completely black - no content, minimal power consumption */
+}

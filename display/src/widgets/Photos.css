@@ -1,0 +1,64 @@
+.photos-widget {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  animation: fadeIn 0.8s ease-out 0.5s both;
+  font-family: 'Roboto', sans-serif;
+  overflow: hidden;
+  max-height: calc(100vh - 130px - 130px - 400px);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.photo-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.photo-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: center;
+  transition: opacity 0.5s ease;
+}
+
+.photo-caption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  padding: 16px 12px 8px 12px;
+  font-size: 1rem;
+  font-weight: 300;
+  opacity: 0.9;
+}
+
+.photo-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  font-size: 1.1rem;
+  opacity: 0.4;
+  font-style: italic;
+  font-weight: 300;
+}

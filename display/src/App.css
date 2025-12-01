@@ -1,0 +1,260 @@
+/* MagicMirror-Inspired Styling - Portrait Mode */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Roboto Condensed", "Helvetica Neue", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.mirror {
+  width: 100vw;
+  height: 100vh;
+  background: #000000;
+  color: #ffffff;
+  overflow: hidden;
+  position: relative;
+  cursor: none; /* Hide cursor for true mirror effect */
+}
+
+/* Subtle vignette effect like real mirror */
+.mirror::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.4) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.mirror-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  padding: 130px 25px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.mirror-content.vertical-layout {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-evenly;
+  align-items: center;
+  gap: 3rem;
+}
+
+.widget-section {
+  width: 100%;
+  max-width: 1400px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.widget-section.top {
+  flex: 0 0 auto;
+}
+
+.widget-section.middle {
+  flex: 0 0 auto;
+}
+
+.widget-section.bottom {
+  flex: 1 1 auto;
+  align-items: flex-start;
+  padding-top: 2rem;
+}
+
+.mirror-content.animating {
+  pointer-events: none;
+}
+
+/* Widget base styling - MagicMirror style */
+.widget {
+  color: #ffffff;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease;
+}
+
+.widget:hover {
+  opacity: 0.95;
+}
+
+/* Message overlay - MagicMirror notification style */
+.message-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 10px;
+  padding: 30px 50px;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+  animation: fadeInScale 0.3s ease;
+  max-width: 90%;
+  text-align: center;
+}
+
+.message-overlay.priority-high {
+  border-color: #ff4444;
+  box-shadow: 0 0 30px rgba(255, 68, 68, 0.6);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+.message-overlay .message-text {
+  font-size: 3rem;
+  font-weight: 300;
+  color: #ffffff;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-family: "Roboto Condensed", sans-serif;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* Status indicator - MagicMirror style */
+.status-indicator {
+  position: fixed;
+  bottom: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 15px;
+  font-size: 0.7rem;
+  opacity: 0.5;
+  z-index: 100;
+  font-family: "Roboto Condensed", sans-serif;
+  letter-spacing: 1px;
+}
+
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.disconnected {
+  background: #ef4444;
+  animation: none;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Editor Mode Hint - Subtle and elegant */
+.editor-hint {
+  position: fixed;
+  bottom: 10px;
+  left: 10px;
+  padding: 6px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.6);
+  z-index: 100;
+  opacity: 0.4;
+  transition: opacity 0.3s ease;
+  font-family: "Roboto Condensed", sans-serif;
+  letter-spacing: 1px;
+}
+
+.editor-hint:hover {
+  opacity: 0.8;
+}
+
+.editor-hint kbd {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  font-family: monospace;
+  font-size: 0.85em;
+  margin: 0 2px;
+}
+
+/* Fullscreen Button - Minimal and elegant */
+.fullscreen-btn {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: all 0.3s ease;
+  opacity: 0.4;
+}
+
+.fullscreen-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.5);
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+.fullscreen-btn:active {
+  transform: scale(0.95);
+}
+
+/* Dimmed mode for power saving */
+.mirror.dimmed {
+  filter: brightness(0.3);
+  transition: filter 0.5s ease;
+}
+
+/* Loading animation */
+@keyframes shimmer {
+  0% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0.3;
+  }
+}
+
+.loading {
+  animation: shimmer 2s ease-in-out infinite;
+}

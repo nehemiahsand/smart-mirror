@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  sensor:
+    build:
+      context: ./sensor
+      dockerfile: Dockerfile
+    container_name: smart-mirror-sensor
+    privileged: true
+    network_mode: host
+    devices:
+      - /dev/gpiomem0:/dev/gpiomem
+      - /dev/gpiochip0:/dev/gpiochip0
+      - /dev/gpiochip4:/dev/gpiochip4
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: smart-mirror-backend
+    privileged: true
+    network_mode: host
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - SENSOR_URL=http://localhost:5555
+      - DHT22_GPIO_PIN=4
+      - DISPLAY=:0
+      - WAYLAND_DISPLAY=wayland-0
+      - XDG_RUNTIME_DIR=/run/user/1000
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/data/photos:/app/data/photos
+      - ./backend/.env:/app/.env:ro
+      - /var/run/dbus:/var/run/dbus
+      - /run/NetworkManager:/run/NetworkManager:ro
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+      - /sys/class/drm:/sys/class/drm
+      - /run/user/1000:/run/user/1000
+    depends_on:
+      - sensor
+    restart: unless-stopped
+
+  display:
+    build:
+      context: ./display
+      dockerfile: Dockerfile
+    container_name: smart-mirror-display
+    network_mode: host
+    environment:
+      - VITE_API_URL=http://localhost:3001
+      - VITE_WS_URL=ws://localhost:3001
+      - TZ=America/Chicago
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  pwa:
+    build:
+      context: ./mobile-pwa
+      dockerfile: Dockerfile
+    container_name: smart-mirror-pwa
+    network_mode: host
+    environment:
+      - VITE_API_URL=http://192.168.1.85:3001
+    depends_on:
+      - backend
+    restart: unless-stopped

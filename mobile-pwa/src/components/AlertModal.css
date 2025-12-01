@@ -1,0 +1,75 @@
+.alert-modal {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.08));
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 30px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s ease-out;
+  text-align: center;
+}
+
+.alert-icon {
+  font-size: 48px;
+  margin-bottom: 15px;
+}
+
+.alert-modal h3 {
+  margin: 0 0 15px 0;
+  font-size: 22px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.alert-modal p {
+  margin: 0 0 25px 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.9);
+  white-space: pre-line;
+}
+
+.alert-btn {
+  padding: 12px 40px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+.alert-modal.info .alert-btn {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.alert-modal.success .alert-btn {
+  background: linear-gradient(135deg, #a8edea 0%, #6dd5b4 100%);
+  color: #1a5547;
+  box-shadow: 0 4px 15px rgba(109, 213, 180, 0.3);
+}
+
+.alert-modal.warning .alert-btn {
+  background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+  color: #6c5000;
+  box-shadow: 0 4px 15px rgba(253, 203, 110, 0.3);
+}
+
+.alert-modal.error .alert-btn {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+}
+
+.alert-btn:hover {
+  transform: translateY(-2px);
+}
+
+.alert-btn:active {
+  transform: translateY(0);
+}
