@@ -26,9 +26,9 @@ docker-compose logs -f
 
 ## URLs
 
-- Mirror Display: http://192.168.1.85:3000
-- Backend API: http://192.168.1.85:3001
-- PWA Control Panel: http://192.168.1.85:3002
+- Mirror Display: http://<pi-ip>:3000
+- Backend API: http://<pi-ip>:3001
+- PWA Control Panel: http://<pi-ip>:3002
 
 ## Development
 

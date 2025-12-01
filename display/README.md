@@ -69,8 +69,8 @@ VITE_WS_URL=ws://localhost:3001
 
 For Raspberry Pi, use your Pi's IP address:
 ```
-VITE_API_URL=http://192.168.1.85:3001
-VITE_WS_URL=ws://192.168.1.85:3001
+VITE_API_URL=http://<pi-ip>:3001
+VITE_WS_URL=ws://<pi-ip>:3001
 ```
 
 Or use Tailscale IP for remote access:
@@ -112,7 +112,7 @@ npm start
 ```
 
 Access from any device on your network at:
-- Local: `http://192.168.1.85:3000`
+- Local: `http://<pi-ip>:3000`
 - Tailscale: `http://100.120.146.19:3000`
 
 ## WebSocket Events

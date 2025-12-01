@@ -1,6 +1,6 @@
-# 🚀 Smart Mirror Setup Instructions
+# Smart Mirror Setup Instructions
 
-Your Raspberry Pi IP: **192.168.1.85**  
+Your Raspberry Pi Local IP: **Check with `hostname -I`**  
 Tailscale VPN IP: **100.120.146.19**
 
 ## Remote Access via Tailscale
@@ -67,7 +67,7 @@ nano .env
 ```
 
 Edit:
-- `VITE_WS_URL=ws://192.168.1.85:3001` (use your Pi's IP)
+- `VITE_WS_URL=ws://<pi-ip>:3001` (use your Pi's actual local IP)
 
 ### 4. Start the Application
 
@@ -86,8 +86,8 @@ npm start
 ### 5. Access the Mirror
 
 Open browser on any device in your network:
-- **Display UI:** http://192.168.1.85:5173
-- **Backend API:** http://192.168.1.85:3001/api/health
+- **Display UI:** http://<pi-ip>:5173
+- **Backend API:** http://<pi-ip>:3001/api/health
 
 ### 6. Test Drag & Drop Editor
 
@@ -132,7 +132,7 @@ curl http://localhost:5173
 **Display won't connect to backend:**
 - Verify backend is running
 - Check VITE_WS_URL in display/.env
-- Test WebSocket: `curl http://192.168.1.85:3001/api/health`
+- Test WebSocket: `curl http://<pi-ip>:3001/api/health`
 
 **DHT22 sensor errors:**
 - Normal if you don't have the sensor connected

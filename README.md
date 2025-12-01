@@ -27,9 +27,9 @@ This mirror uses **Tailscale VPN** for secure remote access from anywhere in the
 - API: `http://100.120.146.19:3001`
 
 **On Local Network:**
-- PWA: `http://192.168.1.85:3002` or `http://nehemiah-pi5.local:3002`
-- Display: `http://192.168.1.85:3000`
-- API: `http://192.168.1.85:3001`
+- PWA: `http://<pi-ip>:3002` or `http://<pi-hostname>.local:3002`
+- Display: `http://<pi-ip>:3000`
+- API: `http://<pi-ip>:3001`
 
 **Via Setup Hotspot:**
 - PWA: `http://10.42.0.1:3002`
