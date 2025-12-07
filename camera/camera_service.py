@@ -63,10 +63,10 @@ class PersonDetector:
             try:
                 self.camera = cv2.VideoCapture(self.camera_index)
                 if self.camera.isOpened():
-                    # Set camera properties optimized for ultra-low power
-                    self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                    self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-                    self.camera.set(cv2.CAP_PROP_FPS, 5)  # 5 FPS - enough for motion/AI detection, lower CPU
+                    # Set camera to maximum resolution for widest field of view
+                    self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+                    self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+                    self.camera.set(cv2.CAP_PROP_FPS, 10)  # 10 FPS for smoother video stream
                     self.camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Reduce buffer for lower latency
                     logger.info(f"Camera initialized successfully on attempt {attempt + 1}")
                     return True
@@ -234,11 +234,11 @@ def detection_loop():
         logger.error("Camera initialization failed - detection disabled")
         return
     
-    logger.info("Starting camera capture loop (5 FPS capture, AI detection every 5 seconds)...")
+    logger.info("Starting camera capture loop (10 FPS capture, AI detection every 5 seconds)...")
     while True:
         try:
             detector.process_frame()
-            time.sleep(0.2)  # Capture at 5 FPS - minimal CPU, still good for motion/AI
+            time.sleep(0.1)  # Capture at 10 FPS for smoother video
         except Exception as e:
             logger.error(f"Error in camera loop: {e}")
             time.sleep(1)

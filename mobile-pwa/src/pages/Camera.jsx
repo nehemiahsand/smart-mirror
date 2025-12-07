@@ -153,7 +153,17 @@ export default function Camera() {
 
                         <button
                             className={`stream-button ${streamEnabled ? 'enabled' : 'disabled'}`}
-                            onClick={() => setStreamEnabled(!streamEnabled)}
+                            onClick={() => {
+                                const newState = !streamEnabled;
+                                setStreamEnabled(newState);
+                                
+                                // If turning OFF, refresh page to kill stream connection
+                                if (!newState) {
+                                    setTimeout(() => {
+                                        window.location.reload();
+                                    }, 100);
+                                }
+                            }}
                         >
                             <span className="button-icon">{streamEnabled ? '🎥' : '⏸️'}</span>
                             <span className="button-text">
@@ -161,11 +171,10 @@ export default function Camera() {
                             </span>
                         </button>
 
-                        {streamEnabled && (
+                        {streamEnabled ? (
                             <div className="video-container">
                                 <img
-                                    key={Date.now()} // Force remount when toggled to properly close connection
-                                    src={`${API_BASE}/api/camera/raw?t=${Date.now()}`}
+                                    src={`${API_BASE}/api/camera/raw`}
                                     alt="Live camera feed"
                                     className="video-stream"
                                     onError={(e) => {
@@ -173,11 +182,15 @@ export default function Camera() {
                                     }}
                                 />
                                 <div className="feed-info">
-                                    <p>🟢 Live stream active</p>
+                                    <p>🟢 Live stream active (1280x720 HD)</p>
                                     <p className="feed-detail">
                                         AI detection continues in background regardless of stream status
                                     </p>
                                 </div>
+                            </div>
+                        ) : (
+                            <div className="stream-off-message">
+                                <p>📹 Stream is off - click button above to view live feed</p>
                             </div>
                         )}
                     </div>
