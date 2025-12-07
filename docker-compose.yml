@@ -14,6 +14,18 @@ services:
       - /dev/gpiochip4:/dev/gpiochip4
     restart: unless-stopped
 
+  camera:
+    build:
+      context: ./camera
+      dockerfile: Dockerfile
+    container_name: smart-mirror-camera
+    privileged: true
+    network_mode: host
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -25,6 +37,7 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - SENSOR_URL=http://localhost:5555
+      - CAMERA_URL=http://127.0.0.1:5556
       - DHT22_GPIO_PIN=4
       - DISPLAY=:0
       - WAYLAND_DISPLAY=wayland-0
@@ -40,6 +53,7 @@ services:
       - /run/user/1000:/run/user/1000
     depends_on:
       - sensor
+      - camera
     restart: unless-stopped
 
   display:

@@ -191,13 +191,13 @@ class WebSocketServer {
    * Start automatic time, sensor, and weather broadcasts
    */
   startAutoBroadcasts() {
-    // Broadcast time every 1 second (skip in standby mode for minimal power usage)
+    // Broadcast time every 10 seconds (1 second was overkill)
     this.timeInterval = setInterval(() => {
       const settings = settingsService.getAll();
       if (!settings?.display?.standbyMode) {
         this.broadcastTime();
       }
-    }, 1000);
+    }, 10000);
 
     // Broadcast sensor data every 60 seconds (skip in standby mode)
     this.sensorInterval = setInterval(async () => {
@@ -207,13 +207,13 @@ class WebSocketServer {
       }
     }, 60000);
 
-    // Broadcast weather every 5 minutes (skip in standby mode)
+    // Broadcast weather every 10 minutes (was 5 minutes)
     this.weatherInterval = setInterval(async () => {
       const settings = settingsService.getAll();
       if (!settings?.display?.standbyMode) {
         await this.broadcastCurrentWeather();
       }
-    }, 300000);
+    }, 600000);
 
     // Send initial weather data immediately
     setTimeout(async () => {
@@ -316,6 +316,30 @@ class WebSocketServer {
       }
     } catch (error) {
       logger.error('Failed to broadcast weather data', { error: error.message });
+    }
+  }
+
+  /**
+   * Broadcast settings change to all clients (for immediate UI updates)
+   */
+  broadcastSettingsChange(setting, value) {
+    try {
+      const settingsService = require('../services/settings');
+      const allSettings = settingsService.getAll();
+      
+      this.broadcast({
+        type: 'settings_changed',
+        data: {
+          setting,
+          value,
+          allSettings
+        },
+        timestamp: Date.now()
+      });
+      
+      logger.info('Settings change broadcasted', { setting, value });
+    } catch (error) {
+      logger.error('Failed to broadcast settings change', { error: error.message });
     }
   }
 

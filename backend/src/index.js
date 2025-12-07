@@ -12,6 +12,7 @@ const settingsService = require('./services/settings');
 const weatherService = require('./services/weather');
 const googleCalendarService = require('./services/googleCalendar');
 const powerService = require('./services/power');
+const cameraService = require('./services/camera');
 const dht22Service = require('./sensors/dht22');
 const websocketServer = require('./api/websocket');
 const apiRoutes = require('./api/routes');
@@ -95,9 +96,14 @@ async function start() {
 
     // Initialize Google Calendar service
     await googleCalendarService.initialize();
-      // Initialize Power service
-      await powerService.initialize();
-      logger.info('Power service', { available: powerService.isAvailable() });
+    
+    // Initialize Power service
+    await powerService.initialize();
+    logger.info('Power service', { available: powerService.isAvailable() });
+
+    // Initialize Camera service with AI person detection
+    await cameraService.initialize();
+    logger.info('Camera service initialized');
 
     if (googleCalendarService.isInitialized()) {
       logger.info('Google Calendar service initialized');
@@ -129,7 +135,7 @@ async function start() {
             if (!currentSettings?.display?.standbyMode) {
               const reading = await dht22Service.getCurrentReading();
               if (!reading.error) {
-                logger.debug('Sensor reading', reading);
+                // Reduced logging - only log on websocket broadcast
                 websocketServer.broadcastSensorData(reading);
               }
             }
@@ -163,7 +169,7 @@ async function start() {
         
         if (!weather.error) {
           websocketServer.broadcastWeatherData(weather);
-          logger.debug('Weather update broadcasted');
+          // Removed debug log to reduce overhead
         }
       } catch (error) {
         logger.error('Failed to update weather', { error: error.message });

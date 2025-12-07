@@ -13,6 +13,7 @@ const dht22Service = require('../sensors/dht22');
 const googleCalendarService = require('../services/googleCalendar');
 const powerService = require('../services/power');
 const displayService = require('../services/display');
+const cameraService = require('../services/camera');
 const websocketServer = require('./websocket');
 const layoutRoutes = require('./layout-routes');
 
@@ -94,6 +95,80 @@ router.post('/display/refresh', (req, res) => {
   } catch (error) {
     logger.error('Failed to trigger refresh', { error: error.message });
     res.status(500).json({ error: 'Failed to refresh display' });
+  }
+});
+
+// ===== Camera / Person Detection Endpoints =====
+router.get('/camera/status', async (req, res) => {
+  try {
+    const status = await cameraService.getStatus();
+    res.json(status);
+  } catch (error) {
+    logger.error('Failed to get camera status', { error: error.message });
+    res.status(500).json({ error: 'Failed to get camera status' });
+  }
+});
+
+router.get('/camera/raw', async (req, res) => {
+  try {
+    const http = require('http');
+    const CAMERA_URL = process.env.CAMERA_URL || 'http://127.0.0.1:5556';
+    
+    // Parse the URL
+    const url = new URL(`${CAMERA_URL}/video/raw`);
+    
+    // Make HTTP request to camera service
+    const options = {
+      hostname: url.hostname,
+      port: url.port || 5556,
+      path: url.pathname,
+      method: 'GET'
+    };
+    
+    const proxyReq = http.request(options, (proxyRes) => {
+      // Forward headers
+      res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'multipart/x-mixed-replace; boundary=frame');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      
+      // Pipe the camera stream to the response
+      proxyRes.pipe(res);
+      
+      proxyRes.on('error', (err) => {
+        logger.error('Camera raw feed proxy error', { error: err.message });
+        res.end();
+      });
+    });
+    
+    proxyReq.on('error', (err) => {
+      logger.error('Failed to connect to camera service for raw feed', { error: err.message });
+      res.status(500).json({ error: 'Camera raw feed unavailable' });
+    });
+    
+    proxyReq.end();
+    
+    // Handle client disconnect
+    req.on('close', () => {
+      proxyReq.destroy();
+    });
+  } catch (error) {
+    logger.error('Failed to get camera raw feed', { error: error.message });
+    res.status(500).json({ error: 'Camera raw feed unavailable' });
+  }
+});
+
+router.post('/camera/auto-standby', async (req, res) => {
+  try {
+    const { enabled } = req.body;
+    if (typeof enabled !== 'boolean') {
+      return res.status(400).json({ error: 'enabled must be a boolean' });
+    }
+    cameraService.setAutoStandby(enabled);
+    res.json({ success: true, auto_standby_enabled: enabled });
+  } catch (error) {
+    logger.error('Failed to set auto-standby', { error: error.message });
+    res.status(500).json({ error: 'Failed to set auto-standby' });
   }
 });
 

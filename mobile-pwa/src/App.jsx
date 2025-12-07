@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import WiFiSettings from './pages/WiFiSettings';
+import Camera from './pages/Camera';
 import WidgetManager from './pages/WidgetManager';
 import Photos from './pages/Photos';
 import Settings from './pages/Settings';
@@ -34,6 +35,7 @@ function AppContent() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/wifi" element={<WiFiSettings />} />
+          <Route path="/camera" element={<Camera />} />
           <Route path="/widgets" element={<WidgetManager />} />
           <Route path="/photos" element={<Photos />} />
           <Route path="/settings" element={<Settings />} />
@@ -53,6 +55,13 @@ function AppContent() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
           </svg>
           <span className="nav-label">WiFi</span>
+        </Link>
+
+        <Link to="/camera" className={`nav-item ${activeTab === 'camera' ? 'active' : ''}`}>
+          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <span className="nav-label">Camera</span>
         </Link>
 
         <Link to="/photos" className={`nav-item ${activeTab === 'photos' ? 'active' : ''}`}>
