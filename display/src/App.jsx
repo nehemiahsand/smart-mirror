@@ -1,18 +1,40 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import './App.css';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useLayoutEngine } from './hooks/useLayoutEngine';
 import TimeDateWidget from './widgets/TimeDate';
 import WeatherTempWidget from './widgets/WeatherTemp';
+import WeatherTrafficWidget from './widgets/WeatherTraffic';
 import GoogleCalendarWidget from './widgets/GoogleCalendar';
 import PhotosWidget from './widgets/Photos';
+import TrafficWidget from './widgets/Traffic';
+import SportsScores from './widgets/SportsScores';
 import MessageOverlay from './components/MessageOverlay';
 import StatusIndicator from './components/StatusIndicator';
 import LayoutContainer from './components/LayoutContainer';
 import StandbyMode from './components/StandbyMode';
+import SpotifyPlayer from './components/SpotifyPlayer';
 
 function App() {
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(() => {
+        // Restore page state from localStorage
+        return localStorage.getItem('currentPage') || 'home';
+    });
+    const [isJarvisListening, setIsJarvisListening] = useState(false);
+
+    // WebSocket with page change handler
+    const handlePageChange = useCallback((page) => {
+        console.log('Page change requested:', page);
+        setCurrentPage(page);
+        localStorage.setItem('currentPage', page);
+    }, []);
+
+    const handleListeningChange = useCallback((listening) => {
+        console.log('Jarvis listening:', listening);
+        console.log('Setting isJarvisListening to:', listening);
+        setIsJarvisListening(listening);
+    }, []);
 
     const {
         isConnected,
@@ -21,7 +43,7 @@ function App() {
         weatherData,
         settings,
         message
-    } = useWebSocket();
+    } = useWebSocket(handlePageChange, handleListeningChange);
 
     // Initialize layout engine
     const {
@@ -161,8 +183,34 @@ function App() {
         return <StandbyMode />;
     }
 
+    // Page navigation
+    const goToHome = () => setCurrentPage('home');
+    const goToSpotify = () => setCurrentPage('spotify');
+
+    // Page indicator component
+    const PageIndicator = () => (
+        <div className="page-indicator">
+            <div className={`page-dot ${currentPage === 'home' ? 'active' : ''}`} />
+            <div className={`page-dot ${currentPage === 'spotify' ? 'active' : ''}`} />
+        </div>
+    );
+
+    // Render Spotify page
+    if (currentPage === 'spotify') {
+        return (
+            <>
+                <SpotifyPlayer onGoHome={goToHome} />
+                <PageIndicator />
+            </>
+        );
+    }
+
+    // Render Home page
     return (
         <div className="mirror">
+            {/* Jarvis listening glow effect */}
+            {isJarvisListening && <div className="jarvis-glow"></div>}
+
             <div className={`mirror-content vertical-layout ${isAnimating ? 'animating' : ''}`}>
                 {/* Dynamic Layout - Combined widgets for better organization */}
 
@@ -174,16 +222,28 @@ function App() {
                 )}
 
                 {/* Google Calendar - Below Time/Date */}
-                {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar')) && (
-                    <div className="widget-section middle" style={{ order: getWidgetOrder('googlecalendar') }}>
-                        <GoogleCalendarWidget />
+                {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar') || isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
+                    <div className="widget-section middle calendar-nba-row" style={{ order: getWidgetOrder('googlecalendar') }}>
+                        {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar')) && (
+                            <div className="calendar-widget">
+                                <GoogleCalendarWidget />
+                            </div>
+                        )}
+                        {(isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
+                            <div className="nba-widget">
+                                <SportsScores
+                                    sport={settings?.sports?.sport || 'nba'}
+                                    teams={settings?.sports?.teams || settings?.nba?.teams || []}
+                                />
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Weather & Temperature - Middle */}
-                {(isWidgetEnabled('weather') || isWidgetEnabled('temperature') || isWidgetEnabled('weathertemp')) && (
+                {/* Weather & Temperature & Traffic - Middle (Combined) */}
+                {(isWidgetEnabled('weathertemp') || isWidgetEnabled('traffic')) && (
                     <div className="widget-section middle" style={{ order: getWidgetOrder('weathertemp') }}>
-                        <WeatherTempWidget weatherData={weatherData} sensorData={sensorData} />
+                        <WeatherTrafficWidget weatherData={weatherData} sensorData={sensorData} />
                     </div>
                 )}
 
@@ -201,12 +261,8 @@ function App() {
             {/* Connection Status */}
             <StatusIndicator isConnected={isConnected} />
 
-            {/* Fullscreen Button */}
-            {!isFullscreen && (
-                <button className="fullscreen-btn" onClick={enterFullscreen} title="Enter Fullscreen (F)">
-                    ⛶
-                </button>
-            )}
+            {/* Page Indicator */}
+            <PageIndicator />
         </div>
     );
 }

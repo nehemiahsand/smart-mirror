@@ -29,8 +29,8 @@ class PersonDetector:
             model_complexity=0,  # Lightest model
             smooth_landmarks=False,  # Disable smoothing
             enable_segmentation=False,  # Disable segmentation
-            min_detection_confidence=0.5,  # Higher threshold to reduce false positives
-            min_tracking_confidence=0.5
+            min_detection_confidence=0.7,  # Higher threshold to reduce false positives
+            min_tracking_confidence=0.7
         )
         
         # Motion detection (pre-screening before AI)
@@ -139,12 +139,12 @@ class PersonDetector:
         visible_count = 0
         for landmark_idx in required_landmarks:
             landmark = landmarks[landmark_idx.value]
-            # Check visibility (>0.5 means landmark is visible and confident)
-            if landmark.visibility > 0.5:
+            # Check visibility (>0.7 means landmark is visible and confident)
+            if landmark.visibility > 0.7:
                 visible_count += 1
         
-        # Require at least 2 out of 3 key landmarks to be visible
-        return visible_count >= 2
+        # Require ALL 3 key landmarks to be visible (more strict)
+        return visible_count >= 3
     
     def calculate_fps(self):
         """Calculate current FPS"""
@@ -191,6 +191,12 @@ class PersonDetector:
             self.ai_skip_count += 1
             if self.ai_skip_count % 10 == 0:  # Log every 10 skips
                 logger.info(f"AI skipped {self.ai_skip_count} times (no motion)")
+            
+            # Even if no motion, check if we should clear the detection flag
+            current_time = time.time()
+            if self.person_detected and self.last_detection_time and (current_time - self.last_detection_time) > 2.0:
+                self.person_detected = False
+                logger.info("Person no longer detected (no motion)")
             return
         
         # Motion detected - run AI person detection
@@ -204,11 +210,15 @@ class PersonDetector:
                 self.last_detection_time = current_time
                 self.total_detections += 1
                 logger.info(f"Person detected! Total detections: {self.total_detections} (AI skipped {self.ai_skip_count} times)")
+            else:
+                # Person still detected but within cooldown - don't log
+                self.person_detected = True
+                self.last_detection_time = current_time
         else:
             # Only clear detection if cooldown has passed
             if self.person_detected and (current_time - self.last_detection_time) > 2.0:
                 self.person_detected = False
-                logger.info("Person no longer detected")
+                logger.info("Person no longer detected (motion but no person found)")
     
     def get_raw_jpeg_frame(self):
         """Get current raw frame as JPEG without overlay"""

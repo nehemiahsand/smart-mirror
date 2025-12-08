@@ -6,8 +6,8 @@ const API_BASE = `http://${window.location.hostname}:3001`;
 
 const WIDGETS = [
   { id: 'timedate', name: 'Time & Date', icon: '🕐' },
-  { id: 'googlecalendar', name: 'Google Calendar', icon: '📅' },
-  { id: 'weathertemp', name: 'Weather & Temperature', icon: '🌤️' },
+  { id: 'weathertemp', name: 'Weather & Temperature & Traffic', icon: '🌤️' },
+  { id: 'googlecalendar', name: 'Calendar & Sports', icon: '📅' },
   { id: 'photos', name: 'Photos Slideshow', icon: '📸' },
 ];
 

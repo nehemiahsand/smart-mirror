@@ -362,6 +362,16 @@ class WebSocketServer {
         });
         break;
       
+      case 'sync_page':
+        // Display is syncing its current page - broadcast to all clients
+        logger.info('Page sync from display', { page: data.page });
+        this.broadcast({
+          type: 'page_change',
+          page: data.page,
+          timestamp: Date.now()
+        });
+        break;
+      
       case 'command':
         this.handleCommand(ws, data);
         break;

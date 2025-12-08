@@ -98,7 +98,7 @@ export default function Camera() {
                                 <span className="status-label">Time Until Standby</span>
                                 <span className="status-value">
                                     {cameraStatus.person_detected
-                                        ? '1m 0s'
+                                        ? '5m 0s'
                                         : formatTime(cameraStatus.time_until_standby)}
                                 </span>
                             </div>
@@ -156,7 +156,7 @@ export default function Camera() {
                             onClick={() => {
                                 const newState = !streamEnabled;
                                 setStreamEnabled(newState);
-                                
+
                                 // If turning OFF, refresh page to kill stream connection
                                 if (!newState) {
                                     setTimeout(() => {

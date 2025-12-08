@@ -16,6 +16,7 @@ const cameraService = require('./services/camera');
 const dht22Service = require('./sensors/dht22');
 const websocketServer = require('./api/websocket');
 const apiRoutes = require('./api/routes');
+const spotifyRoutes = require('./api/spotify-routes');
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -40,6 +41,7 @@ app.use((req, res, next) => {
 
 // API Routes
 app.use('/api', apiRoutes);
+app.use('/api/spotify', spotifyRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -85,6 +87,10 @@ async function start() {
     // Initialize settings service
     await settingsService.initialize();
     logger.info('Settings service initialized');
+
+    // Reload Spotify tokens after settings are initialized
+    const spotifyService = require('./services/spotify');
+    spotifyService.loadTokens();
 
     // Set OpenWeather API key if provided
     if (process.env.OPENWEATHER_API_KEY) {

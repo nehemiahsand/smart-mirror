@@ -6,6 +6,8 @@ import Camera from './pages/Camera';
 import WidgetManager from './pages/WidgetManager';
 import Photos from './pages/Photos';
 import Settings from './pages/Settings';
+import SportsSettings from './pages/SportsSettings';
+import MoreMenu from './pages/MoreMenu';
 import './components/common.css';
 import './App.css';
 
@@ -38,7 +40,9 @@ function AppContent() {
           <Route path="/camera" element={<Camera />} />
           <Route path="/widgets" element={<WidgetManager />} />
           <Route path="/photos" element={<Photos />} />
+          <Route path="/sports" element={<SportsSettings />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/more" element={<MoreMenu />} />
         </Routes>
       </main>
 
@@ -48,13 +52,6 @@ function AppContent() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
           <span className="nav-label">Home</span>
-        </Link>
-
-        <Link to="/wifi" className={`nav-item ${activeTab === 'wifi' ? 'active' : ''}`}>
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-          </svg>
-          <span className="nav-label">WiFi</span>
         </Link>
 
         <Link to="/camera" className={`nav-item ${activeTab === 'camera' ? 'active' : ''}`}>
@@ -78,12 +75,11 @@ function AppContent() {
           <span className="nav-label">Widgets</span>
         </Link>
 
-        <Link to="/settings" className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`}>
+        <Link to="/more" className={`nav-item ${activeTab === 'more' ? 'active' : ''}`}>
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
           </svg>
-          <span className="nav-label">Settings</span>
+          <span className="nav-label">More</span>
         </Link>
       </nav>
     </>

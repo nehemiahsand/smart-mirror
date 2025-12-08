@@ -1,0 +1,132 @@
+.traffic-widget {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 15px;
+  padding: 1.5rem;
+  min-width: 300px;
+  max-width: 400px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.traffic-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.traffic-icon {
+  font-size: 2rem;
+}
+
+.traffic-title {
+  font-size: 1.3rem;
+  font-weight: 300;
+  color: #ffffff;
+  opacity: 0.9;
+}
+
+.traffic-main {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.traffic-duration {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
+}
+
+.duration-value {
+  font-size: 3.5rem;
+  font-weight: 300;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.duration-unit {
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: #ffffff;
+  opacity: 0.7;
+}
+
+.traffic-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.traffic-distance {
+  font-size: 1.2rem;
+  font-weight: 300;
+  color: #ffffff;
+  opacity: 0.8;
+}
+
+.traffic-conditions {
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+}
+
+.traffic-eta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.eta-label {
+  font-size: 1rem;
+  font-weight: 300;
+  color: #ffffff;
+  opacity: 0.7;
+}
+
+.eta-time {
+  font-size: 1.5rem;
+  font-weight: 300;
+  color: #ffffff;
+}
+
+.traffic-loading,
+.traffic-error {
+  text-align: center;
+  padding: 1rem;
+}
+
+.traffic-loading {
+  font-size: 1.1rem;
+  color: #ffffff;
+  opacity: 0.7;
+}
+
+.traffic-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.traffic-error-icon {
+  font-size: 2rem;
+}
+
+.traffic-error-text {
+  font-size: 1rem;
+  color: #ef4444;
+}
+
+.traffic-stale-warning {
+  margin-top: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(251, 191, 36, 0.2);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: #fbbf24;
+  text-align: center;
+}

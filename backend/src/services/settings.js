@@ -47,7 +47,17 @@ class SettingsService {
       // Try to load existing settings
       try {
         const data = await fs.readFile(SETTINGS_FILE, 'utf8');
-        this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(data) };
+        const loadedSettings = JSON.parse(data);
+        // Deep merge to preserve all settings including spotify
+        this.settings = {
+          ...DEFAULT_SETTINGS,
+          ...loadedSettings,
+          // Ensure nested objects are properly merged
+          display: { ...DEFAULT_SETTINGS.display, ...loadedSettings.display },
+          weather: { ...DEFAULT_SETTINGS.weather, ...loadedSettings.weather },
+          widgets: { ...DEFAULT_SETTINGS.widgets, ...loadedSettings.widgets },
+          network: { ...DEFAULT_SETTINGS.network, ...loadedSettings.network }
+        };
         logger.info('Settings loaded successfully');
       } catch (error) {
         // File doesn't exist, create with defaults

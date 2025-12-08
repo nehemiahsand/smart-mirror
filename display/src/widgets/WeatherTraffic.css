@@ -1,0 +1,95 @@
+.weathertraffic-widget {
+  width: 100%;
+  max-width: 1400px;
+}
+
+.weathertraffic-container {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  gap: 2rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 20px;
+  padding: 1.5rem 2rem;
+  backdrop-filter: blur(10px);
+}
+
+.wt-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-align: center;
+}
+
+.wt-label {
+  font-size: 1rem;
+  font-weight: 300;
+  color: #ffffff;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 0.3rem;
+}
+
+.wt-icon {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.wt-temp {
+  font-size: 2.5rem;
+  font-weight: 300;
+  color: #ffffff;
+  line-height: 1;
+}
+
+.wt-desc {
+  font-size: 1rem;
+  font-weight: 300;
+  color: #ffffff;
+  opacity: 0.8;
+  text-transform: capitalize;
+  margin-top: 0.2rem;
+}
+
+.wt-detail {
+  font-size: 1.1rem;
+  font-weight: 400;
+  color: #ffffff;
+  opacity: 0.9;
+  margin-top: 0.5rem;
+}
+
+/* Make ETA even bigger for traffic section */
+.wt-section.traffic .wt-detail {
+  font-size: 1.5rem;
+  font-weight: 500;
+  opacity: 1;
+}
+
+/* Section dividers */
+.wt-section:not(:last-child) {
+  border-right: 1px solid rgba(255, 255, 255, 0.2);
+  padding-right: 2rem;
+}
+
+.wt-section:not(:first-child) {
+  padding-left: 2rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .weathertraffic-container {
+    gap: 1rem;
+  }
+  
+  .wt-section:not(:last-child) {
+    padding-right: 1rem;
+  }
+  
+  .wt-section:not(:first-child) {
+    padding-left: 1rem;
+  }
+}

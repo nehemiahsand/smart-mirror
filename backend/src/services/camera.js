@@ -10,7 +10,8 @@ const displayService = require('./display');
 
 const CAMERA_URL = process.env.CAMERA_URL || 'http://localhost:5556';
 const POLL_INTERVAL = 5000; // Check every 5 seconds (matches AI detection interval)
-const NO_PERSON_TIMEOUT = 1 * 60 * 1000; // 1 minute in milliseconds
+const NO_PERSON_TIMEOUT = 5 * 60 * 1000; // 5 minutes in milliseconds
+const STANDBY_SHUTDOWN_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
 
 class CameraService {
   constructor() {
@@ -20,6 +21,8 @@ class CameraService {
     this.checkInterval = null;
     this.autoStandbyEnabled = true;
     this.lastStandbyState = null;
+    this.shutdownTimer = null;
+    this.standbyStartTime = null;
   }
 
   async initialize() {
@@ -138,6 +141,14 @@ class CameraService {
       if (currentSettings && currentSettings.display && currentSettings.display.standbyMode) {
         logger.info('Waking display from standby (person detected)...');
         
+        // Cancel auto-shutdown timer if running
+        if (this.shutdownTimer) {
+          clearTimeout(this.shutdownTimer);
+          this.shutdownTimer = null;
+          this.standbyStartTime = null;
+          logger.info('Cancelled auto-shutdown timer');
+        }
+        
         // Use the same logic as the standby button
         await settingsService.updateMultiple({ 'display.standbyMode': false });
         await displayService.turnOn();
@@ -160,7 +171,7 @@ class CameraService {
       const currentSettings = settingsService.getAll();
       
       if (currentSettings && currentSettings.display && !currentSettings.display.standbyMode) {
-        logger.info('Entering standby mode (no person for 1 minute)...');
+        logger.info('Entering standby mode (no person for 5 minutes)...');
         
         // Use the same logic as the standby button
         await settingsService.updateMultiple({ 'display.standbyMode': true });
@@ -172,7 +183,24 @@ class CameraService {
           websocketServer.broadcastSettingsUpdate(settingsService.getAll());
         }
         
+        // Start 30-minute auto-shutdown timer
+        this.standbyStartTime = Date.now();
+        this.shutdownTimer = setTimeout(async () => {
+          logger.warn('Auto-shutdown triggered: System in standby for 30 minutes');
+          try {
+            const powerService = require('./power');
+            if (powerService.isAvailable()) {
+              await powerService.shutdown(false);
+            } else {
+              logger.error('Cannot shutdown: Power service not available');
+            }
+          } catch (error) {
+            logger.error('Auto-shutdown failed:', { error: error.message });
+          }
+        }, STANDBY_SHUTDOWN_TIMEOUT);
+        
         logger.info('Display entered standby mode successfully');
+        logger.info('Auto-shutdown will trigger in 30 minutes if not woken');
       } else if (currentSettings && currentSettings.display && currentSettings.display.standbyMode) {
         logger.info('Display already in standby mode');
       }
@@ -193,6 +221,10 @@ class CameraService {
         last_detection: this.lastDetectionTime,
         time_until_standby: this.lastDetectionTime 
           ? Math.max(0, NO_PERSON_TIMEOUT - (Date.now() - this.lastDetectionTime))
+          : null,
+        standby_start_time: this.standbyStartTime,
+        time_until_shutdown: this.standbyStartTime
+          ? Math.max(0, STANDBY_SHUTDOWN_TIMEOUT - (Date.now() - this.standbyStartTime))
           : null
       };
     } catch (error) {
@@ -207,12 +239,51 @@ class CameraService {
     return `${CAMERA_URL}/video/feed`;
   }
 
+  startShutdownTimer() {
+    // Cancel existing timer if any
+    if (this.shutdownTimer) {
+      clearTimeout(this.shutdownTimer);
+    }
+    
+    this.standbyStartTime = Date.now();
+    this.shutdownTimer = setTimeout(async () => {
+      logger.warn('Auto-shutdown triggered: System in standby for 30 minutes');
+      try {
+        const powerService = require('./power');
+        if (powerService.isAvailable()) {
+          await powerService.shutdown(false);
+        } else {
+          logger.error('Cannot shutdown: Power service not available');
+        }
+      } catch (error) {
+        logger.error('Auto-shutdown failed:', { error: error.message });
+      }
+    }, STANDBY_SHUTDOWN_TIMEOUT);
+    
+    logger.info('Auto-shutdown timer started (30 minutes)');
+  }
+
+  cancelShutdownTimer() {
+    if (this.shutdownTimer) {
+      clearTimeout(this.shutdownTimer);
+      this.shutdownTimer = null;
+      this.standbyStartTime = null;
+      logger.info('Auto-shutdown timer cancelled');
+    }
+  }
+
   setAutoStandby(enabled) {
     this.autoStandbyEnabled = enabled;
     
     if (!enabled) {
-      // Disabling auto-standby - reset the countdown timer
+      // Disabling auto-standby - reset the countdown timers
       this.lastDetectionTime = null;
+      if (this.shutdownTimer) {
+        clearTimeout(this.shutdownTimer);
+        this.shutdownTimer = null;
+        this.standbyStartTime = null;
+        logger.info('Cleared auto-shutdown timer');
+      }
     } else {
       // Re-enabling auto-standby - reset state and check current person status
       this.lastDetectionTime = null;

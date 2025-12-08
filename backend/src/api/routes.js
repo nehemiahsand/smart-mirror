@@ -14,6 +14,9 @@ const googleCalendarService = require('../services/googleCalendar');
 const powerService = require('../services/power');
 const displayService = require('../services/display');
 const cameraService = require('../services/camera');
+const trafficService = require('../services/traffic');
+const nbaService = require('../services/nba');
+const sportsService = require('../services/sports');
 const websocketServer = require('./websocket');
 const layoutRoutes = require('./layout-routes');
 
@@ -260,8 +263,12 @@ router.post('/settings', async (req, res) => {
       try {
         if (standbyMode) {
           await displayService.turnOff();
+          // Start 30-minute auto-shutdown timer
+          cameraService.startShutdownTimer();
         } else {
           await displayService.turnOn();
+          // Cancel auto-shutdown timer when waking manually
+          cameraService.cancelShutdownTimer();
         }
       } catch (err) {
         logger.error('Failed to change display state', { error: err.message });
@@ -302,8 +309,12 @@ router.put('/settings', async (req, res) => {
       try {
         if (standbyMode) {
           await displayService.turnOff();
+          // Start 30-minute auto-shutdown timer
+          cameraService.startShutdownTimer();
         } else {
           await displayService.turnOn();
+          // Cancel auto-shutdown timer when waking manually
+          cameraService.cancelShutdownTimer();
         }
       } catch (err) {
         logger.error('Failed to change display state', { error: err.message });
@@ -801,6 +812,132 @@ router.get('/system/info', (req, res) => {
   } catch (error) {
     logger.error('Failed to get system info', { error: error.message });
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ===== Voice Command Broadcast Endpoint =====
+router.post('/broadcast', (req, res) => {
+  try {
+    const { type, page, command, listening } = req.body;
+    
+    logger.info('Broadcasting voice command:', { type, page, command, listening });
+    
+    // Broadcast to all connected WebSocket clients
+    const payload = {
+      type: type || 'voice_command',
+      timestamp: Date.now()
+    };
+    
+    // Include optional fields if present
+    if (page !== undefined) payload.page = page;
+    if (command !== undefined) payload.command = command;
+    if (listening !== undefined) payload.listening = listening;
+    
+    websocketServer.broadcast(payload);
+    
+    res.json({ success: true, broadcasted: true });
+  } catch (error) {
+    logger.error('Error broadcasting command:', error);
+    res.status(500).json({ error: 'Failed to broadcast command' });
+  }
+});
+
+// ===== Traffic Endpoints =====
+router.get('/traffic/commute', async (req, res) => {
+  try {
+    const settings = settingsService.getAll();
+    
+    if (!settings.traffic || !settings.traffic.enabled) {
+      return res.status(400).json({ error: 'Traffic widget not configured' });
+    }
+
+    const { origin, destination, googleMapsApiKey } = settings.traffic;
+    
+    if (!origin || !destination) {
+      return res.status(400).json({ error: 'Origin and destination must be configured in settings' });
+    }
+
+    if (!googleMapsApiKey) {
+      return res.status(400).json({ error: 'Google Maps API key not configured' });
+    }
+
+    const data = await trafficService.getCommuteData(origin, destination, googleMapsApiKey);
+    res.json(data);
+  } catch (error) {
+    logger.error('Failed to get traffic data', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.post('/traffic/clear-cache', async (req, res) => {
+  try {
+    trafficService.clearCache();
+    res.json({ success: true, message: 'Cache cleared' });
+  } catch (error) {
+    logger.error('Failed to clear traffic cache', { error: error.message });
+    res.status(500).json({ error: 'Failed to clear cache' });
+  }
+});
+
+// ============================================================================
+// Sports Scores Routes (NBA, NFL, NCAA, MLB, Soccer)
+// ============================================================================
+
+// Get list of supported sports
+router.get('/sports', async (req, res) => {
+  try {
+    const sports = sportsService.getSupportedSports();
+    res.json(sports);
+  } catch (error) {
+    logger.error('Failed to get sports list', { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch sports list' });
+  }
+});
+
+// Get scores for a specific sport
+router.get('/sports/:sport/scores', async (req, res) => {
+  try {
+    const sport = req.params.sport;
+    const teams = req.query.teams ? req.query.teams.split(',') : null;
+    const scores = await sportsService.getScores(sport, teams);
+    res.json(scores);
+  } catch (error) {
+    logger.error(`Failed to get ${req.params.sport} scores`, { error: error.message });
+    res.status(500).json({ error: `Failed to fetch ${req.params.sport} scores` });
+  }
+});
+
+// Clear cache for specific sport or all sports
+router.post('/sports/clear-cache', async (req, res) => {
+  try {
+    const sport = req.body.sport || null;
+    sportsService.clearCache(sport);
+    res.json({ success: true, message: sport ? `${sport} cache cleared` : 'All caches cleared' });
+  } catch (error) {
+    logger.error('Failed to clear sports cache', { error: error.message });
+    res.status(500).json({ error: 'Failed to clear cache' });
+  }
+});
+
+// Legacy NBA endpoint for backward compatibility
+router.get('/nba/scores', async (req, res) => {
+  try {
+    const teams = req.query.teams ? req.query.teams.split(',') : null;
+    const scores = await sportsService.getScores('nba', teams);
+    res.json(scores);
+  } catch (error) {
+    logger.error('Failed to get NBA scores', { error: error.message });
+    res.status(500).json({ error: 'Failed to fetch NBA scores' });
+  }
+});
+
+router.post('/nba/clear-cache', async (req, res) => {
+  try {
+    sportsService.clearCache('nba');
+    res.json({ success: true, message: 'Cache cleared' });
+  } catch (error) {
+    logger.error('Failed to clear NBA cache', { error: error.message });
+    res.status(500).json({ error: 'Failed to clear cache' });
   }
 });
 

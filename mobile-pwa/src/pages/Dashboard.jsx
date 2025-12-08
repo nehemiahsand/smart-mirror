@@ -126,6 +126,30 @@ export default function Dashboard() {
     }
   };
 
+  const changePage = async (page) => {
+    setBusy(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/broadcast`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'page_change',
+          page: page
+        })
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to change page');
+      }
+
+    } catch (e) {
+      console.error('Page change failed:', e);
+      setAlertModal({ type: 'error', message: `Failed to change page: ${e.message}` });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="page">
@@ -221,6 +245,38 @@ export default function Dashboard() {
               <span>⏻</span>
               Shutdown Mirror
             </button>
+          </div>
+        </div>
+
+        {/* Page Navigation */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-icon">📱</span>
+            <h2>Display Pages</h2>
+          </div>
+          <div className="quick-actions">
+            <button className="action-btn" disabled={busy} onClick={() => changePage('home')}>
+              <span>🏠</span>
+              Home Page
+            </button>
+            <button className="action-btn" disabled={busy} onClick={() => changePage('spotify')}>
+              <span>🎵</span>
+              Spotify Page
+            </button>
+          </div>
+        </div>
+
+        {/* Widget Settings */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-icon">⚙️</span>
+            <h2>Widget Settings</h2>
+          </div>
+          <div className="quick-actions">
+            <a href="/sports" className="action-btn">
+              <span>🏀</span>
+              Sports
+            </a>
           </div>
         </div>
       </div>

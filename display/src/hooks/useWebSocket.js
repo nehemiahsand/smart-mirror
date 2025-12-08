@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
 
-export const useWebSocket = () => {
+export const useWebSocket = (onPageChange, onListeningChange) => {
   const [isConnected, setIsConnected] = useState(false);
   const [time, setTime] = useState(null);
   const [sensorData, setSensorData] = useState(null);
@@ -20,6 +20,13 @@ export const useWebSocket = () => {
       ws.onopen = () => {
         console.log('WebSocket connected');
         setIsConnected(true);
+        
+        // Broadcast current page to sync voice service
+        const currentPage = localStorage.getItem('currentPage') || 'home';
+        ws.send(JSON.stringify({
+          type: 'sync_page',
+          page: currentPage
+        }));
       };
 
       ws.onmessage = (event) => {
@@ -58,6 +65,21 @@ export const useWebSocket = () => {
               break;
             case 'weather_data':
               setWeatherData(data.data);
+              break;
+            case 'page_change':
+            case 'voice_command':
+              // Handle voice-triggered page changes
+              if (data.page && onPageChange) {
+                console.log('🎤 Voice command: changing page to', data.page);
+                onPageChange(data.page);
+              }
+              break;
+            case 'jarvis_listening':
+              // Handle Jarvis listening state for visual feedback
+              console.log('🎤 Jarvis listening state:', data.listening);
+              if (onListeningChange) {
+                onListeningChange(data.listening);
+              }
               break;
             case 'layout_update':
               // Merge layout update into settings
