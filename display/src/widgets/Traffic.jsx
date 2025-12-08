@@ -73,14 +73,14 @@ const Traffic = () => {
         if (!trafficData?.durationMinutes) {
             return null;
         }
-        
+
         const eta = new Date(currentTime.getTime() + (trafficData.durationMinutes * 60 * 1000));
         const hours = eta.getHours();
         const minutes = eta.getMinutes();
         const ampm = hours >= 12 ? 'PM' : 'AM';
         const displayHours = hours % 12 || 12;
         const displayMinutes = minutes.toString().padStart(2, '0');
-        
+
         return `${displayHours}:${displayMinutes} ${ampm}`;
     }, [currentTime, trafficData]);
 
@@ -134,7 +134,7 @@ const Traffic = () => {
                 <div className="eta-time">
                     {liveETA || trafficData.etaFormatted || '--:--'}
                 </div>
-                <div style={{fontSize: '12px', marginTop: '5px', color: '#888'}}>
+                <div style={{ fontSize: '12px', marginTop: '5px', color: '#888' }}>
                     Debug: {trafficData.durationMinutes}min drive | Live: {liveETA ? 'YES' : 'NO'}
                 </div>
             </div>
