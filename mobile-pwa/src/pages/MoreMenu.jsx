@@ -11,7 +11,7 @@ export default function MoreMenu() {
 
       <div className="menu-section">
         <h2 className="section-title">Configuration</h2>
-        
+
         <Link to="/wifi" className="menu-item">
           <div className="menu-icon">📶</div>
           <div className="menu-content">
@@ -48,7 +48,7 @@ export default function MoreMenu() {
 
       <div className="menu-section">
         <h2 className="section-title">About</h2>
-        
+
         <div className="info-card">
           <div className="info-row">
             <span className="info-label">Smart Mirror</span>

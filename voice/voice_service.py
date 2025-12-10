@@ -31,8 +31,8 @@ COMMANDS = {
     'home': ['home', 'main page', 'go home', 'main', 'homepage', 'back home', 'return home', 'go back home', 'exit', 'close', 'back', 'go back', 'om', 'ohm', 'dome', 'rome', 'foam'],
     
     # Playback controls
-    'play': ['play', 'resume', 'start', 'unpause', 'play music', 'start playing', 'continue', 'play song', 'plate', 'place', 'plane'],
-    'pause': ['pause', 'stop', 'stop music', 'pause music', 'halt', 'freeze', 'paws', 'poz', 'paz'],
+    'play': ['play', 'resume', 'start', 'unpause', 'play music', 'start playing', 'continue', 'play song', 'plate', 'place', 'plane', 'lei', 'pay', 'pray', 'delay', 'hey play', 'okay play', 'display'],
+    'pause': ['pause', 'stop', 'stop music', 'pause music', 'halt', 'freeze', 'paws', 'poz', 'paz', 'boss', 'cause'],
     'next': ['next', 'skip', 'next song', 'skip song', 'skip track', 'next track', 'forward', 'skip this'],
     'previous': ['previous', 'last song', 'go back', 'back', 'previous song', 'previous track', 'last track', 'rewind', 'go back'],
     'volume_up': ['volume up', 'louder', 'turn it up', 'increase volume', 'raise volume', 'up'],
@@ -169,12 +169,12 @@ class VoiceRecognitionService:
         """Send Spotify playback command"""
         try:
             endpoints = {
-                'play': {'method': 'POST', 'url': '/api/spotify/play'},
-                'pause': {'method': 'POST', 'url': '/api/spotify/pause'},
+                'play': {'method': 'PUT', 'url': '/api/spotify/play'},
+                'pause': {'method': 'PUT', 'url': '/api/spotify/pause'},
                 'next': {'method': 'POST', 'url': '/api/spotify/next'},
                 'previous': {'method': 'POST', 'url': '/api/spotify/previous'},
-                'volume_up': {'method': 'POST', 'url': '/api/spotify/volume', 'data': {'direction': 'up'}},
-                'volume_down': {'method': 'POST', 'url': '/api/spotify/volume', 'data': {'direction': 'down'}},
+                'volume_up': {'method': 'PUT', 'url': '/api/spotify/volume', 'data': {'direction': 'up'}},
+                'volume_down': {'method': 'PUT', 'url': '/api/spotify/volume', 'data': {'direction': 'down'}},
             }
             
             if action not in endpoints:
@@ -185,7 +185,11 @@ class VoiceRecognitionService:
             url = f"{BACKEND_URL}{endpoint['url']}"
             data = endpoint.get('data', {})
             
-            response = requests.post(url, json=data, timeout=2)
+            method = endpoint['method']
+            if method == 'PUT':
+                response = requests.put(url, json=data, timeout=2)
+            else:
+                response = requests.post(url, json=data, timeout=2)
             if response.status_code == 200:
                 logger.info(f"✅ Spotify command executed: {action}")
                 return True
@@ -213,22 +217,33 @@ class VoiceRecognitionService:
         
         # SPOTIFY PAGE: Listen for playback controls and "home"
         elif self.current_page == 'spotify':
-            # Check for home navigation first (highest priority)
-            for keyword in COMMANDS['home']:
-                if keyword in text_lower:
-                    logger.info(f"🏠 Navigating to home page (matched: '{keyword}')")
-                    self.send_page_command('home')
-                    return True
-            
-            # Check for playback commands
+            # Check for playback commands FIRST (higher priority)
             for action, keywords in COMMANDS.items():
                 if action in ['play', 'pause', 'next', 'previous']:
-                    if any(keyword in text_lower for keyword in keywords):
-                        logger.info(f"🎵 Executing Spotify command: {action}")
-                        self.send_spotify_command(action)
+                    # Check if any keyword matches in the text (case insensitive, substring match)
+                    for keyword in keywords:
+                        if keyword in text_lower:
+                            logger.info(f"🎵 Executing Spotify command: {action} (matched: '{keyword}' in '{text}')")
+                            self.send_spotify_command(action)
+                            return True
+            
+            # Check for home navigation (lower priority)
+            # Use word boundaries for home commands to avoid "back" matching "playback"
+            for keyword in COMMANDS['home']:
+                # For single words, use word boundary check
+                if len(keyword.split()) == 1:
+                    if f" {keyword} " in f" {text_lower} " or text_lower.startswith(keyword + " ") or text_lower.endswith(" " + keyword) or text_lower == keyword:
+                        logger.info(f"🏠 Navigating to home page (matched: '{keyword}')")
+                        self.send_page_command('home')
+                        return True
+                else:
+                    # For phrases, simple substring match
+                    if keyword in text_lower:
+                        logger.info(f"🏠 Navigating to home page (matched: '{keyword}')")
+                        self.send_page_command('home')
                         return True
             
-            logger.debug(f"❌ No match on Spotify page. Available: Home, Play, Pause, Next, Previous")
+            logger.info(f"❌ No match on Spotify page for: '{text}'")
         
         return False
     
