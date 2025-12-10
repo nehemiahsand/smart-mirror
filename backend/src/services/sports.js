@@ -62,31 +62,44 @@ class SportsService {
         return this.filterByTeams(cached.data, teams);
       }
 
-      // Try today first, then check up to 7 days ahead for next games
+      // Always fetch today's games first
+      const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const url = `https://site.web.api.espn.com/apis/site/v2/sports/${config.url}/scoreboard?dates=${today}&limit=200`;
+
+      logger.info(`${config.name}: Fetching today's games from ${url}`);
+      const response = await axios.get(url);
+      
       let formattedGames = null;
-      let searchDate = new Date();
-      const maxDaysAhead = 7;
 
-      for (let daysAhead = 0; daysAhead <= maxDaysAhead; daysAhead++) {
-        const dateStr = new Date(searchDate.getTime() + (daysAhead * 24 * 60 * 60 * 1000))
-          .toISOString().split('T')[0].replace(/-/g, '');
+      // If we have games today (scheduled, live, or completed), show them
+      if (response.data && response.data.events && response.data.events.length > 0) {
+        formattedGames = this.formatGames(response.data.events, sport);
+        logger.info(`${config.name}: Found ${response.data.events.length} games for today`);
+      } else {
+        // No games today, search up to 7 days ahead for next games
+        logger.info(`${config.name}: No games today, searching for upcoming games...`);
+        const maxDaysAhead = 7;
         
-        const url = `https://site.web.api.espn.com/apis/site/v2/sports/${config.url}/scoreboard?dates=${dateStr}&limit=200`;
-
-        logger.info(`${config.name}: Fetching from ${url}`);
-        const response = await axios.get(url);
-        
-        if (response.data && response.data.events && response.data.events.length > 0) {
-          formattedGames = this.formatGames(response.data.events, sport);
-          if (daysAhead > 0) {
-            logger.info(`${config.name}: No games today, showing games from ${daysAhead} day(s) ahead`);
+        for (let daysAhead = 1; daysAhead <= maxDaysAhead; daysAhead++) {
+          const searchDate = new Date();
+          searchDate.setDate(searchDate.getDate() + daysAhead);
+          const dateStr = searchDate.toISOString().split('T')[0].replace(/-/g, '');
+          
+          const futureUrl = `https://site.web.api.espn.com/apis/site/v2/sports/${config.url}/scoreboard?dates=${dateStr}&limit=200`;
+          
+          logger.info(`${config.name}: Checking ${daysAhead} day(s) ahead...`);
+          const futureResponse = await axios.get(futureUrl);
+          
+          if (futureResponse.data && futureResponse.data.events && futureResponse.data.events.length > 0) {
+            formattedGames = this.formatGames(futureResponse.data.events, sport);
+            logger.info(`${config.name}: Found games ${daysAhead} day(s) ahead`);
+            break;
           }
-          break;
         }
       }
 
       if (!formattedGames) {
-        logger.warn(`${config.name}: No games found in next ${maxDaysAhead} days`);
+        logger.warn(`${config.name}: No games found in next 7 days`);
         return { games: [], lastUpdate: new Date().toISOString(), sport };
       }
       

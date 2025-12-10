@@ -28,11 +28,11 @@ WEBSOCKET_BROADCAST_URL = f"{BACKEND_URL}/api/broadcast"
 COMMANDS = {
     # Navigation
     'spotify': ['spotify', 'music', 'music player', 'player', 'open spotify', 'go to spotify', 'show spotify', 'show music'],
-    'home': ['home', 'main page', 'go home', 'main', 'homepage', 'back home', 'return home', 'go back home', 'exit', 'close', 'back', 'go back'],
+    'home': ['home', 'main page', 'go home', 'main', 'homepage', 'back home', 'return home', 'go back home', 'exit', 'close', 'back', 'go back', 'om', 'ohm', 'dome', 'rome', 'foam'],
     
     # Playback controls
-    'play': ['play', 'resume', 'start', 'unpause', 'play music', 'start playing', 'continue', 'play song'],
-    'pause': ['pause', 'stop', 'stop music', 'pause music', 'halt', 'freeze'],
+    'play': ['play', 'resume', 'start', 'unpause', 'play music', 'start playing', 'continue', 'play song', 'plate', 'place', 'plane'],
+    'pause': ['pause', 'stop', 'stop music', 'pause music', 'halt', 'freeze', 'paws', 'poz', 'paz'],
     'next': ['next', 'skip', 'next song', 'skip song', 'skip track', 'next track', 'forward', 'skip this'],
     'previous': ['previous', 'last song', 'go back', 'back', 'previous song', 'previous track', 'last track', 'rewind', 'go back'],
     'volume_up': ['volume up', 'louder', 'turn it up', 'increase volume', 'raise volume', 'up'],
@@ -111,6 +111,13 @@ class VoiceRecognitionService:
                     if new_page != self.current_page:
                         logger.info(f"📱 Page changed via WebSocket: {self.current_page} → {new_page}")
                         self.current_page = new_page
+                elif data.get('type') == 'standby_change':
+                    # When standby mode changes, re-sync the page
+                    is_standby = data.get('standby', False)
+                    if not is_standby:
+                        logger.info(f"📱 Exiting standby mode, re-syncing page...")
+                        time.sleep(1)  # Wait for display to update
+                        self.sync_page_from_display()
             except Exception as e:
                 logger.debug(f"WebSocket message error: {e}")
         

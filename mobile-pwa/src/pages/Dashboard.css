@@ -248,3 +248,49 @@
 .modal-btn.confirm:active {
   background: #4f46e5;
 }
+
+/* Quick Info Grid */
+.quick-info-card {
+  background: #1a1a2e;
+  border: 1px solid #2d2d44;
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.quick-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(99, 102, 241, 0.1);
+  border-radius: 12px;
+}
+
+.info-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.info-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.info-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #6366f1;
+  line-height: 1.2;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}

@@ -259,6 +259,13 @@ router.post('/settings', async (req, res) => {
     if (updates['display.standbyMode'] !== undefined) {
       const standbyMode = updates['display.standbyMode'];
       
+      // Broadcast standby state change to voice service
+      websocketServer.broadcast({
+        type: 'standby_change',
+        standby: standbyMode,
+        timestamp: Date.now()
+      });
+      
       // Turn display on/off based on standby mode
       try {
         if (standbyMode) {
@@ -304,6 +311,13 @@ router.put('/settings', async (req, res) => {
     // Handle standby mode changes - turn display on/off
     if (updates['display.standbyMode'] !== undefined) {
       const standbyMode = updates['display.standbyMode'];
+      
+      // Broadcast standby state change to voice service
+      websocketServer.broadcast({
+        type: 'standby_change',
+        standby: standbyMode,
+        timestamp: Date.now()
+      });
       
       // Turn display on/off based on standby mode
       try {

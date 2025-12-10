@@ -8,6 +8,7 @@ const API_BASE = `http://${window.location.hostname}:3001`;
 export default function Dashboard() {
   const [sensorData, setSensorData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
+  const [trafficData, setTrafficData] = useState(null);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -22,13 +23,15 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [sensor, weather, settingsData] = await Promise.all([
+      const [sensor, weather, traffic, settingsData] = await Promise.all([
         fetch(`${API_BASE}/api/sensor`).then(r => r.json()),
         fetch(`${API_BASE}/api/weather`).then(r => r.json()),
+        fetch(`${API_BASE}/api/traffic/commute`).then(r => r.json()).catch(() => null),
         fetch(`${API_BASE}/api/settings`).then(r => r.json())
       ]);
       setSensorData(sensor);
       setWeatherData(weather);
+      setTrafficData(traffic);
       setSettings(settingsData);
       setLoading(false);
     } catch (error) {
@@ -168,55 +171,59 @@ export default function Dashboard() {
       </div>
 
       <div className="cards">
-        {/* Indoor Climate */}
-        <div className="card">
+        {/* Quick Info */}
+        <div className="card quick-info-card">
           <div className="card-header">
-            <span className="card-icon">🌡️</span>
-            <h2>Indoor Climate</h2>
+            <span className="card-icon">📊</span>
+            <h2>Quick Info</h2>
           </div>
-          {sensorData && !sensorData.error ? (
-            <div className="climate-data">
-              <div className="climate-item">
-                <div className="value">{sensorData.temperatureFahrenheit}°F</div>
-                <div className="label">{sensorData.temperatureCelsius}°C</div>
+          <div className="quick-info-grid">
+            {/* Indoor Temp */}
+            {sensorData && !sensorData.error ? (
+              <div className="info-item">
+                <div className="info-icon">🏠</div>
+                <div className="info-content">
+                  <div className="info-value">{sensorData.temperatureFahrenheit}°F</div>
+                  <div className="info-label">Indoor Temp</div>
+                </div>
               </div>
-              <div className="climate-item">
-                <div className="value">{sensorData.humidity}%</div>
-                <div className="label">Humidity</div>
+            ) : null}
+
+            {/* Indoor Humidity */}
+            {sensorData && !sensorData.error ? (
+              <div className="info-item">
+                <div className="info-icon">💧</div>
+                <div className="info-content">
+                  <div className="info-value">{sensorData.humidity}%</div>
+                  <div className="info-label">Indoor Humidity</div>
+                </div>
               </div>
-            </div>
-          ) : (
-            <div className="no-data">Sensor unavailable</div>
-          )}
+            ) : null}
+
+            {/* Outdoor Temp */}
+            {weatherData && !weatherData.error ? (
+              <div className="info-item">
+                <div className="info-icon">🌤️</div>
+                <div className="info-content">
+                  <div className="info-value">{weatherData.temperature}°</div>
+                  <div className="info-label">Outdoor Temp</div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Traffic */}
+            {trafficData && !trafficData.error ? (
+              <div className="info-item">
+                <div className="info-icon">🚗</div>
+                <div className="info-content">
+                  <div className="info-value">{trafficData.durationMinutes} min</div>
+                  <div className="info-label">To School</div>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
 
-        {/* Weather */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-icon">☁️</span>
-            <h2>Weather</h2>
-          </div>
-          {weatherData && !weatherData.error ? (
-            <div className="weather-data">
-              <div className="weather-main">
-                <div className="temp">{weatherData.temperature}°</div>
-                <div className="desc">{weatherData.description}</div>
-              </div>
-              <div className="weather-details">
-                <div className="detail">
-                  <span>Feels like</span>
-                  <strong>{weatherData.feelsLike}°</strong>
-                </div>
-                <div className="detail">
-                  <span>Humidity</span>
-                  <strong>{weatherData.humidity}%</strong>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="no-data">Weather unavailable</div>
-          )}
-        </div>
 
         {/* Quick Actions */}
         <div className="card">
@@ -263,20 +270,6 @@ export default function Dashboard() {
               <span>🎵</span>
               Spotify Page
             </button>
-          </div>
-        </div>
-
-        {/* Widget Settings */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-icon">⚙️</span>
-            <h2>Widget Settings</h2>
-          </div>
-          <div className="quick-actions">
-            <a href="/sports" className="action-btn">
-              <span>🏀</span>
-              Sports
-            </a>
           </div>
         </div>
       </div>
