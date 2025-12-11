@@ -224,6 +224,23 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Display Pages */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-icon">📱</span>
+            <h2>Display Pages</h2>
+          </div>
+          <div className="quick-actions">
+            <button className="action-btn" disabled={busy} onClick={() => changePage('home')}>
+              <span>🏠</span>
+              Home Page
+            </button>
+            <button className="action-btn" disabled={busy} onClick={() => changePage('spotify')}>
+              <span>🎵</span>
+              Spotify Page
+            </button>
+          </div>
+        </div>
 
         {/* Quick Actions */}
         <div className="card">
@@ -251,24 +268,6 @@ export default function Dashboard() {
             <button className="action-btn danger" disabled={busy} onClick={() => confirmPowerAction('shutdown')}>
               <span>⏻</span>
               Shutdown Mirror
-            </button>
-          </div>
-        </div>
-
-        {/* Page Navigation */}
-        <div className="card">
-          <div className="card-header">
-            <span className="card-icon">📱</span>
-            <h2>Display Pages</h2>
-          </div>
-          <div className="quick-actions">
-            <button className="action-btn" disabled={busy} onClick={() => changePage('home')}>
-              <span>🏠</span>
-              Home Page
-            </button>
-            <button className="action-btn" disabled={busy} onClick={() => changePage('spotify')}>
-              <span>🎵</span>
-              Spotify Page
             </button>
           </div>
         </div>
