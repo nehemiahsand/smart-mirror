@@ -11,7 +11,14 @@ RUN apt-get update && apt-get install -y \
     iw \
     x11-xserver-utils \
     wlr-randr \
+    locales \
     && rm -rf /var/lib/apt/lists/*
+
+# Generate and set UTF-8 locale
+RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
+ENV LANG=en_US.UTF-8 \
+    LC_ALL=en_US.UTF-8 \
+    LANGUAGE=en_US:en
 
 WORKDIR /app
 

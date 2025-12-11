@@ -1,0 +1,14 @@
+[Unit]
+Description=WiFi Fallback Hotspot Service
+After=network.target NetworkManager.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+ExecStart=/home/smartmirror/Downloads/smart-mirror/wifi-fallback-hotspot.sh
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

@@ -27,8 +27,14 @@ const server = http.createServer(app);
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ charset: 'utf-8' }));
+app.use(express.urlencoded({ extended: true, charset: 'utf-8' }));
+
+// Set default charset for all responses
+app.use((req, res, next) => {
+  res.charset = 'utf-8';
+  next();
+});
 
 // Request logging middleware
 app.use((req, res, next) => {

@@ -8,7 +8,23 @@ const fs = require('fs').promises;
 const { promisify } = require('util');
 const logger = require('../utils/logger');
 
-const execAsync = promisify(exec);
+// Create execAsync with UTF-8 locale
+const execAsync = (command) => {
+  return new Promise((resolve, reject) => {
+    exec(command, { 
+      encoding: 'utf8', 
+      env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' } 
+    }, (error, stdout, stderr) => {
+      if (error) {
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+};
 
 const WPA_SUPPLICANT_CONF = '/etc/wpa_supplicant/wpa_supplicant.conf';
 const WPA_SUPPLICANT_BACKUP = '/etc/wpa_supplicant/wpa_supplicant.conf.backup';
@@ -17,18 +33,89 @@ class WiFiService {
   /**
    * List available WiFi networks
    * Works on Raspberry Pi OS Bookworm using nmcli or iw
-   * Note: Works even when hotspot is active
+   * Note: iw can scan even when hotspot is active
    */
   async scanNetworks() {
     try {
       logger.info('Scanning for WiFi networks');
       
-      // Try nmcli first (NetworkManager - common in Bookworm)
-      // This works even when hotspot is active on wlan0
+      // Check if we're in hotspot mode
+      let isHotspot = false;
       try {
-        const { stdout } = await execAsync('nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list 2>/dev/null');
+        const { stdout: nmstatusOut } = await execAsync('nmcli -t -f GENERAL.STATE,GENERAL.CONNECTION connection show Hotspot 2>/dev/null || echo ""');
+        isHotspot = nmstatusOut && nmstatusOut.includes('activated');
+      } catch (_) {
+        isHotspot = false;
+      }
+      
+      // If in hotspot mode, use iw which can scan even when interface is in AP mode
+      if (isHotspot) {
+        logger.info('Hotspot active, using iw for scanning');
+        try {
+          // Trigger a scan
+          await execAsync('iw dev wlan0 scan trigger 2>/dev/null || true');
+          // Wait a bit for scan to complete
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          const { stdout } = await execAsync('iw dev wlan0 scan dump 2>/dev/null');
+          
+          const networks = [];
+          const bssBlocks = stdout.split('BSS ');
+          
+          for (const block of bssBlocks.slice(1)) {
+            const ssidMatch = block.match(/SSID: (.+)/);
+            const signalMatch = block.match(/signal: ([-\d.]+) dBm/);
+            const hasEncryption = block.includes('RSN:') || block.includes('WPA:');
+            
+            if (ssidMatch && ssidMatch[1] && ssidMatch[1].trim()) {
+              const ssid = ssidMatch[1].trim();
+              
+              // Skip our own hotspot
+              if (ssid === 'SmartMirror-Setup' || ssid === 'Hotspot') {
+                continue;
+              }
+              
+              // Convert dBm to percentage (approximate)
+              let signal = 0;
+              if (signalMatch) {
+                const dbm = parseFloat(signalMatch[1]);
+                signal = Math.min(100, Math.max(0, (dbm + 100) * 2));
+              }
+              
+              // Avoid duplicates
+              if (!networks.find(n => n.ssid === ssid)) {
+                networks.push({
+                  ssid,
+                  signal: Math.round(signal),
+                  secured: hasEncryption
+                });
+              }
+            }
+          }
+          
+          // Sort by signal strength
+          networks.sort((a, b) => b.signal - a.signal);
+          
+          logger.info('WiFi scan completed (iw - hotspot mode)', { count: networks.length });
+          return networks;
+        } catch (iwError) {
+          logger.warn('iw scan failed in hotspot mode', { error: iwError.message });
+        }
+      }
+      
+      // Try nmcli first (NetworkManager - common in Bookworm)
+      try {
+        logger.info('Attempting nmcli scan');
+        // Trigger a rescan
+        await execAsync('nmcli device wifi rescan 2>&1 || true');
+        logger.info('nmcli rescan triggered, waiting 1s');
+        await new Promise(resolve => setTimeout(resolve, 1000));
         
-        if (stdout) {
+        logger.info('Fetching wifi list');
+        const { stdout } = await execAsync('nmcli -t -f SSID,SIGNAL,SECURITY dev wifi list 2>&1');
+        logger.info('Got nmcli output', { length: stdout ? stdout.length : 0 });
+        
+        if (stdout && stdout.length > 0) {
           const networks = [];
           const lines = stdout.trim().split('\n');
           
@@ -59,7 +146,7 @@ class WiFiService {
       
       // Fallback to iw (modern replacement for iwlist)
       try {
-        const { stdout } = await execAsync('sudo iw dev wlan0 scan 2>/dev/null');
+        const { stdout } = await execAsync('iw dev wlan0 scan 2>/dev/null');
         
         const networks = [];
         const bssBlocks = stdout.split('BSS ');
@@ -100,9 +187,9 @@ class WiFiService {
       }
       
       // Final fallback to iwlist (legacy)
-      const { stdout } = await execAsync('sudo iwlist wlan0 scan 2>/dev/null || echo "SCAN_FAILED"');
+      const { stdout } = await execAsync('iwlist wlan0 scan 2>/dev/null || echo "SCAN_FAILED"');
       
-      if (stdout.includes('SCAN_FAILED')) {
+      if (!stdout || stdout.includes('SCAN_FAILED')) {
         logger.warn('WiFi scan failed - all methods exhausted');
         return [];
       }
@@ -220,6 +307,18 @@ class WiFiService {
       try {
         await this.stopHotspot();
         logger.info('Stopped hotspot before connecting to new network');
+        // Wait a moment for the interface to fully release
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Rescan for networks after stopping hotspot
+        try {
+          await execAsync('nmcli device wifi rescan');
+          logger.info('Rescanned for WiFi networks');
+          // Wait for scan to complete
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        } catch (rescanError) {
+          logger.warn('WiFi rescan failed, continuing anyway', { error: rescanError.message });
+        }
       } catch (error) {
         logger.debug('No hotspot to stop or failed to stop', { error: error.message });
       }
@@ -274,8 +373,10 @@ class WiFiService {
           }
         }
       } catch (nmcliError) {
-        logger.debug('NetworkManager connection failed, trying wpa_supplicant', {
-          error: nmcliError.message
+        logger.warn('NetworkManager connection failed, trying wpa_supplicant', {
+          error: nmcliError.message,
+          stderr: nmcliError.stderr,
+          stdout: nmcliError.stdout
         });
       }
       
@@ -310,7 +411,7 @@ class WiFiService {
       
       // Backup existing config
       try {
-        await execAsync(`sudo cp ${WPA_SUPPLICANT_CONF} ${WPA_SUPPLICANT_BACKUP} 2>/dev/null`);
+        await execAsync(`cp ${WPA_SUPPLICANT_CONF} ${WPA_SUPPLICANT_BACKUP} 2>/dev/null`);
         logger.info('Backed up existing wpa_supplicant.conf');
       } catch (error) {
         logger.warn('Could not backup wpa_supplicant.conf');
@@ -371,11 +472,11 @@ network={
       
       // Write to temporary file
       const tempFile = '/tmp/wpa_supplicant_temp.conf';
-      await execAsync(`echo '${newConfig.replace(/'/g, "'\\''")}' | sudo tee ${tempFile} > /dev/null`);
+      await execAsync(`echo '${newConfig.replace(/'/g, "'\\''")}'  | tee ${tempFile} > /dev/null`);
       
       // Copy to actual location
-      await execAsync(`sudo cp ${tempFile} ${WPA_SUPPLICANT_CONF}`);
-      await execAsync(`sudo chmod 600 ${WPA_SUPPLICANT_CONF}`);
+      await execAsync(`cp ${tempFile} ${WPA_SUPPLICANT_CONF}`);
+      await execAsync(`chmod 600 ${WPA_SUPPLICANT_CONF}`);
       
       // Restart wpa_supplicant
       await this._restartWpaSupplicant();
@@ -429,9 +530,9 @@ network={
       
       // Try multiple methods to restart wpa_supplicant
       const restartCommands = [
-        'sudo systemctl restart wpa_supplicant',
-        'sudo wpa_cli -i wlan0 reconfigure',
-        'sudo killall wpa_supplicant && sudo wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf'
+        'systemctl restart wpa_supplicant',
+        'wpa_cli -i wlan0 reconfigure',
+        'killall wpa_supplicant && wpa_supplicant -B -i wlan0 -c /etc/wpa_supplicant/wpa_supplicant.conf'
       ];
       
       for (const cmd of restartCommands) {
@@ -545,7 +646,7 @@ network={
   async disconnect() {
     try {
       logger.info('Disconnecting from WiFi');
-      await execAsync('sudo wpa_cli -i wlan0 disconnect');
+      await execAsync('wpa_cli -i wlan0 disconnect');
       
       return {
         success: true,
@@ -688,14 +789,14 @@ network={
         // Remove any persisted NM profiles (.nmconnection files)
         try {
           if (forgetAll) {
-            await execAsync(`sudo find /etc/NetworkManager/system-connections -type f -name '*.nmconnection' -exec rm -f {} +`);
+            await execAsync(`find /etc/NetworkManager/system-connections -type f -name '*.nmconnection' -exec rm -f {} +`);
             logger.info('Removed all NM system-connections files');
           } else {
-            await execAsync(`sudo find /etc/NetworkManager/system-connections -type f -name '*${ssid}*.nmconnection' -exec rm -f {} +`);
+            await execAsync(`find /etc/NetworkManager/system-connections -type f -name '*${ssid}*.nmconnection' -exec rm -f {} +`);
             logger.info('Removed NM system-connections files for SSID', { ssid });
           }
           // Restart NetworkManager to flush caches
-          try { await execAsync('sudo systemctl restart NetworkManager'); } catch (_) {}
+          try { await execAsync('systemctl restart NetworkManager'); } catch (_) {}
         } catch (e) {
           logger.debug('No NM system-connections files removed', { error: e.message });
         }
@@ -727,9 +828,9 @@ network={
           }
           if (newConfig !== config) {
             const tempFile = '/tmp/wpa_supplicant_temp_forget.conf';
-            await execAsync(`echo '${newConfig.replace(/'/g, "'\\''")}' | sudo tee ${tempFile} > /dev/null`);
-            await execAsync(`sudo cp ${tempFile} ${WPA_SUPPLICANT_CONF}`);
-            await execAsync(`sudo chmod 600 ${WPA_SUPPLICANT_CONF}`);
+            await execAsync(`echo '${newConfig.replace(/'/g, "'\\''")}' | tee ${tempFile} > /dev/null`);
+            await execAsync(`cp ${tempFile} ${WPA_SUPPLICANT_CONF}`);
+            await execAsync(`chmod 600 ${WPA_SUPPLICANT_CONF}`);
             await this._restartWpaSupplicant();
             logger.info('Removed SSID from wpa_supplicant', { ssid });
           }
