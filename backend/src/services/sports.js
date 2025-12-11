@@ -62,8 +62,13 @@ class SportsService {
         return this.filterByTeams(cached.data, teams);
       }
 
-      // Always fetch today's games first
-      const today = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      // Always fetch today's games first (use local timezone, not UTC)
+      const localDate = new Date();
+      const year = localDate.getFullYear();
+      const month = String(localDate.getMonth() + 1).padStart(2, '0');
+      const day = String(localDate.getDate()).padStart(2, '0');
+      const today = `${year}${month}${day}`;
+      
       const url = `https://site.web.api.espn.com/apis/site/v2/sports/${config.url}/scoreboard?dates=${today}&limit=200`;
 
       logger.info(`${config.name}: Fetching today's games from ${url}`);
@@ -72,18 +77,38 @@ class SportsService {
       let formattedGames = null;
 
       // If we have games today (scheduled, live, or completed), show them
+      // We show completed games for the rest of the day so users can see final scores
       if (response.data && response.data.events && response.data.events.length > 0) {
         formattedGames = this.formatGames(response.data.events, sport);
         logger.info(`${config.name}: Found ${response.data.events.length} games for today`);
-      } else {
-        // No games today, search up to 7 days ahead for next games
+        
+        // Check if we have any games that aren't completed yet (upcoming or live)
+        const hasActiveGames = response.data.events.some(event => {
+          const status = event.competitions[0].status;
+          // Game is active if it's not completed OR if it's currently in progress
+          return !status.type.completed;
+        });
+        
+        // If all games are completed AND it's late in the day (after 10 PM local), look ahead
+        const currentHour = new Date().getHours();
+        if (!hasActiveGames && currentHour >= 22) {
+          logger.info(`${config.name}: All today's games completed and it's late (${currentHour}:00), checking tomorrow`);
+          formattedGames = null; // Force search for tomorrow's games
+        }
+      }
+      
+      if (!formattedGames) {
+        // No games today OR all completed and late at night, search up to 7 days ahead for next games
         logger.info(`${config.name}: No games today, searching for upcoming games...`);
         const maxDaysAhead = 7;
         
         for (let daysAhead = 1; daysAhead <= maxDaysAhead; daysAhead++) {
           const searchDate = new Date();
           searchDate.setDate(searchDate.getDate() + daysAhead);
-          const dateStr = searchDate.toISOString().split('T')[0].replace(/-/g, '');
+          const year = searchDate.getFullYear();
+          const month = String(searchDate.getMonth() + 1).padStart(2, '0');
+          const day = String(searchDate.getDate()).padStart(2, '0');
+          const dateStr = `${year}${month}${day}`;
           
           const futureUrl = `https://site.web.api.espn.com/apis/site/v2/sports/${config.url}/scoreboard?dates=${dateStr}&limit=200`;
           

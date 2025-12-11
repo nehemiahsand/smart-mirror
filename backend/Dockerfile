@@ -12,7 +12,12 @@ RUN apt-get update && apt-get install -y \
     x11-xserver-utils \
     wlr-randr \
     locales \
+    tzdata \
     && rm -rf /var/lib/apt/lists/*
+
+# Set timezone to America/Chicago (CST/CDT)
+ENV TZ=America/Chicago
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Generate and set UTF-8 locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && locale-gen
