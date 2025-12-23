@@ -806,6 +806,20 @@ router.get('/calendar/status', (req, res) => {
   });
 });
 
+// Get list of all calendars
+router.get('/calendar/list', async (req, res) => {
+  try {
+    if (!googleCalendarService.isInitialized()) {
+      return res.status(401).json({ error: 'AUTH_NEEDED' });
+    }
+    const calendars = await googleCalendarService.getCalendarList();
+    res.json({ calendars });
+  } catch (error) {
+    logger.error('Failed to get calendar list', { error: error.message });
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ===== System Endpoints =====
 
 // Get system info
