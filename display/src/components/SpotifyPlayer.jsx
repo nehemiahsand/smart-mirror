@@ -13,6 +13,7 @@ export default function SpotifyPlayer({ onGoHome }) {
     const [isListening, setIsListening] = useState(false);
     const [device, setDevice] = useState(null);
     const [context, setContext] = useState(null);
+    const [playlistName, setPlaylistName] = useState(null);
 
     // Check authentication status
     useEffect(() => {
@@ -27,6 +28,33 @@ export default function SpotifyPlayer({ onGoHome }) {
         const interval = setInterval(fetchCurrentTrack, 2000);
         return () => clearInterval(interval);
     }, [isAuthenticated]);
+
+    // Fetch playlist name when context changes
+    useEffect(() => {
+        const fetchPlaylistName = async () => {
+            if (context?.type === 'playlist' && context?.uri) {
+                // Extract playlist ID from URI (spotify:playlist:PLAYLIST_ID)
+                const playlistId = context.uri.split(':')[2];
+                if (playlistId) {
+                    try {
+                        const response = await fetch(`${API_BASE}/playlist/${playlistId}`);
+                        const data = await response.json();
+                        if (data.name) {
+                            setPlaylistName(data.name);
+                        }
+                    } catch (error) {
+                        console.error('Error fetching playlist name:', error);
+                        setPlaylistName(null);
+                    }
+                }
+            } else {
+                setPlaylistName(null);
+            }
+        };
+
+        fetchPlaylistName();
+    }, [context?.uri]);
+
 
     const checkAuth = async () => {
         try {
@@ -186,27 +214,15 @@ export default function SpotifyPlayer({ onGoHome }) {
                 <h1 className="track-title">
                     {currentTrack?.name || 'No track playing'}
                 </h1>
-                <p className="track-artist">
-                    {currentTrack?.artist || 'Select a song on Spotify'}
+                <p className="track-meta">
+                    <span className="track-artist">{currentTrack?.artist || 'Select a song on Spotify'}</span>
+                    {currentTrack?.album && (
+                        <>
+                            <span className="meta-separator">•</span>
+                            <span className="track-album">{currentTrack.album}</span>
+                        </>
+                    )}
                 </p>
-            </div>
-
-            {/* Device and Context Info */}
-            <div className="playback-info">
-                {device && (
-                    <div className="device-info">
-                        <span className="info-icon">🔊</span>
-                        <span>{device}</span>
-                    </div>
-                )}
-                {context && context.type !== 'track' && (
-                    <div className="context-info">
-                        <span className="info-icon">
-                            {context.type === 'playlist' ? '📋' : context.type === 'album' ? '💿' : '🎵'}
-                        </span>
-                        <span>{context.type === 'playlist' ? 'Playlist' : currentTrack?.album}</span>
-                    </div>
-                )}
             </div>
 
             {/* Progress Bar with Play/Pause Button */}
@@ -226,6 +242,14 @@ export default function SpotifyPlayer({ onGoHome }) {
                 </div>
                 <span className="time-label">{formatTime(duration)}</span>
             </div>
+
+            {/* Device Info - subtle at bottom */}
+            {device && (
+                <div className="device-info">
+                    <span className="device-icon">🔊</span>
+                    <span className="device-name">{device}</span>
+                </div>
+            )}
         </div>
     );
 }

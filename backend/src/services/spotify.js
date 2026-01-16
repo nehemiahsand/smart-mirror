@@ -232,6 +232,10 @@ class SpotifyService {
         return this.makeRequest('GET', '/me/player/devices');
     }
 
+    async getPlaylist(playlistId) {
+        return this.makeRequest('GET', `/playlists/${playlistId}?fields=name,description,images,owner`);
+    }
+
     async transferPlayback(deviceId, play = false) {
         return this.makeRequest('PUT', '/me/player', {
             device_ids: [deviceId],

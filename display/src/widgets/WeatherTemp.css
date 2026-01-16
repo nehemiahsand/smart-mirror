@@ -39,6 +39,23 @@
     margin: 0.5rem 0;
 }
 
+.section-highlow {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    opacity: 0.85;
+}
+
+.section-highlow .high {
+    color: #ff9966;
+}
+
+.section-highlow .low {
+    color: #66b3ff;
+}
+
 .section-desc {
     font-size: 1.3rem;
     opacity: 0.8;

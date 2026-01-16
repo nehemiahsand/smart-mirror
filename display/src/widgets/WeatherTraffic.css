@@ -45,13 +45,28 @@
   line-height: 1;
 }
 
+.wt-highlow {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  font-size: 1.1rem;
+  font-weight: 400;
+}
+
+.wt-highlow .high {
+  color: #ff9966;
+}
+
+.wt-highlow .low {
+  color: #66b3ff;
+}
+
 .wt-desc {
   font-size: 1rem;
   font-weight: 300;
   color: #ffffff;
   opacity: 0.8;
   text-transform: capitalize;
-  margin-top: 0.2rem;
 }
 
 .wt-detail {
@@ -59,7 +74,6 @@
   font-weight: 400;
   color: #ffffff;
   opacity: 0.9;
-  margin-top: 0.5rem;
 }
 
 /* Make ETA even bigger for traffic section */

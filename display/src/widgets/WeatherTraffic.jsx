@@ -90,7 +90,10 @@ const WeatherTrafficWidget = ({ weatherData, sensorData, className = '' }) => {
                         <>
                             <div className="wt-icon">{getWeatherIcon(weatherData.icon)}</div>
                             <div className="wt-temp">{weatherData.temperature}°</div>
-                            <div className="wt-desc">{weatherData.description}</div>
+                            <div className="wt-highlow">
+                                <span className="high">↑ {weatherData.tempMax}°</span>
+                                <span className="low">↓ {weatherData.tempMin}°</span>
+                            </div>
                             <div className="wt-detail">💧 {weatherData.humidity}%</div>
                         </>
                     ) : (

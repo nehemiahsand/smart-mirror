@@ -6,6 +6,7 @@ const axios = require('axios');
 const logger = require('../utils/logger');
 
 const OPENWEATHER_BASE_URL = 'https://api.openweathermap.org/data/2.5';
+const ONECALL_BASE_URL = 'https://api.openweathermap.org/data/3.0';
 
 class WeatherService {
   constructor() {
@@ -13,6 +14,7 @@ class WeatherService {
     this.cache = null;
     this.cacheExpiry = null;
     this.cacheDuration = 10 * 60 * 1000; // 10 minutes
+    this.coordsCache = null; // Cache coordinates for the city
   }
 
   setApiKey(apiKey) {
@@ -35,6 +37,7 @@ class WeatherService {
     }
 
     try {
+      // First, get coordinates from city name using current weather API
       const response = await axios.get(`${OPENWEATHER_BASE_URL}/weather`, {
         params: {
           q: city,
@@ -45,9 +48,40 @@ class WeatherService {
       });
 
       const data = response.data;
+      const lat = data.coord.lat;
+      const lon = data.coord.lon;
+      
+      // Now use One Call API 3.0 for accurate daily high/low
+      let tempMin = Math.round(data.main.temp);
+      let tempMax = Math.round(data.main.temp);
+      
+      try {
+        const oneCallResponse = await axios.get(`${ONECALL_BASE_URL}/onecall`, {
+          params: {
+            lat: lat,
+            lon: lon,
+            appid: this.apiKey,
+            units: units === 'metric' ? 'metric' : 'imperial',
+            exclude: 'minutely,hourly,alerts'
+          },
+          timeout: 5000
+        });
+        
+        // Get today's daily forecast
+        if (oneCallResponse.data.daily && oneCallResponse.data.daily.length > 0) {
+          const today = oneCallResponse.data.daily[0];
+          tempMin = Math.round(today.temp.min);
+          tempMax = Math.round(today.temp.max);
+          logger.info('Got accurate daily high/low from One Call API', { tempMin, tempMax });
+        }
+      } catch (oneCallError) {
+        logger.warn('Could not fetch One Call API for daily high/low, using current temp', { error: oneCallError.message });
+      }
       
       const weatherData = {
         temperature: Math.round(data.main.temp),
+        tempMin: tempMin,
+        tempMax: tempMax,
         feelsLike: Math.round(data.main.feels_like),
         humidity: data.main.humidity,
         pressure: data.main.pressure,

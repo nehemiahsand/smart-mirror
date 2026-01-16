@@ -260,7 +260,26 @@ class GoogleCalendarService {
                     }
                 })
                 // Sort all events by start date
-                .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+                .sort((a, b) => {
+                    // Parse dates correctly for both all-day and timed events
+                    let aDate, bDate;
+                    
+                    if (a.fullDayEvent) {
+                        const aParts = a.startDate.split('-');
+                        aDate = new Date(aParts[0], aParts[1] - 1, aParts[2]);
+                    } else {
+                        aDate = new Date(a.startDate);
+                    }
+                    
+                    if (b.fullDayEvent) {
+                        const bParts = b.startDate.split('-');
+                        bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
+                    } else {
+                        bDate = new Date(b.startDate);
+                    }
+                    
+                    return aDate - bDate;
+                })
                 // Limit to requested number
                 .slice(0, maxResults);
 
@@ -380,7 +399,26 @@ class GoogleCalendarService {
                     return eventEnd > now;
                 }
             })
-            .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+            .sort((a, b) => {
+                // Parse dates correctly for both all-day and timed events
+                let aDate, bDate;
+                
+                if (a.fullDayEvent) {
+                    const aParts = a.startDate.split('-');
+                    aDate = new Date(aParts[0], aParts[1] - 1, aParts[2]);
+                } else {
+                    aDate = new Date(a.startDate);
+                }
+                
+                if (b.fullDayEvent) {
+                    const bParts = b.startDate.split('-');
+                    bDate = new Date(bParts[0], bParts[1] - 1, bParts[2]);
+                } else {
+                    bDate = new Date(b.startDate);
+                }
+                
+                return aDate - bDate;
+            })
             .slice(0, maxResults);
     }
 

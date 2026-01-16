@@ -70,12 +70,12 @@
 
 /* Album Art */
 .album-art-container {
-    width: 450px;
-    height: 450px;
-    border-radius: 20px;
+    width: 440px;
+    height: 440px;
+    border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-    margin-bottom: 40px;
+    margin-bottom: 30px;
     position: relative;
 }
 
@@ -98,48 +98,65 @@
 /* Track Info */
 .track-info {
     text-align: center;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
     max-width: 700px;
 }
 
 .track-title {
-    font-size: 48px;
+    font-size: 42px;
     font-weight: 700;
-    margin: 0 0 15px 0;
+    margin: 0 0 12px 0;
     text-overflow: ellipsis;
     overflow: hidden;
     white-space: nowrap;
+    max-width: 100%;
+    line-height: 1.2;
+}
+
+.track-meta {
+    font-size: 24px;
+    opacity: 0.7;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    flex-wrap: wrap;
     max-width: 100%;
 }
 
 .track-artist {
-    font-size: 28px;
-    opacity: 0.7;
-    margin: 0;
-    text-overflow: ellipsis;
-    overflow: hidden;
     white-space: nowrap;
-    max-width: 100%;
 }
 
-/* Playback Info (Device and Context) */
-.playback-info {
-    display: flex;
-    gap: 40px;
-    margin-bottom: 30px;
-    font-size: 18px;
-    opacity: 0.6;
+.meta-separator {
+    margin: 0 12px;
+    opacity: 0.5;
 }
 
-.device-info,
-.context-info {
+.track-album {
+    opacity: 0.7;
+    white-space: nowrap;
+    font-style: italic;
+}
+
+/* Device Info - Subtle at bottom */
+.device-info {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    opacity: 0.4;
+    margin-top: 10px;
 }
 
-.info-icon {
-    font-size: 20px;
+.device-icon {
+    font-size: 14px;
+}
+
+.device-name {
+    font-weight: 400;
 }
 
 /* Progress Bar */
@@ -147,8 +164,8 @@
     display: flex;
     align-items: center;
     gap: 15px;
-    width: 700px;
-    margin-bottom: 40px;
+    width: 600px;
+    margin-bottom: 20px;
 }
 
 /* Play/Pause Toggle Button */
@@ -213,20 +230,19 @@
 /* Responsive Design */
 @media (max-width: 1024px) {
     .album-art-container {
-        width: 350px;
-        height: 350px;
+        width: 320px;
+        height: 320px;
     }
 
     .track-title {
-        font-size: 36px;
+        font-size: 32px;
     }
 
-    .track-artist {
-        font-size: 22px;
+    .track-meta {
+        font-size: 20px;
     }
 
-    .progress-section,
-    .volume-section {
+    .progress-section {
         width: 90%;
     }
 }
@@ -237,16 +253,16 @@
     }
 
     .album-art-container {
-        width: 280px;
-        height: 280px;
+        width: 260px;
+        height: 260px;
     }
 
     .track-title {
-        font-size: 28px;
+        font-size: 26px;
     }
 
-    .track-artist {
-        font-size: 18px;
+    .track-meta {
+        font-size: 16px;
     }
 
     .control-btn {

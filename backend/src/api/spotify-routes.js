@@ -203,4 +203,18 @@ router.get('/devices', async (req, res) => {
     }
 });
 
+// Get playlist info
+router.get('/playlist/:id', async (req, res) => {
+    try {
+        const playlist = await spotifyService.getPlaylist(req.params.id);
+        res.json(playlist);
+    } catch (error) {
+        logger.error('Error getting playlist:', error);
+        res.status(error.response?.status || 500).json({ 
+            error: 'Failed to get playlist',
+            details: error.message
+        });
+    }
+});
+
 module.exports = router;

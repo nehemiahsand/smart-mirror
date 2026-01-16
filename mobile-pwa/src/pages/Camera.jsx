@@ -98,7 +98,7 @@ export default function Camera() {
                                 <span className="status-label">Time Until Standby</span>
                                 <span className="status-value">
                                     {cameraStatus.person_detected
-                                        ? '5m 0s'
+                                        ? '30m 0s'
                                         : formatTime(cameraStatus.time_until_standby)}
                                 </span>
                             </div>
@@ -118,7 +118,7 @@ export default function Camera() {
                     <div className="auto-standby-control">
                         <div className="info-box">
                             <p>
-                                When enabled, the mirror will automatically enter standby mode after 1 minute
+                                When enabled, the mirror will automatically enter standby mode after 30 minutes
                                 of no person detected, and wake up when a person is detected.
                             </p>
                         </div>

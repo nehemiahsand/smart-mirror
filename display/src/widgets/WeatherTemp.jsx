@@ -92,6 +92,10 @@ const WeatherTempWidget = ({ weatherData, sensorData, className = '' }) => {
                         <>
                             <div className="section-icon">{getWeatherIcon(weatherData.icon)}</div>
                             <div className="section-temp">{weatherData.temperature}°</div>
+                            <div className="section-highlow">
+                                <span className="high">H: {weatherData.tempMax}°</span>
+                                <span className="low">L: {weatherData.tempMin}°</span>
+                            </div>
                             <div className="section-desc">{weatherData.description}</div>
                             <div className="section-details">
                                 <span>💧 {weatherData.humidity}%</span>
@@ -137,6 +141,8 @@ WeatherTempWidget.propTypes = {
     weatherData: PropTypes.shape({
         city: PropTypes.string,
         temperature: PropTypes.number,
+        tempMin: PropTypes.number,
+        tempMax: PropTypes.number,
         description: PropTypes.string,
         icon: PropTypes.string,
         humidity: PropTypes.number,

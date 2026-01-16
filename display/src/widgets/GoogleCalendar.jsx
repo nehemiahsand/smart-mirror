@@ -38,27 +38,21 @@ const GoogleCalendarWidget = ({ className = '' }) => {
 
     const formatEventTime = (event) => {
         const now = new Date();
-        
+
         if (event.fullDayEvent) {
             // For all-day events, parse the date correctly (YYYY-MM-DD format)
             // Add 'T00:00:00' to treat it as local time, not UTC
             const dateParts = event.startDate.split('-');
             const start = new Date(dateParts[0], dateParts[1] - 1, dateParts[2]);
-            
+
             // Check if it's today
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             if (start.getTime() === today.getTime()) {
                 return 'Today';
             }
-            
-            // Check if it's tomorrow
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            if (start.getTime() === tomorrow.getTime()) {
-                return 'Tomorrow';
-            }
-            
+
+            // For all other days, show the date
             return start.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -68,7 +62,7 @@ const GoogleCalendarWidget = ({ className = '' }) => {
 
         // For timed events, parse normally
         const start = new Date(event.startDate);
-        
+
         // For timed events, always show time
         const timeStr = start.toLocaleTimeString('en-US', {
             hour: 'numeric',
