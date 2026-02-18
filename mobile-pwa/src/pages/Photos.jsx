@@ -81,14 +81,6 @@ export default function Photos() {
     e.target.value = '';
   };
 
-  const confirmDelete = (photoId) => {
-    setConfirmModal({
-      message: 'Delete this photo? This cannot be undone.',
-      onConfirm: () => handleDelete(photoId),
-      danger: true
-    });
-  };
-
   const handleDelete = async (photoId) => {
     setConfirmModal(null);
 
@@ -387,7 +379,7 @@ export default function Photos() {
             <div className="modal-details">
               <button
                 className="delete-btn"
-                onClick={() => confirmDelete(selectedPhoto.id)}
+                onClick={() => handleDelete(selectedPhoto.id)}
               >
                 🗑️ Delete Photo
               </button>
