@@ -22,6 +22,9 @@ class CameraService {
     this.lastStandbyState = null;
     this.shutdownTimer = null;
     this.standbyStartTime = null;
+    this.isDark = false;
+    this.brightness = 100;
+    this.darkStandbyEnabled = true; // Enable standby when room goes dark
   }
 
   async initialize() {
@@ -96,10 +99,32 @@ class CameraService {
   async checkPersonDetection() {
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
-      const { person_detected, total_detections, fps } = response.data;
+      const { person_detected, total_detections, fps, is_dark, brightness } = response.data;
 
       const previousState = this.personDetected;
+      const previousDarkState = this.isDark;
       this.personDetected = person_detected;
+      this.isDark = is_dark;
+      this.brightness = brightness;
+
+      // Check for dark room - enter standby immediately when lights go off
+      if (this.darkStandbyEnabled && is_dark && !previousDarkState) {
+        logger.info(`Room went dark (brightness: ${brightness}) - entering standby`);
+        await this.enterStandby();
+        return; // Don't process person detection when dark
+      }
+
+      // Wake from standby when lights come back on (if someone is there)
+      if (this.darkStandbyEnabled && !is_dark && previousDarkState && person_detected) {
+        logger.info(`Room is now light (brightness: ${brightness}) and person detected - waking display`);
+        await this.wakeDisplay();
+        return;
+      }
+
+      // Skip person detection logic if room is dark
+      if (is_dark) {
+        return;
+      }
 
       if (person_detected) {
         this.lastDetectionTime = Date.now();
@@ -200,6 +225,9 @@ class CameraService {
         total_detections: response.data.total_detections,
         fps: response.data.fps,
         auto_standby_enabled: this.autoStandbyEnabled,
+        dark_standby_enabled: this.darkStandbyEnabled,
+        is_dark: response.data.is_dark,
+        brightness: response.data.brightness,
         last_detection: this.lastDetectionTime,
         time_until_standby: this.lastDetectionTime 
           ? Math.max(0, NO_PERSON_TIMEOUT - (Date.now() - this.lastDetectionTime))

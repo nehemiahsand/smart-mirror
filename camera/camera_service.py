@@ -56,6 +56,12 @@ class PersonDetector:
         self.ai_process_interval = 5.0  # Run AI detection every 5 seconds (ultra-optimized)
         self.ai_skip_count = 0  # Count how many times AI was skipped due to no motion
         
+        # Light level detection
+        self.brightness = 100  # 0-255 scale
+        self.is_dark = False
+        self.dark_threshold = 30  # Below this is considered "dark"
+        self.light_threshold = 50  # Above this is considered "light" (hysteresis)
+        
     def initialize_camera(self):
         """Initialize camera with retry logic"""
         max_retries = 5
@@ -107,6 +113,27 @@ class PersonDetector:
         # Return True if enough motion detected
         self.motion_detected = motion_pixels > self.motion_threshold
         return self.motion_detected
+    
+    def detect_brightness(self, frame):
+        """
+        Detect room brightness level from the camera frame
+        Returns average brightness (0-255)
+        """
+        # Convert to grayscale
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Calculate mean brightness
+        self.brightness = int(gray.mean())
+        
+        # Use hysteresis to prevent flickering
+        if self.is_dark and self.brightness > self.light_threshold:
+            self.is_dark = False
+            logger.info(f"Room is now LIGHT (brightness: {self.brightness})")
+        elif not self.is_dark and self.brightness < self.dark_threshold:
+            self.is_dark = True
+            logger.info(f"Room is now DARK (brightness: {self.brightness})")
+        
+        return self.brightness
     
     def detect_person(self, frame):
         """
@@ -177,6 +204,8 @@ class PersonDetector:
         # Only run AI detection once per second (instead of every frame)
         if current_time - self.last_ai_process_time >= self.ai_process_interval:
             self.last_ai_process_time = current_time
+            # Detect brightness level
+            self.detect_brightness(frame)
             self.process_ai_detection(frame.copy())
         
         # Calculate FPS
@@ -274,7 +303,9 @@ def detection_status():
         'last_detection': detector.last_detection_time,
         'total_detections': detector.total_detections,
         'ai_skip_count': detector.ai_skip_count,
-        'fps': round(detector.fps, 1)
+        'fps': round(detector.fps, 1),
+        'brightness': detector.brightness,
+        'is_dark': detector.is_dark
     })
 
 @app.route('/video/raw')

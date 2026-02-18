@@ -174,6 +174,16 @@ class SportsService {
         } else if (sport === 'soccer') {
           detail = `${status.displayClock || ''}'`.trim();
         }
+      } else {
+        // For upcoming games, convert time to Central timezone
+        const gameDate = new Date(event.date);
+        const centralTime = gameDate.toLocaleTimeString('en-US', {
+          timeZone: 'America/Chicago',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true
+        });
+        detail = centralTime;
       }
 
       // Get broadcast info - show only first network

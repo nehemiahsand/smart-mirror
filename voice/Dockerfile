@@ -9,9 +9,17 @@ RUN apt-get update && apt-get install -y \
     gcc \
     g++ \
     make \
+    wget \
+    unzip \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+
+# Download Vosk model (small English model - ~50MB)
+RUN wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \
+    && unzip vosk-model-small-en-us-0.15.zip \
+    && mv vosk-model-small-en-us-0.15 model \
+    && rm vosk-model-small-en-us-0.15.zip
 
 # Install Python dependencies
 COPY requirements.txt .

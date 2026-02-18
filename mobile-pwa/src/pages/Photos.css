@@ -33,11 +33,12 @@
 
 .controls-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 
 .control-item {
+  justify-content: center;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -121,6 +122,8 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  align-self: center;
+  width: fit-content;
 }
 
 .shuffle-btn:active {

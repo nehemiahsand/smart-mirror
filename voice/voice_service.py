@@ -2,15 +2,18 @@
 """
 Voice Recognition Service for Smart Mirror
 Continuous voice command listener (no wake word)
+Uses Vosk for 100% offline/local speech recognition
 """
 
-import speech_recognition as sr
 import requests
 import time
 import logging
 import json
+import os
 from threading import Thread
 import websocket
+from vosk import Model, KaldiRecognizer
+import pyaudio
 
 # Setup logging
 logging.basicConfig(
@@ -23,20 +26,25 @@ logger = logging.getLogger(__name__)
 BACKEND_URL = "http://localhost:3001"
 WEBSOCKET_URL = "ws://localhost:3001"
 WEBSOCKET_BROADCAST_URL = f"{BACKEND_URL}/api/broadcast"
+VOSK_MODEL_PATH = "/app/model"
+
+# Audio configuration
+SAMPLE_RATE = 16000
+CHUNK_SIZE = 4000
 
 # Voice commands mapping
 COMMANDS = {
     # Navigation
     'spotify': ['spotify', 'music', 'music player', 'player', 'open spotify', 'go to spotify', 'show spotify', 'show music'],
-    'home': ['home', 'main page', 'go home', 'main', 'homepage', 'back home', 'return home', 'go back home', 'exit', 'close', 'back', 'go back', 'om', 'ohm', 'dome', 'rome', 'foam'],
+    'home': ['home', 'main page', 'go home', 'main', 'homepage', 'back home', 'return home', 'go back home', 'exit', 'close', 'back', 'go back'],
     
     # Playback controls
-    'play': ['play', 'resume', 'start', 'unpause', 'play music', 'start playing', 'continue', 'play song', 'plate', 'place', 'plane', 'lei', 'pay', 'pray', 'delay', 'hey play', 'okay play', 'display'],
-    'pause': ['pause', 'stop', 'stop music', 'pause music', 'halt', 'freeze', 'paws', 'poz', 'paz', 'boss', 'cause'],
+    'play': ['play', 'resume', 'start', 'unpause', 'play music', 'start playing', 'continue', 'play song'],
+    'pause': ['pause', 'stop', 'stop music', 'pause music', 'halt'],
     'next': ['next', 'skip', 'next song', 'skip song', 'skip track', 'next track', 'forward', 'skip this'],
-    'previous': ['previous', 'last song', 'go back', 'back', 'previous song', 'previous track', 'last track', 'rewind', 'go back'],
-    'volume_up': ['volume up', 'louder', 'turn it up', 'increase volume', 'raise volume', 'up'],
-    'volume_down': ['volume down', 'quieter', 'turn it down', 'lower volume', 'decrease volume', 'down'],
+    'previous': ['previous', 'last song', 'go back', 'back', 'previous song', 'previous track', 'last track', 'rewind'],
+    'volume_up': ['volume up', 'louder', 'turn it up', 'increase volume', 'raise volume'],
+    'volume_down': ['volume down', 'quieter', 'turn it down', 'lower volume', 'decrease volume'],
     
     # Spotify specific
     'play_liked': ['play my liked songs', 'play liked songs', 'play favorites', 'play my favorites'],
@@ -44,16 +52,17 @@ COMMANDS = {
 
 class VoiceRecognitionService:
     def __init__(self):
-        self.recognizer = sr.Recognizer()
-        self.microphone = None
         self.current_page = 'home'
         self.is_listening = False
-        self.wake_word_active = False
         self.ws = None
+        self.model = None
+        self.recognizer = None
+        self.audio = None
+        self.stream = None
         
-        # Adjust for ambient noise on startup
-        logger.info("Initializing voice recognition...")
-        self.setup_microphone()
+        # Initialize Vosk model
+        logger.info("Initializing Vosk speech recognition (100% offline)...")
+        self.setup_vosk()
         
         # Sync current page from display on startup
         self.sync_page_from_display()
@@ -61,26 +70,37 @@ class VoiceRecognitionService:
         # Start WebSocket listener in background thread
         self.start_websocket_listener()
         
-    def setup_microphone(self):
-        """Initialize and configure microphone"""
+    def setup_vosk(self):
+        """Initialize Vosk model and audio stream"""
         try:
-            # List available microphones
-            mic_list = sr.Microphone.list_microphone_names()
-            logger.info(f"Available microphones: {mic_list}")
+            # Check if model exists
+            if not os.path.exists(VOSK_MODEL_PATH):
+                logger.error(f"Vosk model not found at {VOSK_MODEL_PATH}")
+                return False
             
-            # Use default microphone
-            self.microphone = sr.Microphone()
+            # Load the model
+            logger.info(f"Loading Vosk model from {VOSK_MODEL_PATH}...")
+            self.model = Model(VOSK_MODEL_PATH)
+            self.recognizer = KaldiRecognizer(self.model, SAMPLE_RATE)
             
-            # Calibrate for ambient noise
-            logger.info("Calibrating for ambient noise (5 seconds)...")
-            with self.microphone as source:
-                self.recognizer.adjust_for_ambient_noise(source, duration=5)
+            # Initialize PyAudio
+            self.audio = pyaudio.PyAudio()
             
-            logger.info(f"Microphone initialized: {mic_list[0] if mic_list else 'Default'}")
+            # Find and open the microphone
+            logger.info("Opening microphone stream...")
+            self.stream = self.audio.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=SAMPLE_RATE,
+                input=True,
+                frames_per_buffer=CHUNK_SIZE
+            )
+            
+            logger.info("✅ Vosk initialized successfully (100% offline, no data sent to cloud)")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to initialize microphone: {e}")
+            logger.error(f"Failed to initialize Vosk: {e}")
             return False
     
     def sync_page_from_display(self):
@@ -248,51 +268,63 @@ class VoiceRecognitionService:
         return False
     
     def listen_continuously(self):
-        """Main listening loop - continuous command recognition"""
-        logger.info("🎤 Voice assistant started")
+        """Main listening loop - continuous command recognition using Vosk"""
+        logger.info("🎤 Voice assistant started (100% OFFLINE - Vosk)")
+        logger.info("🔒 Your voice never leaves this device!")
         logger.info("📋 Home page: Say 'Spotify' to navigate")
         logger.info("📋 Spotify page: Say 'Home', 'Play', 'Pause', 'Next', 'Previous'")
         
         while True:
             try:
-                with self.microphone as source:
-                    audio = self.recognizer.listen(source, timeout=3, phrase_time_limit=2)
-                    
-                try:
-                    text = self.recognizer.recognize_google(audio)
-                    self.process_command(text)
-                    
-                except sr.UnknownValueError:
-                    pass  # Ignore speech we can't understand
-                except sr.RequestError as e:
-                    logger.error(f"Speech recognition error: {e}")
-                    time.sleep(1)
-                    
-            except sr.WaitTimeoutError:
-                pass  # Normal timeout, keep listening
+                # Read audio data from stream
+                data = self.stream.read(CHUNK_SIZE, exception_on_overflow=False)
                 
+                # Process with Vosk
+                if self.recognizer.AcceptWaveform(data):
+                    result = json.loads(self.recognizer.Result())
+                    text = result.get('text', '').strip()
+                    
+                    if text:
+                        self.process_command(text)
+                else:
+                    # Partial result - can be used for faster response
+                    partial = json.loads(self.recognizer.PartialResult())
+                    partial_text = partial.get('partial', '').strip()
+                    # Could process partial results for faster response if needed
+                    
             except Exception as e:
                 logger.error(f"Error in listening loop: {e}")
                 time.sleep(1)
+    
+    def cleanup(self):
+        """Clean up resources"""
+        if self.stream:
+            self.stream.stop_stream()
+            self.stream.close()
+        if self.audio:
+            self.audio.terminate()
 
 def main():
     """Main entry point"""
     logger.info("=" * 60)
     logger.info("Smart Mirror Voice Recognition Service")
+    logger.info("Using Vosk for 100% offline speech recognition")
     logger.info("=" * 60)
     
     service = VoiceRecognitionService()
     
-    if not service.microphone:
-        logger.error("Failed to initialize microphone. Exiting.")
+    if not service.model:
+        logger.error("Failed to initialize Vosk model. Exiting.")
         return
     
     try:
         service.listen_continuously()
     except KeyboardInterrupt:
         logger.info("\n👋 Voice recognition service stopped")
+        service.cleanup()
     except Exception as e:
         logger.error(f"Fatal error: {e}")
+        service.cleanup()
 
 if __name__ == "__main__":
     main()

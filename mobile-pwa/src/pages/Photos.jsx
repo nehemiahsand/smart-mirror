@@ -100,7 +100,6 @@ export default function Photos() {
       if (response.ok) {
         setPhotos(prev => prev.filter(p => p.id !== photoId));
         setSelectedPhoto(null);
-        setAlertModal({ type: 'success', message: 'Photo deleted successfully!' });
       } else {
         const error = await response.json();
         setAlertModal({ type: 'error', message: `Delete failed: ${error.error || 'Unknown error'}` });
@@ -133,6 +132,13 @@ export default function Photos() {
       console.error('Failed to update interval:', error);
     }
   };
+
+  // Shuffle buttton to randomize photo order
+  const shufflePhotos = async () => {
+    const shuffled = [...photos].sort(() => 0.5 - Math.random());
+    setPhotos(shuffled);
+    await saveOrder();
+  }
 
   // Drag and drop handlers
   const handleDragStart = (e, index) => {
@@ -297,6 +303,13 @@ export default function Photos() {
           <div className="control-item">
             <label>Total Photos</label>
             <div className="photo-count">{photos.length}</div>
+          </div>
+
+          {/* Shuffle Button */}
+          <div className="control-item">
+            <button className="shuffle-btn" onClick={shufflePhotos}>
+              🔄 Shuffle
+            </button>
           </div>
         </div>
       </div>
