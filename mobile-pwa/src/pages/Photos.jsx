@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './Photos.css';
 import ConfirmModal from '../components/ConfirmModal';
 import AlertModal from '../components/AlertModal';
@@ -17,7 +17,7 @@ export default function Photos() {
 
   useEffect(() => {
     fetchPhotos();
-    fetchSettings();
+    fetchSettings(); // Load settings in background
   }, []);
 
   const fetchPhotos = async () => {
@@ -25,10 +25,10 @@ export default function Photos() {
       const response = await fetch(`${API_BASE}/api/photos`);
       const data = await response.json();
       setPhotos(data.photos || []);
-      setLoading(false);
     } catch (error) {
       console.error('Failed to fetch photos:', error);
-      setLoading(false);
+    } finally {
+      setLoading(false); // Always set loading to false
     }
   };
 
@@ -140,13 +140,13 @@ export default function Photos() {
     await saveOrder();
   }
 
-  // Drag and drop handlers
-  const handleDragStart = (e, index) => {
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleDragStart = useCallback((e, index) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
-  };
+  }, []);
 
-  const handleDragOver = (e, index) => {
+  const handleDragOver = useCallback((e, index) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
 
@@ -160,14 +160,14 @@ export default function Photos() {
 
     setPhotos(newPhotos);
     setDraggedIndex(index);
-  };
+  }, [draggedIndex, photos]);
 
-  const handleDragEnd = async () => {
+  const handleDragEnd = useCallback(async () => {
     if (draggedIndex !== null) {
       await saveOrder();
     }
     setDraggedIndex(null);
-  };
+  }, [draggedIndex]);
 
   // Touch handlers for mobile
   const handleTouchStart = (e, index) => {
@@ -181,27 +181,18 @@ export default function Photos() {
   const handleTouchMove = (e, index) => {
     if (draggedIndex === null) return;
 
+    // Throttle touch move events for better performance
+    if (Date.now() - (window.lastTouchMove || 0) < 16) return; // ~60fps
+    window.lastTouchMove = Date.now();
+
     const touch = e.touches[0];
-    const touchX = touch.clientX;
-    const touchY = touch.clientY;
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const card = element?.closest('.photo-card');
 
-    // Find which card is under the touch point
-    const cards = document.querySelectorAll('.photo-card');
-    let targetIndex = -1;
+    if (!card) return;
 
-    cards.forEach((card, idx) => {
-      const rect = card.getBoundingClientRect();
-      if (
-        touchX >= rect.left &&
-        touchX <= rect.right &&
-        touchY >= rect.top &&
-        touchY <= rect.bottom
-      ) {
-        targetIndex = idx;
-      }
-    });
+    const targetIndex = Array.from(card.parentNode.children).indexOf(card);
 
-    // If we found a valid target and it's different from current position
     if (targetIndex !== -1 && targetIndex !== draggedIndex) {
       const newPhotos = [...photos];
       const draggedPhoto = newPhotos[draggedIndex];
@@ -254,8 +245,36 @@ export default function Photos() {
       <div className="photos-page">
         <div className="page-header">
           <h1>Photos</h1>
+          <label className="upload-btn" style={{ opacity: 0.5, pointerEvents: 'none' }}>
+            📤 Upload
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled
+              style={{ display: 'none' }}
+            />
+          </label>
         </div>
-        <div className="loading">Loading photos</div>
+
+        {/* Loading skeleton */}
+        <div className="card" style={{ marginBottom: '16px' }}>
+          <div className="controls-grid">
+            <div className="control-item">
+              <div className="skeleton-label"></div>
+              <div className="skeleton-control"></div>
+            </div>
+            <div className="control-item">
+              <div className="skeleton-label"></div>
+              <div className="skeleton-control"></div>
+            </div>
+            <div className="control-item">
+              <div className="skeleton-button"></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="loading">Loading photos...</div>
       </div>
     );
   }
@@ -339,6 +358,8 @@ export default function Photos() {
               <img
                 src={`${API_BASE}/api/photos/image/${photo.filename}`}
                 alt="Photo"
+                loading="lazy"
+                decoding="async"
               />
               <div className="photo-overlay">
                 <div className="photo-controls">

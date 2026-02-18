@@ -382,3 +382,37 @@
   padding: 60px 20px;
   color: #9ca3af;
 }
+
+/* Skeleton loading animations */
+.skeleton-label, .skeleton-control, .skeleton-button {
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s infinite;
+  border-radius: 4px;
+}
+
+.skeleton-label {
+  height: 16px;
+  width: 80%;
+  margin-bottom: 8px;
+}
+
+.skeleton-control {
+  height: 32px;
+  width: 100%;
+}
+
+.skeleton-button {
+  height: 32px;
+  width: 80px;
+  margin: 0 auto;
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
