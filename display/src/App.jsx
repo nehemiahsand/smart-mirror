@@ -151,8 +151,7 @@ function App() {
     // Save layout to Raspberry Pi via POST /api/settings
     const handleSaveLayout = async (layoutData) => {
         try {
-            const baseURL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-            const response = await fetch(`${baseURL}/api/settings`, {
+            const response = await apiFetch('/api/settings', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

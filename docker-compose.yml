@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   sensor:
     build:
@@ -28,14 +26,16 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        VITE_API_KEY: smartmirrorsareawesome2005
     container_name: smart-mirror-backend
     privileged: true
     network_mode: host
     environment:
       - NODE_ENV=production
-      - PORT=3001
+      - PORT=80
       - SENSOR_URL=http://localhost:5555
       - CAMERA_URL=http://127.0.0.1:5556
       - DHT22_GPIO_PIN=4
@@ -63,22 +63,10 @@ services:
     container_name: smart-mirror-display
     network_mode: host
     environment:
-      - VITE_API_URL=http://localhost:3001
-      - VITE_WS_URL=ws://localhost:3001
+      - VITE_API_URL=http://localhost
+      - VITE_WS_URL=ws://localhost
       - VITE_API_KEY=smartmirrorsareawesome2005
       - TZ=America/Chicago
-    depends_on:
-      - backend
-    restart: unless-stopped
-
-  pwa:
-    build:
-      context: ./mobile-pwa
-      dockerfile: Dockerfile
-    container_name: smart-mirror-pwa
-    network_mode: host
-    environment:
-      - VITE_API_URL=http://192.168.1.85:3001
     depends_on:
       - backend
     restart: unless-stopped
@@ -94,22 +82,11 @@ services:
       - /dev/snd:/dev/snd
     environment:
       - PULSE_SERVER=unix:/run/user/1000/pulse/native
+      - BACKEND_URL=http://localhost
+      - WEBSOCKET_URL=ws://localhost
       - API_KEY=smartmirrorsareawesome2005
     volumes:
       - /run/user/1000/pulse:/run/user/1000/pulse:ro
     depends_on:
       - backend
-    restart: unless-stopped
-
-  proxy:
-    image: caddy:2-alpine
-    container_name: smart-mirror-proxy
-    network_mode: host
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
-      - ./data/caddy_data:/data
-      - ./data/caddy_config:/config
-    depends_on:
-      - backend
-      - pwa
     restart: unless-stopped

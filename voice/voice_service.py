@@ -23,8 +23,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Configuration
-BACKEND_URL = "http://localhost:3001"
-WEBSOCKET_URL = "ws://localhost:3001"
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:3001").rstrip("/")
+default_ws_url = BACKEND_URL.replace("https://", "wss://", 1).replace("http://", "ws://", 1)
+WEBSOCKET_URL = os.environ.get("WEBSOCKET_URL", default_ws_url)
 WEBSOCKET_BROADCAST_URL = f"{BACKEND_URL}/api/broadcast"
 VOSK_MODEL_PATH = "/app/model"
 API_KEY = os.environ.get("API_KEY")

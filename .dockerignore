@@ -1,0 +1,9 @@
+**/node_modules
+**/npm-debug.log
+**/.git
+**/.gitignore
+**/*.log
+backend/data
+camera/.env
+data
+mobile-pwa/dist

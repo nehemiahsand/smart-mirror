@@ -7,6 +7,8 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 const logger = require('./utils/logger');
 const settingsService = require('./services/settings');
 const weatherService = require('./services/weather');
@@ -21,6 +23,9 @@ const apiKeyMiddleware = require('./middleware/apiKey');
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
+const FRONTEND_DIST = path.join(__dirname, '../public');
+const FRONTEND_INDEX = path.join(FRONTEND_DIST, 'index.html');
+const HAS_FRONTEND_BUILD = fs.existsSync(FRONTEND_INDEX);
 
 // Initialize Express app
 const app = express();
@@ -51,22 +56,32 @@ app.use((req, res, next) => {
 app.use('/api/spotify', apiKeyMiddleware, spotifyRoutes);
 app.use('/api', apiKeyMiddleware, apiRoutes);
 
-// Root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    name: 'Smart Mirror Backend',
-    version: '1.0.0',
-    status: 'running',
-    endpoints: {
-      health: '/api/health',
-      settings: '/api/settings',
-      weather: '/api/weather/current',
-      wifi: '/api/wifi/status',
-      sensor: '/api/sensor/dht22',
-      system: '/api/system/info'
+if (HAS_FRONTEND_BUILD) {
+  app.use(express.static(FRONTEND_DIST));
+
+  app.get(/^(?!\/api(?:\/|$)).*/, (req, res, next) => {
+    if (req.method !== 'GET' || path.extname(req.path)) {
+      return next();
     }
+    return res.sendFile(FRONTEND_INDEX);
   });
-});
+} else {
+  app.get('/', (req, res) => {
+    res.json({
+      name: 'Smart Mirror Backend',
+      version: '1.0.0',
+      status: 'running',
+      endpoints: {
+        health: '/api/health',
+        settings: '/api/settings',
+        weather: '/api/weather/current',
+        wifi: '/api/wifi/status',
+        sensor: '/api/sensor/dht22',
+        system: '/api/system/info'
+      }
+    });
+  });
+}
 
 // 404 handler
 app.use((req, res) => {

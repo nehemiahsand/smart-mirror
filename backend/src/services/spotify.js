@@ -16,7 +16,7 @@ class SpotifyService {
         this.tokenExpiry = null;
         this.clientId = process.env.SPOTIFY_CLIENT_ID || '';
         this.clientSecret = process.env.SPOTIFY_CLIENT_SECRET || '';
-        this.redirectUri = process.env.SPOTIFY_REDIRECT_URI || 'http://localhost:3001/api/spotify/callback';
+        this.redirectUri = process.env.SPOTIFY_REDIRECT_URI || 'http://localhost/api/spotify/callback';
         
         // Load tokens from settings
         this.loadTokens();

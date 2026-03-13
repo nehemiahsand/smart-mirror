@@ -1,3 +1,17 @@
+FROM node:18-slim AS pwa-builder
+
+WORKDIR /build/mobile-pwa
+
+COPY mobile-pwa/package*.json ./
+RUN npm ci
+
+COPY mobile-pwa/ ./
+
+ARG VITE_API_KEY
+ENV VITE_API_KEY=${VITE_API_KEY}
+
+RUN npm run build
+
 FROM node:18-slim
 
 # Install Python, network tools, X11/Wayland utilities, and dependencies for DHT22 sensor
@@ -28,21 +42,22 @@ ENV LANG=en_US.UTF-8 \
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY backend/package*.json ./
 
 # Install Node dependencies
-RUN npm install --only=production
+RUN npm install --omit=dev
 
 # Install Python dependencies for DHT22
-COPY src/sensors/requirements.txt ./sensors/
+COPY backend/src/sensors/requirements.txt ./sensors/
 RUN pip3 install --no-cache-dir -r sensors/requirements.txt --break-system-packages
 
 # Copy application code
-COPY . .
+COPY backend/ ./
+COPY --from=pwa-builder /build/mobile-pwa/dist ./public
 
 # Create data directory
 RUN mkdir -p /app/data
 
-EXPOSE 3001
+EXPOSE 80
 
 CMD ["node", "src/index.js"]

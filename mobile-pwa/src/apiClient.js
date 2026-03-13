@@ -1,9 +1,10 @@
-// If accessed via Vite dev server (port 3002), point to 3001. 
-// If accessed via Caddy (port 80 or 443), use the current origin so Caddy can route it to /api/.
+const configuredBase = import.meta.env.VITE_API_URL;
 const isDevServer = window.location.port === '3002';
-const API_BASE = isDevServer 
-  ? `http://${window.location.hostname}:3001` 
-  : window.location.origin;
+const API_BASE = configuredBase || (
+  isDevServer
+    ? `http://${window.location.hostname}:3001`
+    : window.location.origin
+);
 const API_KEY = import.meta.env.VITE_API_KEY;
 
 function buildHeaders(extra = {}) {
