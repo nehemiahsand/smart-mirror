@@ -32,6 +32,8 @@ const WEAK_DEFAULTS = new Set([
   'change-me-in-env-AUTH_SECRET',
 ]);
 const DEFAULT_ALLOWED_ORIGINS = new Set([
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
   'http://localhost:3002',
   'http://127.0.0.1:3002',
 ]);
@@ -57,7 +59,7 @@ function isAllowedOrigin(origin) {
 
   try {
     const parsed = new URL(origin);
-    return !parsed.port || parsed.port === '80' || parsed.port === '443' || parsed.port === '3002';
+    return !parsed.port || parsed.port === '80' || parsed.port === '443' || parsed.port === '3000' || parsed.port === '3002';
   } catch (_) {
     return false;
   }
