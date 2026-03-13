@@ -52,7 +52,7 @@ class SpotifyService {
         }
     }
 
-    getAuthUrl() {
+    getAuthUrl(state) {
         const scopes = [
             'user-read-playback-state',
             'user-modify-playback-state',
@@ -66,7 +66,8 @@ class SpotifyService {
             response_type: 'code',
             client_id: this.clientId,
             scope: scopes.join(' '),
-            redirect_uri: this.redirectUri
+            redirect_uri: this.redirectUri,
+            state
         });
 
         return `${SPOTIFY_ACCOUNTS_BASE}/authorize?${params.toString()}`;

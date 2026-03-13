@@ -18,7 +18,7 @@ class DHT22Service {
     this.lastReadTime = null;
     this.readInterval = 2000; // 2 seconds between reads
     this.autoReadTimer = null;
-    this.sensorServerUrl = 'http://127.0.0.1:5555';
+    this.sensorServerUrl = process.env.SENSOR_URL || 'http://127.0.0.1:5555';
     this.cacheTimeout = 30000; // Cache readings for 30 seconds
     
     this.initialize();

@@ -4,6 +4,9 @@
 **/.gitignore
 **/*.log
 backend/data
+backend/.env
 camera/.env
 data
+display/.env
+mobile-pwa/.env
 mobile-pwa/dist

@@ -163,26 +163,15 @@ export default function SpotifyPlayer({ onGoHome }) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    const [authUrl, setAuthUrl] = useState('');
-
-    useEffect(() => {
-        if (!isAuthenticated) {
-            apiFetch(`${API_BASE}/auth-url`)
-                .then(res => res.json())
-                .then(data => setAuthUrl(data.authUrl))
-                .catch(err => console.error('Error getting auth URL:', err));
-        }
-    }, [isAuthenticated]);
-
     if (!isAuthenticated) {
         return (
             <div className="spotify-player">
                 <div className="spotify-auth-prompt">
                     <div className="spotify-icon">🎵</div>
                     <h2>Connect to Spotify</h2>
-                    <p>Visit this URL on your phone or computer:</p>
+                    <p>Open the admin dashboard and connect Spotify from Settings.</p>
                     <div className="auth-url-display">
-                        {authUrl || 'Loading...'}
+                        http://mirror/settings
                     </div>
                     <p className="auth-hint">Say "Home" to go back</p>
                 </div>

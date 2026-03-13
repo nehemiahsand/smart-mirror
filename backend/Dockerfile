@@ -7,9 +7,6 @@ RUN npm ci
 
 COPY mobile-pwa/ ./
 
-ARG VITE_API_KEY
-ENV VITE_API_KEY=${VITE_API_KEY}
-
 RUN npm run build
 
 FROM node:18-slim
@@ -58,6 +55,6 @@ COPY --from=pwa-builder /build/mobile-pwa/dist ./public
 # Create data directory
 RUN mkdir -p /app/data
 
-EXPOSE 80
+EXPOSE 3001
 
 CMD ["node", "src/index.js"]

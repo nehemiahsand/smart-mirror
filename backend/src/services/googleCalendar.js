@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
+const { consumeOAuthState, issueOAuthState } = require('../utils/oauthState');
 
 const CREDENTIALS_PATH = path.join(__dirname, '../../data/calendar-credentials.json');
 const TOKEN_PATH = path.join(__dirname, '../../data/calendar-token.json');
@@ -114,20 +115,26 @@ class GoogleCalendarService {
                 redirect_uris[0]
             );
 
+            const state = issueOAuthState('google_calendar');
             const authUrl = oAuth2Client.generateAuthUrl({
                 access_type: 'offline',
                 scope: SCOPES,
+                state,
             });
 
-            return authUrl;
+            return { authUrl, state };
         } catch (error) {
             logger.error('Failed to generate auth URL:', error);
             throw error;
         }
     }
 
-    async authorize(code) {
+    async authorize(code, state) {
         try {
+            if (!consumeOAuthState('google_calendar', state)) {
+                throw new Error('INVALID_OAUTH_STATE');
+            }
+
             const credentialsContent = await fs.readFile(CREDENTIALS_PATH, 'utf8');
             const credentials = JSON.parse(credentialsContent);
             const { client_id, client_secret, redirect_uris } = credentials.installed;

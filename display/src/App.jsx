@@ -43,27 +43,13 @@ function App() {
         sensorData,
         weatherData,
         settings,
-        message
+        message,
+        syncPage
     } = useWebSocket(handlePageChange, handleListeningChange);
 
     useEffect(() => {
-        const broadcastPage = async () => {
-            try {
-                await apiFetch('/api/broadcast', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        type: 'page_change',
-                        page: currentPage
-                    })
-                });
-            } catch (error) {
-                console.error('Failed to broadcast page change:', error);
-            }
-        };
-
-        broadcastPage();
-    }, [currentPage]);
+        syncPage(currentPage);
+    }, [currentPage, syncPage]);
 
     // Initialize layout engine
     const {

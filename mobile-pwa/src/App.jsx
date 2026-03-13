@@ -11,6 +11,7 @@ import MoreMenu from './pages/MoreMenu';
 import Login from './pages/Login';
 import './components/common.css';
 import './App.css';
+import { fetchAuthSession } from './apiClient';
 
 function App() {
   return (
@@ -25,6 +26,7 @@ function App() {
 function AppContent() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [authState, setAuthState] = useState({ checked: false, authenticated: false });
   const isLoginPage = location.pathname === '/login';
 
   useEffect(() => {
@@ -32,19 +34,47 @@ function AppContent() {
     setActiveTab(path);
   }, [location]);
 
+  useEffect(() => {
+    let active = true;
+
+    const loadSession = async () => {
+      try {
+        const session = await fetchAuthSession();
+        if (!active) return;
+        setAuthState({ checked: true, authenticated: session.authenticated === true });
+      } catch (_) {
+        if (!active) return;
+        setAuthState({ checked: true, authenticated: false });
+      }
+    };
+
+    loadSession();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const RequireAuth = ({ children }) => {
-    const token = window.localStorage.getItem('adminToken');
-    if (!token) {
+    if (!authState.checked) {
+      return <div className="loading">Loading...</div>;
+    }
+
+    if (!authState.authenticated) {
       return <Navigate to="/login" replace />;
     }
     return children;
+  };
+
+  const handleAuthChange = (authenticated) => {
+    setAuthState({ checked: true, authenticated });
   };
 
   return (
     <>
       <main className="main-content">
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/login" element={<Login sessionChecked={authState.checked} authenticated={authState.authenticated} onAuthChange={handleAuthChange} />} />
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
           <Route path="/wifi" element={<RequireAuth><WiFiSettings /></RequireAuth>} />
@@ -52,7 +82,7 @@ function AppContent() {
           <Route path="/widgets" element={<RequireAuth><WidgetManager /></RequireAuth>} />
           <Route path="/photos" element={<RequireAuth><Photos /></RequireAuth>} />
           <Route path="/sports" element={<RequireAuth><SportsSettings /></RequireAuth>} />
-          <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><Settings authenticated={authState.authenticated} onAuthChange={handleAuthChange} /></RequireAuth>} />
           <Route path="/more" element={<RequireAuth><MoreMenu /></RequireAuth>} />
         </Routes>
       </main>

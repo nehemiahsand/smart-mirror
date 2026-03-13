@@ -6,8 +6,6 @@ import { apiFetch, getApiBase } from '../apiClient';
 
 export default function Photos() {
   const API_BASE = getApiBase();
-  const API_KEY = import.meta.env.VITE_API_KEY;
-  const imageQuery = API_KEY ? `?apiKey=${encodeURIComponent(API_KEY)}` : '';
   const [photos, setPhotos] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -350,7 +348,7 @@ export default function Photos() {
               onClick={() => openModal(photo)}
             >
               <img
-                src={`${API_BASE}/api/photos/image/${photo.filename}${imageQuery}`}
+                  src={`${API_BASE}/api/photos/image/${photo.filename}`}
                 alt="Photo"
                 loading="lazy"
                 decoding="async"
@@ -375,7 +373,7 @@ export default function Photos() {
             </button>
             <img
               className="modal-image"
-              src={`${API_BASE}/api/photos/image/${selectedPhoto.filename}${imageQuery}`}
+                    src={`${API_BASE}/api/photos/image/${selectedPhoto.filename}`}
               alt="Photo preview"
             />
             <div className="modal-details">

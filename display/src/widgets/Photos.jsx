@@ -20,8 +20,6 @@ const PhotosWidget = ({
         const fetchPhotos = async () => {
             try {
                 const baseURL = getApiUrl();
-                const imageApiKey = import.meta.env.VITE_API_KEY;
-                const imageQuery = imageApiKey ? `?apiKey=${encodeURIComponent(imageApiKey)}` : '';
                 const response = await apiFetch('/api/photos');
                 const data = await response.json();
 
@@ -36,7 +34,7 @@ const PhotosWidget = ({
                     // Add base URL to photo paths
                     const photosWithFullUrls = data.photos.map(photo => ({
                         ...photo,
-                        url: `${baseURL}${photo.url}${imageQuery}`
+                        url: `${baseURL}${photo.url}`
                     }));
                     setPhotos(photosWithFullUrls);
                 } else {

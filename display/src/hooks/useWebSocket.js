@@ -1,20 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
-const API_KEY = import.meta.env.VITE_API_KEY;
-const BASE_WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001';
-
-function buildWsUrl() {
-  if (!API_KEY) return BASE_WS_URL;
-  try {
-    const url = new URL(BASE_WS_URL);
-    url.searchParams.set('apiKey', API_KEY);
-    return url.toString();
-  } catch (e) {
-    // If BASE_WS_URL is not a full URL, fall back to appending query string
-    const separator = BASE_WS_URL.includes('?') ? '&' : '?';
-    return `${BASE_WS_URL}${separator}apiKey=${encodeURIComponent(API_KEY)}`;
+function getDefaultWsUrl() {
+  if (typeof window === 'undefined') {
+    return 'ws://localhost';
   }
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.hostname}`;
 }
+
+const BASE_WS_URL = import.meta.env.VITE_WS_URL || getDefaultWsUrl();
 
 export const useWebSocket = (onPageChange, onListeningChange) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -29,7 +24,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
 
   const connect = useCallback(() => {
     try {
-      const ws = new WebSocket(buildWsUrl());
+      const ws = new WebSocket(BASE_WS_URL);
 
       ws.onopen = () => {
         console.log('WebSocket connected');
@@ -170,12 +165,11 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
     };
   }, [connect]);
 
-  const sendCommand = useCallback((command, payload) => {
+  const syncPage = useCallback((page) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
-        type: 'command',
-        command,
-        payload
+        type: 'sync_page',
+        page
       }));
     }
   }, []);
@@ -187,6 +181,6 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
     weatherData,
     settings,
     message,
-    sendCommand
+    syncPage
   };
 };

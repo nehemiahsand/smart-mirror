@@ -166,13 +166,8 @@ class VoiceRecognitionService:
             logger.info("📡 WebSocket connected - listening for page changes")
         
         def run_websocket():
-            ws_url = WEBSOCKET_URL
-            if API_KEY:
-                separator = '&' if '?' in WEBSOCKET_URL else '?'
-                ws_url = f"{WEBSOCKET_URL}{separator}apiKey={API_KEY}"
-
             self.ws = websocket.WebSocketApp(
-                ws_url,
+                WEBSOCKET_URL,
                 on_open=on_open,
                 on_message=on_message,
                 on_error=on_error,

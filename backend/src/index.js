@@ -19,20 +19,79 @@ const dht22Service = require('./sensors/dht22');
 const websocketServer = require('./api/websocket');
 const apiRoutes = require('./api/routes');
 const spotifyRoutes = require('./api/spotify-routes');
-const apiKeyMiddleware = require('./middleware/apiKey');
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
 const FRONTEND_DIST = path.join(__dirname, '../public');
 const FRONTEND_INDEX = path.join(FRONTEND_DIST, 'index.html');
 const HAS_FRONTEND_BUILD = fs.existsSync(FRONTEND_INDEX);
+const WEAK_DEFAULTS = new Set([
+  'smartmirrorsareawesome2005',
+  'admin123',
+  'supersecretkey',
+  'change-me-in-env-AUTH_SECRET',
+]);
+const DEFAULT_ALLOWED_ORIGINS = new Set([
+  'http://localhost:3002',
+  'http://127.0.0.1:3002',
+]);
+
+function getAllowedOrigins() {
+  const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  return new Set([...DEFAULT_ALLOWED_ORIGINS, ...configuredOrigins]);
+}
+
+function isAllowedOrigin(origin) {
+  if (!origin) {
+    return true;
+  }
+
+  const allowedOrigins = getAllowedOrigins();
+  if (allowedOrigins.has(origin)) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(origin);
+    return !parsed.port || parsed.port === '80' || parsed.port === '443' || parsed.port === '3002';
+  } catch (_) {
+    return false;
+  }
+}
+
+function validateSecurityConfig() {
+  const required = ['API_KEY', 'ADMIN_PASSWORD', 'AUTH_SECRET'];
+
+  for (const key of required) {
+    const value = process.env[key];
+    if (!value || !String(value).trim()) {
+      throw new Error(`${key} must be configured`);
+    }
+    if (WEAK_DEFAULTS.has(String(value).trim())) {
+      throw new Error(`${key} is using a weak default value`);
+    }
+  }
+}
 
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
+app.set('trust proxy', 1);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin(origin, callback) {
+    if (isAllowedOrigin(origin)) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+}));
 app.use(express.json({ charset: 'utf-8' }));
 app.use(express.urlencoded({ extended: true, charset: 'utf-8' }));
 
@@ -52,9 +111,8 @@ app.use((req, res, next) => {
 });
 
 // API Routes
-// Protect all API endpoints with API key middleware when API_KEY is configured
-app.use('/api/spotify', apiKeyMiddleware, spotifyRoutes);
-app.use('/api', apiKeyMiddleware, apiRoutes);
+app.use('/api/spotify', spotifyRoutes);
+app.use('/api', apiRoutes);
 
 if (HAS_FRONTEND_BUILD) {
   app.use(express.static(FRONTEND_DIST));
@@ -106,6 +164,7 @@ app.use((err, req, res, next) => {
 async function start() {
   try {
     logger.info('Starting Smart Mirror Backend Server...');
+    validateSecurityConfig();
 
     // Initialize settings service
     await settingsService.initialize();

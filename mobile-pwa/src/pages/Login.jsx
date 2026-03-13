@@ -3,14 +3,17 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import './Login.css';
 import { apiFetch } from '../apiClient';
 
-export default function Login() {
+export default function Login({ sessionChecked = false, authenticated = false, onAuthChange = () => {} }) {
     const navigate = useNavigate();
     const [password, setPassword] = useState('');
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
 
-    const existingToken = window.localStorage.getItem('adminToken');
-    if (existingToken) {
+    if (!sessionChecked) {
+        return <div className="loading">Loading...</div>;
+    }
+
+    if (authenticated) {
         return <Navigate to="/dashboard" replace />;
     }
 
@@ -28,11 +31,11 @@ export default function Login() {
             });
 
             const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json.token) {
+            if (!res.ok || !json.authenticated) {
                 throw new Error(json.error || 'Invalid password');
             }
 
-            window.localStorage.setItem('adminToken', json.token);
+            onAuthChange(true);
             navigate('/dashboard', { replace: true });
         } catch (loginError) {
             setError(loginError.message || 'Login failed');

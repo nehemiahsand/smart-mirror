@@ -1,12 +1,15 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-const API_KEY = import.meta.env.VITE_API_KEY;
+function getDefaultApiUrl() {
+  if (typeof window === 'undefined') {
+    return 'http://localhost';
+  }
+
+  return `${window.location.protocol}//${window.location.hostname}`;
+}
+
+const API_URL = import.meta.env.VITE_API_URL || getDefaultApiUrl();
 
 function buildHeaders(extra = {}) {
-  const headers = { ...extra };
-  if (API_KEY) {
-    headers['X-API-Key'] = API_KEY;
-  }
-  return headers;
+  return { ...extra };
 }
 
 export function apiFetch(path, options = {}) {

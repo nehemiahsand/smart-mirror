@@ -6,12 +6,16 @@ const express = require('express');
 const router = express.Router();
 const spotifyService = require('../services/spotify');
 const logger = require('../utils/logger');
+const adminAuth = require('../middleware/adminAuth');
+const adminOrApiKey = require('../middleware/adminOrApiKey');
+const { consumeOAuthState, issueOAuthState } = require('../utils/oauthState');
 
 // Get Spotify authentication URL
-router.get('/auth-url', (req, res) => {
+router.get('/auth-url', adminAuth, (req, res) => {
     try {
-        const authUrl = spotifyService.getAuthUrl();
-        res.json({ authUrl });
+        const state = issueOAuthState('spotify');
+        const authUrl = spotifyService.getAuthUrl(state);
+        res.json({ authUrl, state });
     } catch (error) {
         logger.error('Error getting Spotify auth URL:', error);
         res.status(500).json({ error: 'Failed to get authentication URL' });
@@ -20,24 +24,28 @@ router.get('/auth-url', (req, res) => {
 
 // Handle Spotify OAuth callback
 router.get('/callback', async (req, res) => {
-    const { code, error } = req.query;
+    const { code, error, state } = req.query;
 
     if (error) {
         logger.error('Spotify auth error:', error);
-        return res.redirect(`/spotify-error?error=${encodeURIComponent(error)}`);
+        return res.redirect(`/settings?spotify=error&reason=${encodeURIComponent(error)}`);
     }
 
     if (!code) {
-        return res.redirect('/spotify-error?error=no_code');
+        return res.redirect('/settings?spotify=error&reason=no_code');
+    }
+
+    if (!consumeOAuthState('spotify', state)) {
+        logger.warn('Spotify callback rejected due to invalid OAuth state');
+        return res.redirect('/settings?spotify=error&reason=invalid_state');
     }
 
     try {
         await spotifyService.exchangeCode(code);
-        // Redirect to display on port 3000 with success message
-        res.redirect('http://localhost:3000?spotify=connected');
+        res.redirect('/settings?spotify=connected');
     } catch (error) {
         logger.error('Error exchanging Spotify code:', error);
-        res.redirect('http://localhost:3000?spotify=error');
+        res.redirect('/settings?spotify=error');
     }
 });
 
@@ -50,7 +58,7 @@ router.get('/status', (req, res) => {
 });
 
 // Clear authentication
-router.post('/logout', (req, res) => {
+router.post('/logout', adminAuth, (req, res) => {
     spotifyService.clearTokens();
     res.json({ success: true });
 });
@@ -84,7 +92,7 @@ router.get('/currently-playing', async (req, res) => {
 });
 
 // Play
-router.put('/play', async (req, res) => {
+router.put('/play', adminOrApiKey, async (req, res) => {
     try {
         await spotifyService.play(req.body.device_id, req.body.context_uri);
         res.json({ success: true });
@@ -98,7 +106,7 @@ router.put('/play', async (req, res) => {
 });
 
 // Play liked songs
-router.put('/play-liked', async (req, res) => {
+router.put('/play-liked', adminOrApiKey, async (req, res) => {
     try {
         await spotifyService.playLikedSongs();
         res.json({ success: true });
@@ -112,7 +120,7 @@ router.put('/play-liked', async (req, res) => {
 });
 
 // Pause
-router.put('/pause', async (req, res) => {
+router.put('/pause', adminOrApiKey, async (req, res) => {
     try {
         await spotifyService.pause();
         res.json({ success: true });
@@ -126,7 +134,7 @@ router.put('/pause', async (req, res) => {
 });
 
 // Next track
-router.post('/next', async (req, res) => {
+router.post('/next', adminOrApiKey, async (req, res) => {
     try {
         await spotifyService.next();
         res.json({ success: true });
@@ -140,7 +148,7 @@ router.post('/next', async (req, res) => {
 });
 
 // Previous track
-router.post('/previous', async (req, res) => {
+router.post('/previous', adminOrApiKey, async (req, res) => {
     try {
         await spotifyService.previous();
         res.json({ success: true });
@@ -154,7 +162,7 @@ router.post('/previous', async (req, res) => {
 });
 
 // Set volume
-router.put('/volume', async (req, res) => {
+router.put('/volume', adminOrApiKey, async (req, res) => {
     try {
         const { volume } = req.body;
         if (volume === undefined || volume < 0 || volume > 100) {
@@ -172,7 +180,7 @@ router.put('/volume', async (req, res) => {
 });
 
 // Seek to position
-router.put('/seek', async (req, res) => {
+router.put('/seek', adminOrApiKey, async (req, res) => {
     try {
         const { position } = req.body;
         if (position === undefined || position < 0) {

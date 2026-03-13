@@ -4,12 +4,25 @@ services:
       context: ./sensor
       dockerfile: Dockerfile
     container_name: smart-mirror-sensor
-    privileged: true
-    network_mode: host
+    working_dir: /tmp
+    command: ["python3", "/app/dht22_server.py"]
+    environment:
+      - BLINKA_FORCECHIP=BCM2XXX
+      - BLINKA_FORCEBOARD=RASPBERRY_PI_5
+      - RPI_LGPIO_REVISION=d04170
     devices:
       - /dev/gpiomem0:/dev/gpiomem
       - /dev/gpiochip0:/dev/gpiochip0
       - /dev/gpiochip4:/dev/gpiochip4
+    expose:
+      - "5555"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     restart: unless-stopped
 
   camera:
@@ -17,31 +30,45 @@ services:
       context: ./camera
       dockerfile: Dockerfile
     container_name: smart-mirror-camera
-    privileged: true
-    network_mode: host
+    user: "1000:1000"
+    group_add:
+      - "44"
+    environment:
+      - CAMERA_CAPTURE_FPS=20
+      - CAMERA_STREAM_FPS=20
     devices:
       - /dev/video0:/dev/video0
       - /dev/video1:/dev/video1
+    expose:
+      - "5556"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     restart: unless-stopped
 
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-      args:
-        VITE_API_KEY: smartmirrorsareawesome2005
     container_name: smart-mirror-backend
-    privileged: true
-    network_mode: host
+    env_file:
+      - ./backend/.env
     environment:
       - NODE_ENV=production
-      - PORT=80
-      - SENSOR_URL=http://localhost:5555
-      - CAMERA_URL=http://127.0.0.1:5556
+      - PORT=3001
+      - SENSOR_URL=http://sensor:5555
+      - CAMERA_URL=http://camera:5556
       - DHT22_GPIO_PIN=4
       - DISPLAY=:0
       - WAYLAND_DISPLAY=wayland-0
       - XDG_RUNTIME_DIR=/run/user/1000
+    ports:
+      - "80:3001"
+    user: "1000:1000"
     volumes:
       - ./backend/data:/app/data
       - ./backend/data/photos:/app/data/photos
@@ -54,6 +81,10 @@ services:
     depends_on:
       - sensor
       - camera
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   display:
@@ -61,14 +92,16 @@ services:
       context: ./display
       dockerfile: Dockerfile
     container_name: smart-mirror-display
-    network_mode: host
     environment:
-      - VITE_API_URL=http://localhost
-      - VITE_WS_URL=ws://localhost
-      - VITE_API_KEY=smartmirrorsareawesome2005
       - TZ=America/Chicago
+    ports:
+      - "3000:3000"
     depends_on:
       - backend
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
 
   voice:
@@ -76,17 +109,26 @@ services:
       context: ./voice
       dockerfile: Dockerfile
     container_name: smart-mirror-voice
-    privileged: true
-    network_mode: host
+    user: "1000:1000"
+    group_add:
+      - "29"
     devices:
       - /dev/snd:/dev/snd
+    env_file:
+      - ./backend/.env
     environment:
       - PULSE_SERVER=unix:/run/user/1000/pulse/native
-      - BACKEND_URL=http://localhost
-      - WEBSOCKET_URL=ws://localhost
-      - API_KEY=smartmirrorsareawesome2005
+      - BACKEND_URL=http://backend:3001
+      - WEBSOCKET_URL=ws://backend:3001
     volumes:
       - /run/user/1000/pulse:/run/user/1000/pulse:ro
     depends_on:
       - backend
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
     restart: unless-stopped

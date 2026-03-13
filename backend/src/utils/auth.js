@@ -1,73 +1,79 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 
-const DEFAULT_AUTH_SECRET = 'change-me-in-env-AUTH_SECRET';
+const TOKEN_ISSUER = 'smart-mirror';
+const DEFAULT_TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7;
+const TOKEN_AUDIENCES = Object.freeze({
+  ADMIN_SESSION: 'admin-session',
+  CAMERA_STREAM: 'camera-stream',
+});
 
 function getSecret() {
-  return process.env.AUTH_SECRET || DEFAULT_AUTH_SECRET;
-}
-
-function base64UrlEncode(buffer) {
-  return buffer.toString('base64').replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-function base64UrlDecode(str) {
-  str = str.replace(/-/g, '+').replace(/_/g, '/');
-  while (str.length % 4) {
-    str += '=';
+  if (!process.env.AUTH_SECRET) {
+    throw new Error('AUTH_SECRET is required');
   }
-  return Buffer.from(str, 'base64');
+  return process.env.AUTH_SECRET;
 }
 
-function createToken(payload, expiresInSeconds = 60 * 60 * 24 * 7) { // default 7 days
-  const exp = Math.floor(Date.now() / 1000) + expiresInSeconds;
-  const fullPayload = { ...payload, exp };
-  const json = JSON.stringify(fullPayload);
-  const payloadB64 = base64UrlEncode(Buffer.from(json, 'utf8'));
-  const hmac = crypto.createHmac('sha256', getSecret());
-  hmac.update(payloadB64);
-  const signature = base64UrlEncode(hmac.digest());
-  return `${payloadB64}.${signature}`;
-}
+function createToken(payload, expiresInSeconds = DEFAULT_TOKEN_TTL_SECONDS, options = {}) {
+  const jwtOptions = {
+    algorithm: 'HS256',
+    expiresIn: expiresInSeconds,
+    issuer: TOKEN_ISSUER,
+  };
 
-function timingSafeEqual(a, b) {
-  const bufA = Buffer.from(a, 'utf8');
-  const bufB = Buffer.from(b, 'utf8');
-  if (bufA.length !== bufB.length) {
-    return false;
+  if (options.audience) {
+    jwtOptions.audience = options.audience;
   }
-  return crypto.timingSafeEqual(bufA, bufB);
+
+  if (options.subject) {
+    jwtOptions.subject = options.subject;
+  }
+
+  if (options.jwtId) {
+    jwtOptions.jwtid = options.jwtId;
+  }
+
+  return jwt.sign(payload, getSecret(), jwtOptions);
 }
 
-function verifyToken(token) {
-  if (!token || typeof token !== 'string') return null;
-  const parts = token.split('.');
-  if (parts.length !== 2) return null;
-
-  const [payloadB64, signature] = parts;
-  const hmac = crypto.createHmac('sha256', getSecret());
-  hmac.update(payloadB64);
-  const expectedSig = base64UrlEncode(hmac.digest());
-
-  if (!timingSafeEqual(signature, expectedSig)) {
+function verifyToken(token, options = {}) {
+  if (!token || typeof token !== 'string') {
     return null;
+  }
+
+  const verifyOptions = {
+    algorithms: ['HS256'],
+    issuer: TOKEN_ISSUER,
+  };
+
+  if (options.audience) {
+    verifyOptions.audience = options.audience;
+  }
+
+  if (options.subject) {
+    verifyOptions.subject = options.subject;
+  }
+
+  if (options.jwtId) {
+    verifyOptions.jwtid = options.jwtId;
   }
 
   try {
-    const json = base64UrlDecode(payloadB64).toString('utf8');
-    const payload = JSON.parse(json);
-    if (payload.exp && typeof payload.exp === 'number') {
-      const now = Math.floor(Date.now() / 1000);
-      if (payload.exp < now) {
-        return null;
-      }
-    }
-    return payload;
-  } catch (err) {
+    return jwt.verify(token, getSecret(), verifyOptions);
+  } catch (_) {
     return null;
   }
+}
+
+function generateTokenId() {
+  return crypto.randomUUID();
 }
 
 module.exports = {
   createToken,
+  DEFAULT_TOKEN_TTL_SECONDS,
+  generateTokenId,
+  TOKEN_AUDIENCES,
   verifyToken,
 };

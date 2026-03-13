@@ -9,6 +9,9 @@ const logger = require('../utils/logger');
 const settingsService = require('../services/settings');
 const weatherService = require('../services/weather');
 const dht22Service = require('../sensors/dht22');
+const { redactSensitive } = require('../utils/redaction');
+
+const ALLOWED_SYNC_PAGES = new Set(['home', 'spotify']);
 
 class WebSocketServer {
   constructor() {
@@ -18,46 +21,13 @@ class WebSocketServer {
     this.sensorInterval = null;
     this.weatherInterval = null;
     this.heartbeatInterval = null;
-    this.commandHandlers = new Map();
-    
-    // Register command handlers
-    this.registerCommandHandlers();
-  }
-
-  /**
-   * Register handlers for client commands
-   */
-  registerCommandHandlers() {
-    this.commandHandlers.set('set_theme', this.handleSetTheme.bind(this));
-    this.commandHandlers.set('change_layout', this.handleChangeLayout.bind(this));
-    this.commandHandlers.set('display_message', this.handleDisplayMessage.bind(this));
-    this.commandHandlers.set('set_layout', this.handleSetLayout.bind(this));
   }
 
   initialize(server) {
-    const apiKey = process.env.API_KEY;
-
     this.wss = new WebSocket.Server({ server });
 
     this.wss.on('connection', (ws, req) => {
       const clientIp = req.socket.remoteAddress;
-
-      // If API_KEY is configured, require matching apiKey query param for WebSocket
-      if (apiKey) {
-        try {
-          const url = new URL(req.url, 'ws://localhost');
-          const clientKey = url.searchParams.get('apiKey');
-          if (!clientKey || clientKey !== apiKey) {
-            logger.warn('WebSocket connection rejected due to missing/invalid apiKey', { ip: clientIp });
-            ws.close(1008, 'Invalid API key');
-            return;
-          }
-        } catch (err) {
-          logger.error('Failed to parse WebSocket URL', { error: err.message });
-          ws.close(1008, 'Invalid request');
-          return;
-        }
-      }
       logger.info('WebSocket client connected', { ip: clientIp });
       
       this.clients.add(ws);
@@ -141,7 +111,7 @@ class WebSocketServer {
       const dht22Service = require('../sensors/dht22');
       
       // Send current settings
-      const settings = settingsService.getAll();
+      const settings = redactSensitive(settingsService.getAll());
       this.send(ws, {
         type: 'settings_update',
         data: settings,
@@ -344,7 +314,7 @@ class WebSocketServer {
   broadcastSettingsChange(setting, value) {
     try {
       const settingsService = require('../services/settings');
-      const allSettings = settingsService.getAll();
+      const allSettings = redactSensitive(settingsService.getAll());
       
       this.broadcast({
         type: 'settings_changed',
@@ -383,6 +353,14 @@ class WebSocketServer {
       
       case 'sync_page':
         // Display is syncing its current page - broadcast to all clients
+        if (!ALLOWED_SYNC_PAGES.has(data.page)) {
+          this.send(ws, {
+            type: 'error',
+            message: 'Invalid page sync request',
+            timestamp: Date.now()
+          });
+          return;
+        }
         logger.info('Page sync from display', { page: data.page });
         this.broadcast({
           type: 'page_change',
@@ -390,11 +368,7 @@ class WebSocketServer {
           timestamp: Date.now()
         });
         break;
-      
-      case 'command':
-        this.handleCommand(ws, data);
-        break;
-      
+
       default:
         logger.warn('Unknown WebSocket message type', { type: data.type });
         this.send(ws, {
@@ -403,168 +377,6 @@ class WebSocketServer {
           timestamp: Date.now()
         });
     }
-  }
-
-  /**
-   * Handle client commands
-   */
-  async handleCommand(ws, data) {
-    const { command, payload } = data;
-    
-    if (!command) {
-      this.send(ws, {
-        type: 'command_error',
-        message: 'Command name is required',
-        timestamp: Date.now()
-      });
-      return;
-    }
-
-    logger.info('Received command', { command, payload });
-
-    const handler = this.commandHandlers.get(command);
-    
-    if (handler) {
-      try {
-        const result = await handler(payload, ws);
-        this.send(ws, {
-          type: 'command_response',
-          command,
-          success: true,
-          result,
-          timestamp: Date.now()
-        });
-      } catch (error) {
-        logger.error('Command execution failed', { 
-          command, 
-          error: error.message 
-        });
-        this.send(ws, {
-          type: 'command_error',
-          command,
-          message: error.message,
-          timestamp: Date.now()
-        });
-      }
-    } else {
-      this.send(ws, {
-        type: 'command_error',
-        command,
-        message: `Unknown command: ${command}`,
-        timestamp: Date.now()
-      });
-    }
-  }
-
-  /**
-   * Command handler: Set theme
-   */
-  async handleSetTheme(payload, ws) {
-    const { theme } = payload;
-    
-    if (!theme) {
-      throw new Error('Theme name is required');
-    }
-
-    logger.info('Setting theme', { theme });
-
-    // Update settings
-    const settingsService = require('../services/settings');
-    await settingsService.update('display.theme', theme);
-
-    // Broadcast theme change to all clients
-    this.broadcast({
-      type: 'theme_changed',
-      data: { theme },
-      timestamp: Date.now()
-    });
-
-    return { theme, message: 'Theme updated successfully' };
-  }
-
-  /**
-   * Command handler: Change layout
-   */
-  async handleChangeLayout(payload, ws) {
-    const { layout } = payload;
-    
-    if (!layout) {
-      throw new Error('Layout name is required');
-    }
-
-    logger.info('Changing layout', { layout });
-
-    // Update settings
-    const settingsService = require('../services/settings');
-    await settingsService.update('display.layout', layout);
-
-    // Broadcast layout change to all clients
-    this.broadcast({
-      type: 'layout_changed',
-      data: { layout },
-      timestamp: Date.now()
-    });
-
-    return { layout, message: 'Layout updated successfully' };
-  }
-
-  /**
-   * Command handler: Display message
-   */
-  async handleDisplayMessage(payload, ws) {
-    const { message, duration = 5000, priority = 'normal' } = payload;
-    
-    if (!message) {
-      throw new Error('Message text is required');
-    }
-
-    logger.info('Displaying message', { message, duration, priority });
-
-    // Broadcast message to all clients
-    this.broadcast({
-      type: 'display_message',
-      data: {
-        message,
-        duration,
-        priority,
-        id: Date.now().toString()
-      },
-      timestamp: Date.now()
-    });
-
-    return { 
-      message: 'Message broadcasted successfully',
-      recipients: this.clients.size
-    };
-  }
-
-  /**
-   * Command handler: Set widget layout positions
-   */
-  async handleSetLayout(payload, ws) {
-    const { widgets } = payload;
-    
-    if (!widgets || typeof widgets !== 'object') {
-      throw new Error('Widgets configuration is required');
-    }
-
-    logger.info('Setting widget layout', { widgets: Object.keys(widgets) });
-
-    // Update settings with new layout
-    const settingsService = require('../services/settings');
-    await settingsService.update('layout.widgets', widgets);
-
-    // Broadcast layout change to all clients
-    this.broadcast({
-      type: 'layout_update',
-      data: { widgets },
-      timestamp: Date.now()
-    });
-
-    return { 
-      message: 'Layout updated successfully',
-      widgets: Object.keys(widgets)
-    };
   }
 
   send(ws, data) {
@@ -630,7 +442,7 @@ class WebSocketServer {
   broadcastSettingsUpdate(settings) {
     this.broadcast({
       type: 'settings_update',
-      data: settings,
+      data: redactSensitive(settings),
       timestamp: Date.now()
     });
   }

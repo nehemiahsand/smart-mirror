@@ -5,24 +5,22 @@ const API_BASE = configuredBase || (
     ? `http://${window.location.hostname}:3001`
     : window.location.origin
 );
-const API_KEY = import.meta.env.VITE_API_KEY;
-
-function buildHeaders(extra = {}) {
-  const headers = { ...extra };
-  if (API_KEY) {
-    headers['X-API-Key'] = API_KEY;
-  }
-  const adminToken = window.localStorage.getItem('adminToken');
-  if (adminToken) {
-    headers['Authorization'] = `Bearer ${adminToken}`;
-  }
-  return headers;
-}
 
 export function apiFetch(path, options = {}) {
   const url = path.startsWith('http://') || path.startsWith('https://') ? path : `${API_BASE}${path}`;
-  const mergedHeaders = buildHeaders(options.headers || {});
-  return fetch(url, { ...options, headers: mergedHeaders });
+  return fetch(url, {
+    credentials: 'include',
+    ...options,
+    headers: { ...(options.headers || {}) }
+  });
+}
+
+export async function fetchAuthSession() {
+  const response = await apiFetch('/api/auth/session');
+  if (!response.ok) {
+    return { authenticated: false };
+  }
+  return response.json();
 }
 
 export function getApiBase() {

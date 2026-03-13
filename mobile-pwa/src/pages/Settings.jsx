@@ -3,11 +3,10 @@ import './Settings.css';
 import AlertModal from '../components/AlertModal';
 import { apiFetch } from '../apiClient';
 
-export default function Settings() {
+export default function Settings({ authenticated = false, onAuthChange = () => {} }) {
   const [systemInfo, setSystemInfo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [alertModal, setAlertModal] = useState(null);
-  const [adminToken, setAdminToken] = useState(() => window.localStorage.getItem('adminToken') || '');
   const [loginPassword, setLoginPassword] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
 
@@ -72,8 +71,7 @@ export default function Settings() {
       if (!res.ok) {
         throw new Error(json.error || `Server returned ${res.status}`);
       }
-      window.localStorage.setItem('adminToken', json.token);
-      setAdminToken(json.token);
+      onAuthChange(true);
       setLoginPassword('');
       setAlertModal({ type: 'success', message: 'Admin login successful' });
     } catch (e) {
@@ -83,10 +81,15 @@ export default function Settings() {
     }
   };
 
-  const handleLogout = () => {
-    window.localStorage.removeItem('adminToken');
-    setAdminToken('');
-    window.location.href = '/login';
+  const handleLogout = async () => {
+    try {
+      await apiFetch('/api/auth/logout', { method: 'POST' });
+    } catch (_) {
+      // Clearing local auth state still matters even if the request fails.
+    } finally {
+      onAuthChange(false);
+      window.location.href = '/login';
+    }
   };
 
   return (
@@ -147,7 +150,7 @@ export default function Settings() {
           <span className="card-icon">🔑</span>
           <h2>Admin Access</h2>
         </div>
-        {adminToken ? (
+        {authenticated ? (
           <div className="settings-list">
             <div className="setting-item">
               <span className="setting-label">Status</span>

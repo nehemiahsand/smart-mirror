@@ -14,6 +14,8 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+ENV HOME=/tmp
+ENV XDG_CACHE_HOME=/tmp/.cache
 
 # Download Vosk model (small English model - ~50MB)
 RUN wget -q https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip \

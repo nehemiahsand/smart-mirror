@@ -19,6 +19,13 @@ const nbaService = require('../services/nba');
 const sportsService = require('../services/sports');
 const websocketServer = require('./websocket');
 const layoutRoutes = require('./layout-routes');
+const apiKeyMiddleware = require('../middleware/apiKey');
+const cameraStreamAuth = require('../middleware/cameraStreamAuth');
+const { isSensitiveKey, redactSensitive } = require('../utils/redaction');
+const { getLoginRateLimitStatus, recordFailedLoginAttempt, recordSuccessfulLogin } = require('../utils/loginRateLimit');
+const { ADMIN_SESSION_TTL_SECONDS, clearAdminSessionCookie, extractAdminToken, setAdminSessionCookie } = require('../utils/requestAuth');
+const { createToken, TOKEN_AUDIENCES } = require('../utils/auth');
+const { issueAdminSession, revokeAdminSessionToken, verifyAdminSessionToken } = require('../utils/adminSessions');
 
 // Configure multer for photo uploads
 const upload = multer({
@@ -36,44 +43,23 @@ const upload = multer({
 const router = express.Router();
 const adminAuth = require('../middleware/adminAuth');
 
-const SENSITIVE_KEY_PATTERNS = [/token/i, /secret/i, /password/i, /api.?key/i, /authorization/i];
-
-function isSensitiveKey(key) {
-  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(String(key)));
-}
-
-function redactSensitive(value, parentKey = '') {
-  if (Array.isArray(value)) {
-    return value.map((item) => redactSensitive(item, parentKey));
-  }
-
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  const redacted = {};
-  for (const [key, nestedValue] of Object.entries(value)) {
-    if (isSensitiveKey(key) || isSensitiveKey(parentKey)) {
-      redacted[key] = nestedValue == null ? nestedValue : '[REDACTED]';
-    } else {
-      redacted[key] = redactSensitive(nestedValue, key);
-    }
-  }
-
-  return redacted;
-}
-
 // Mount layout routes
 router.use(layoutRoutes);
 
 // ===== Auth Endpoints =====
-// Simple admin login using ADMIN_PASSWORD env and signed tokens
-const { createToken } = require('../utils/auth');
-
 router.post('/auth/login', (req, res) => {
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminPassword) {
     return res.status(500).json({ error: 'Admin password not configured on server' });
+  }
+
+  const rateLimitStatus = getLoginRateLimitStatus(req.ip);
+  if (!rateLimitStatus.allowed) {
+    res.setHeader('Retry-After', String(rateLimitStatus.retryAfterSeconds));
+    return res.status(429).json({
+      error: 'Too many login attempts. Try again later.',
+      retryAfterSeconds: rateLimitStatus.retryAfterSeconds,
+    });
   }
 
   const { password } = req.body || {};
@@ -82,11 +68,66 @@ router.post('/auth/login', (req, res) => {
   }
 
   if (password !== adminPassword) {
+    const failedStatus = recordFailedLoginAttempt(req.ip);
+    const retryAfterSeconds = failedStatus.allowed ? 0 : failedStatus.retryAfterSeconds;
+    if (retryAfterSeconds > 0) {
+      res.setHeader('Retry-After', String(retryAfterSeconds));
+      return res.status(429).json({
+        error: 'Too many login attempts. Try again later.',
+        retryAfterSeconds,
+      });
+    }
     return res.status(401).json({ error: 'Invalid password' });
   }
 
-  const token = createToken({ role: 'admin', username: 'admin' });
-  res.json({ token });
+  recordSuccessfulLogin(req.ip);
+  const { token } = issueAdminSession('admin', ADMIN_SESSION_TTL_SECONDS);
+  setAdminSessionCookie(req, res, token);
+  res.json({ authenticated: true, expiresInSeconds: ADMIN_SESSION_TTL_SECONDS });
+});
+
+router.get('/auth/session', (req, res) => {
+  const token = extractAdminToken(req);
+  if (!token) {
+    return res.status(401).json({ authenticated: false });
+  }
+
+  const payload = verifyAdminSessionToken(token);
+  if (!payload || payload.role !== 'admin') {
+    clearAdminSessionCookie(req, res);
+    return res.status(401).json({ authenticated: false });
+  }
+
+  return res.json({
+    authenticated: true,
+    username: payload.username || 'admin',
+  });
+});
+
+router.post('/auth/logout', (req, res) => {
+  const token = extractAdminToken(req);
+  if (token) {
+    revokeAdminSessionToken(token);
+  }
+  clearAdminSessionCookie(req, res);
+  res.json({ success: true });
+});
+
+router.post('/auth/stream-token', adminAuth, (req, res) => {
+  const { scope } = req.body || {};
+  if (scope !== 'camera_raw') {
+    return res.status(400).json({ error: 'Unsupported stream scope' });
+  }
+
+  const token = createToken(
+    { role: 'stream', scope },
+    60,
+    {
+      audience: TOKEN_AUDIENCES.CAMERA_STREAM,
+      subject: scope,
+    }
+  );
+  res.json({ token, expiresInSeconds: 60 });
 });
 
 // ===== Privacy / Input Control Endpoints =====
@@ -211,7 +252,7 @@ router.get('/camera/status', async (req, res) => {
   }
 });
 
-router.get('/camera/raw', adminAuth, async (req, res) => {
+router.get('/camera/raw', cameraStreamAuth, async (req, res) => {
   try {
     const http = require('http');
     const CAMERA_URL = process.env.CAMERA_URL || 'http://127.0.0.1:5556';
@@ -274,7 +315,7 @@ router.post('/camera/auto-standby', adminAuth, async (req, res) => {
   }
 });
 
-router.post('/display/power', async (req, res) => {
+router.post('/display/power', adminAuth, async (req, res) => {
   try {
     const { state } = req.body;
     if (!state || !['on', 'off'].includes(state)) {
@@ -519,7 +560,7 @@ router.get('/weather/forecast', async (req, res) => {
 });
 
 // Clear weather cache
-router.post('/weather/cache/clear', (req, res) => {
+router.post('/weather/cache/clear', adminAuth, (req, res) => {
   try {
     weatherService.clearCache();
     res.json({ message: 'Weather cache cleared' });
@@ -554,7 +595,7 @@ router.get('/photos/image/:filename', async (req, res) => {
 });
 
 // Upload new photo
-router.post('/photos', upload.single('photo'), async (req, res) => {
+router.post('/photos', adminAuth, upload.single('photo'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No photo file provided' });
@@ -572,7 +613,7 @@ router.post('/photos', upload.single('photo'), async (req, res) => {
 });
 
 // Update photo metadata
-router.put('/photos/:id', async (req, res) => {
+router.put('/photos/:id', adminAuth, async (req, res) => {
   try {
     const id = parseFloat(req.params.id);
     const updates = {
@@ -589,7 +630,7 @@ router.put('/photos/:id', async (req, res) => {
 });
 
 // Delete photo
-router.delete('/photos/:id', async (req, res) => {
+router.delete('/photos/:id', adminAuth, async (req, res) => {
   try {
     const id = parseFloat(req.params.id);
     await photosService.deletePhoto(id);
@@ -601,7 +642,7 @@ router.delete('/photos/:id', async (req, res) => {
 });
 
 // Reorder photos
-router.post('/photos/reorder', async (req, res) => {
+router.post('/photos/reorder', adminAuth, async (req, res) => {
   try {
     const { photoIds } = req.body;
     if (!Array.isArray(photoIds)) {
@@ -784,7 +825,8 @@ router.get('/sensor', async (req, res) => {
       if (lastReading) {
         res.json(lastReading);
       } else {
-        res.json({ error: 'No sensor data available (standby mode)' });
+        const reading = await dht22Service.getCurrentReading();
+        res.json(reading);
       }
       return;
     }
@@ -886,10 +928,10 @@ router.get('/calendar/events', async (req, res) => {
 });
 
 // Get auth URL for Google Calendar
-router.get('/calendar/auth-url', async (req, res) => {
+router.get('/calendar/auth-url', adminAuth, async (req, res) => {
   try {
-    const authUrl = await googleCalendarService.getAuthUrl();
-    res.json({ authUrl });
+    const auth = await googleCalendarService.getAuthUrl();
+    res.json(auth);
   } catch (error) {
     logger.error('Failed to generate calendar auth URL', { error: error.message });
     res.status(500).json({ error: error.message });
@@ -897,18 +939,19 @@ router.get('/calendar/auth-url', async (req, res) => {
 });
 
 // Authorize Google Calendar with code
-router.post('/calendar/authorize', async (req, res) => {
+router.post('/calendar/authorize', adminAuth, async (req, res) => {
   try {
-    const { code } = req.body;
-    if (!code) {
-      return res.status(400).json({ error: 'Authorization code is required' });
+    const { code, state } = req.body;
+    if (!code || !state) {
+      return res.status(400).json({ error: 'Authorization code and state are required' });
     }
 
-    await googleCalendarService.authorize(code);
+    await googleCalendarService.authorize(code, state);
     res.json({ success: true, message: 'Calendar authorized successfully' });
   } catch (error) {
     logger.error('Failed to authorize calendar', { error: error.message });
-    res.status(500).json({ error: error.message });
+    const status = error.message === 'INVALID_OAUTH_STATE' ? 400 : 500;
+    res.status(status).json({ error: error.message });
   }
 });
 
@@ -993,7 +1036,7 @@ router.get('/system/info', (req, res) => {
 });
 
 // ===== Voice Command Broadcast Endpoint =====
-router.post('/broadcast', (req, res) => {
+router.post('/broadcast', apiKeyMiddleware, (req, res) => {
   try {
     const { type, page, command, listening } = req.body;
     

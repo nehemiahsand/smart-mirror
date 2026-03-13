@@ -18,6 +18,7 @@ const router = express.Router();
 const logger = require('../utils/logger');
 const settingsService = require('../services/settings');
 const websocketServer = require('./websocket');
+const adminAuth = require('../middleware/adminAuth');
 
 // Get current layout
 router.get('/layout', (req, res) => {
@@ -32,7 +33,7 @@ router.get('/layout', (req, res) => {
 });
 
 // Update layout
-router.post('/layout', async (req, res) => {
+router.post('/layout', adminAuth, async (req, res) => {
   try {
     const { widgets } = req.body;
     
@@ -63,7 +64,7 @@ router.post('/layout', async (req, res) => {
 });
 
 // Apply layout preset
-router.post('/layout/preset/:presetName', async (req, res) => {
+router.post('/layout/preset/:presetName', adminAuth, async (req, res) => {
   try {
     const { presetName } = req.params;
     

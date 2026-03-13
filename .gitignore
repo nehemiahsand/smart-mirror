@@ -1,0 +1,7 @@
+backend/.env
+camera/.env
+display/.env
+mobile-pwa/.env
+voice/.env
+__pycache__/
+*.pyc

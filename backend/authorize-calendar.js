@@ -7,6 +7,7 @@ const { google } = require('googleapis');
 const fs = require('fs').promises;
 const path = require('path');
 const readline = require('readline');
+const crypto = require('crypto');
 
 const CREDENTIALS_PATH = path.join(__dirname, 'data/calendar-credentials.json');
 const TOKEN_PATH = path.join(__dirname, 'data/calendar-token.json');
@@ -31,9 +32,11 @@ async function authorize() {
     );
 
     // Generate auth URL
+    const state = crypto.randomBytes(24).toString('hex');
     const authUrl = oAuth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: SCOPES,
+      state,
     });
 
     console.log('\n📅 Google Calendar Authorization');
@@ -57,10 +60,17 @@ async function authorize() {
         // Extract code from URL
         const url = new URL(fullUrl);
         const code = url.searchParams.get('code');
+        const returnedState = url.searchParams.get('state');
 
         if (!code) {
           console.error('\n❌ No authorization code found in URL');
           console.error('Make sure you copied the complete URL from the browser');
+          process.exit(1);
+        }
+
+        if (returnedState !== state) {
+          console.error('\n❌ OAuth state mismatch');
+          console.error('The authorization response did not match the request that was started.');
           process.exit(1);
         }
 

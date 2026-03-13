@@ -3,9 +3,8 @@
  * Handles network scanning, connection, and wpa_supplicant management
  */
 
-const { exec } = require('child_process');
+const { exec, execFile } = require('child_process');
 const fs = require('fs').promises;
-const { promisify } = require('util');
 const logger = require('../utils/logger');
 
 // Create execAsync with UTF-8 locale
@@ -26,8 +25,70 @@ const execAsync = (command) => {
   });
 };
 
+const execFileAsync = (file, args = [], options = {}) => {
+  return new Promise((resolve, reject) => {
+    execFile(file, args, {
+      encoding: 'utf8',
+      env: { ...process.env, LANG: 'en_US.UTF-8', LC_ALL: 'en_US.UTF-8' },
+      ...options
+    }, (error, stdout, stderr) => {
+      if (error) {
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+      } else {
+        resolve({ stdout, stderr });
+      }
+    });
+  });
+};
+
 const WPA_SUPPLICANT_CONF = '/etc/wpa_supplicant/wpa_supplicant.conf';
 const WPA_SUPPLICANT_BACKUP = '/etc/wpa_supplicant/wpa_supplicant.conf.backup';
+const NM_CONNECTIONS_DIR = '/etc/NetworkManager/system-connections';
+
+function validateWiFiValue(value, field, { maxLength, allowEmpty = false } = {}) {
+  if (typeof value !== 'string') {
+    throw new Error(`${field} must be a string`);
+  }
+
+  if (!allowEmpty && !value.trim()) {
+    throw new Error(`${field} is required`);
+  }
+
+  if (maxLength && value.length > maxLength) {
+    throw new Error(`${field} is too long`);
+  }
+
+  if (/[\0\r\n]/.test(value)) {
+    throw new Error(`${field} contains invalid characters`);
+  }
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeWpaString(value) {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+async function removeMatchingNmConnectionFiles(ssid = null) {
+  try {
+    const entries = await fs.readdir(NM_CONNECTIONS_DIR, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.nmconnection')) {
+        continue;
+      }
+      if (ssid && !entry.name.includes(ssid)) {
+        continue;
+      }
+      await fs.unlink(`${NM_CONNECTIONS_DIR}/${entry.name}`);
+    }
+  } catch (error) {
+    logger.debug('No NM system-connections files removed', { error: error.message });
+  }
+}
 
 class WiFiService {
   /**
@@ -301,6 +362,8 @@ class WiFiService {
    */
   async connectToWifi(ssid, password) {
     try {
+      validateWiFiValue(ssid, 'SSID', { maxLength: 64 });
+      validateWiFiValue(password || '', 'Password', { maxLength: 128, allowEmpty: true });
       logger.info('Attempting to connect to WiFi', { ssid, isOpen: !password });
       
       // Stop hotspot if it's running
@@ -331,19 +394,17 @@ class WiFiService {
           logger.info('Using NetworkManager to connect');
           
           // Remove existing connection if it exists
-          await execAsync(`nmcli connection delete "${ssid}" 2>/dev/null || true`);
+          try {
+            await execFileAsync('nmcli', ['connection', 'delete', ssid]);
+          } catch (_) {}
           
           // Add and connect to the network
           if (password && password.trim()) {
             // Secured network
-            await execAsync(
-              `nmcli device wifi connect "${ssid}" password "${password}" 2>&1`
-            );
+            await execFileAsync('nmcli', ['device', 'wifi', 'connect', ssid, 'password', password]);
           } else {
             // Open network (no password)
-            await execAsync(
-              `nmcli device wifi connect "${ssid}" 2>&1`
-            );
+            await execFileAsync('nmcli', ['device', 'wifi', 'connect', ssid]);
           }
           
           // Wait for connection
@@ -398,6 +459,8 @@ class WiFiService {
    */
   async _connectViaWpaSupplicant(ssid, password) {
     try {
+      validateWiFiValue(ssid, 'SSID', { maxLength: 64 });
+      validateWiFiValue(password || '', 'Password', { maxLength: 128, allowEmpty: true });
       logger.info('Using wpa_supplicant to connect', { ssid });
       
       // Read existing wpa_supplicant config
@@ -420,7 +483,7 @@ class WiFiService {
       // Generate PSK hash for better security
       let pskHash = '';
       try {
-        const { stdout } = await execAsync(`wpa_passphrase "${ssid}" "${password}" 2>/dev/null`);
+        const { stdout } = await execFileAsync('wpa_passphrase', [ssid, password]);
         pskHash = stdout;
       } catch (error) {
         logger.warn('wpa_passphrase not available, using plain password');
@@ -433,7 +496,7 @@ class WiFiService {
         // Open network (no password)
         networkBlock = `
 network={
-    ssid="${ssid}"
+    ssid="${escapeWpaString(ssid)}"
     key_mgmt=NONE
     priority=10
 }
@@ -445,8 +508,8 @@ network={
         
         networkBlock = `
 network={
-    ssid="${ssid}"
-    ${pskValue ? `psk=${pskValue}` : `psk="${password}"`}
+    ssid="${escapeWpaString(ssid)}"
+    ${pskValue ? `psk=${pskValue}` : `psk="${escapeWpaString(password)}"`}
     key_mgmt=WPA-PSK
     priority=10
 }
@@ -455,8 +518,8 @@ network={
         // Use plain password
         networkBlock = `
 network={
-    ssid="${ssid}"
-    psk="${password}"
+    ssid="${escapeWpaString(ssid)}"
+    psk="${escapeWpaString(password)}"
     key_mgmt=WPA-PSK
     priority=10
 }
@@ -464,7 +527,8 @@ network={
       }
       
       // Remove existing network block for this SSID if present
-      const ssidPattern = new RegExp(`network=\\{[^}]*ssid="${ssid}"[^}]*\\}`, 'g');
+      const escapedSsidForPattern = escapeRegExp(escapeWpaString(ssid));
+      const ssidPattern = new RegExp(`network=\\{[^}]*ssid="${escapedSsidForPattern}"[^}]*\\}`, 'g');
       existingConfig = existingConfig.replace(ssidPattern, '');
       
       // Append new network block
@@ -472,11 +536,11 @@ network={
       
       // Write to temporary file
       const tempFile = '/tmp/wpa_supplicant_temp.conf';
-      await execAsync(`echo '${newConfig.replace(/'/g, "'\\''")}'  | tee ${tempFile} > /dev/null`);
+      await fs.writeFile(tempFile, newConfig, { encoding: 'utf8', mode: 0o600 });
       
       // Copy to actual location
-      await execAsync(`cp ${tempFile} ${WPA_SUPPLICANT_CONF}`);
-      await execAsync(`chmod 600 ${WPA_SUPPLICANT_CONF}`);
+      await fs.copyFile(tempFile, WPA_SUPPLICANT_CONF);
+      await fs.chmod(WPA_SUPPLICANT_CONF, 0o600);
       
       // Restart wpa_supplicant
       await this._restartWpaSupplicant();
@@ -667,6 +731,8 @@ network={
    */
   async startHotspot(ssid = 'SmartMirror-Setup', password = '') {
     try {
+      validateWiFiValue(ssid, 'SSID', { maxLength: 64 });
+      validateWiFiValue(password || '', 'Password', { maxLength: 128, allowEmpty: true });
       logger.info('Starting WiFi hotspot', { ssid, password: password ? '***' : 'open' });
 
       // Ensure NetworkManager is available
@@ -679,10 +745,10 @@ network={
       } catch (_) {
         // Create a new hotspot (open if no password provided)
         if (password) {
-          await execAsync(`nmcli dev wifi hotspot ifname wlan0 ssid "${ssid}" password "${password}"`);
+          await execFileAsync('nmcli', ['dev', 'wifi', 'hotspot', 'ifname', 'wlan0', 'ssid', ssid, 'password', password]);
         } else {
           // Open hotspot without password
-          await execAsync(`nmcli dev wifi hotspot ifname wlan0 ssid "${ssid}"`);
+          await execFileAsync('nmcli', ['dev', 'wifi', 'hotspot', 'ifname', 'wlan0', 'ssid', ssid]);
         }
         logger.info('Created new hotspot', { open: !password });
       }
@@ -734,6 +800,9 @@ network={
   async forgetNetwork(targetSsid = null, forgetAll = false) {
     try {
       let ssid = targetSsid;
+      if (ssid != null) {
+        validateWiFiValue(ssid, 'SSID', { maxLength: 64 });
+      }
       if (!ssid) {
         const status = await this.getStatus();
         ssid = status?.ssid || null;
@@ -768,7 +837,7 @@ network={
           // Query connection details to match SSID
           for (const conn of wifiConns) {
             try {
-              const { stdout: details } = await execAsync(`nmcli connection show "${conn.name}"`);
+              const { stdout: details } = await execFileAsync('nmcli', ['connection', 'show', conn.name]);
               if (details.includes(`ssid = ${ssid}`) || conn.name === ssid || (conn.name && conn.name.includes(ssid))) {
                 toDelete.push(conn);
               }
@@ -779,7 +848,7 @@ network={
         // Delete the selected connections
         for (const { name, uuid } of toDelete) {
           try {
-            await execAsync(`nmcli connection delete uuid ${uuid}`);
+            await execFileAsync('nmcli', ['connection', 'delete', 'uuid', uuid]);
             logger.info('Deleted NM connection (uuid)', { name, uuid });
           } catch (e) {
             logger.warn('Failed to delete NM connection', { name, error: e.message });
@@ -789,10 +858,10 @@ network={
         // Remove any persisted NM profiles (.nmconnection files)
         try {
           if (forgetAll) {
-            await execAsync(`find /etc/NetworkManager/system-connections -type f -name '*.nmconnection' -exec rm -f {} +`);
+            await removeMatchingNmConnectionFiles();
             logger.info('Removed all NM system-connections files');
           } else {
-            await execAsync(`find /etc/NetworkManager/system-connections -type f -name '*${ssid}*.nmconnection' -exec rm -f {} +`);
+            await removeMatchingNmConnectionFiles(ssid);
             logger.info('Removed NM system-connections files for SSID', { ssid });
           }
           // Restart NetworkManager to flush caches
@@ -823,14 +892,14 @@ network={
             // Also remove lines until matching closing brace
             newConfig = newConfig.replace(/network=\{[\s\S]*?\}/g, '');
           } else {
-            const ssidPattern = new RegExp(`network=\\{[^}]*ssid=\"${ssid}\"[^}]*\\}`, 'g');
+            const ssidPattern = new RegExp(`network=\\{[^}]*ssid=\"${escapeRegExp(escapeWpaString(ssid))}\"[^}]*\\}`, 'g');
             newConfig = config.replace(ssidPattern, '').trim() + '\n';
           }
           if (newConfig !== config) {
             const tempFile = '/tmp/wpa_supplicant_temp_forget.conf';
-            await execAsync(`echo '${newConfig.replace(/'/g, "'\\''")}' | tee ${tempFile} > /dev/null`);
-            await execAsync(`cp ${tempFile} ${WPA_SUPPLICANT_CONF}`);
-            await execAsync(`chmod 600 ${WPA_SUPPLICANT_CONF}`);
+            await fs.writeFile(tempFile, newConfig, { encoding: 'utf8', mode: 0o600 });
+            await fs.copyFile(tempFile, WPA_SUPPLICANT_CONF);
+            await fs.chmod(WPA_SUPPLICANT_CONF, 0o600);
             await this._restartWpaSupplicant();
             logger.info('Removed SSID from wpa_supplicant', { ssid });
           }
