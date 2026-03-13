@@ -8,6 +8,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const fs = require('fs');
+const net = require('net');
 const path = require('path');
 const logger = require('./utils/logger');
 const settingsService = require('./services/settings');
@@ -37,6 +38,56 @@ const DEFAULT_ALLOWED_ORIGINS = new Set([
   'http://localhost:3002',
   'http://127.0.0.1:3002',
 ]);
+const DEFAULT_ALLOWED_PORTS = new Set(['', '80', '443', '3000', '3002']);
+const LOCAL_HOST_SUFFIXES = ['.local', '.localdomain', '.ts.net'];
+
+function isPrivateIpv4(hostname) {
+  const octets = hostname.split('.').map(Number);
+  if (octets.length !== 4 || octets.some((value) => Number.isNaN(value) || value < 0 || value > 255)) {
+    return false;
+  }
+
+  if (octets[0] === 10 || octets[0] === 127) {
+    return true;
+  }
+
+  if (octets[0] === 192 && octets[1] === 168) {
+    return true;
+  }
+
+  if (octets[0] === 172 && octets[1] >= 16 && octets[1] <= 31) {
+    return true;
+  }
+
+  // Tailscale commonly uses CGNAT space (100.64.0.0/10).
+  if (octets[0] === 100 && octets[1] >= 64 && octets[1] <= 127) {
+    return true;
+  }
+
+  return false;
+}
+
+function isLocalOriginHost(hostname) {
+  if (!hostname) {
+    return false;
+  }
+
+  const normalizedHostname = hostname.toLowerCase();
+  if (normalizedHostname === 'localhost' || normalizedHostname === '::1') {
+    return true;
+  }
+
+  if (LOCAL_HOST_SUFFIXES.some((suffix) => normalizedHostname.endsWith(suffix))) {
+    return true;
+  }
+
+  const ipVersion = net.isIP(normalizedHostname);
+  if (ipVersion === 4) {
+    return isPrivateIpv4(normalizedHostname);
+  }
+
+  return false;
+}
 
 function getAllowedOrigins() {
   const configuredOrigins = (process.env.CORS_ALLOWED_ORIGINS || '')
@@ -59,7 +110,19 @@ function isAllowedOrigin(origin) {
 
   try {
     const parsed = new URL(origin);
-    return !parsed.port || parsed.port === '80' || parsed.port === '443' || parsed.port === '3000' || parsed.port === '3002';
+    if (parsed.username || parsed.password) {
+      return false;
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return false;
+    }
+
+    if (!DEFAULT_ALLOWED_PORTS.has(parsed.port || '')) {
+      return false;
+    }
+
+    return isLocalOriginHost(parsed.hostname);
   } catch (_) {
     return false;
   }

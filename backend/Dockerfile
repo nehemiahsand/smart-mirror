@@ -17,6 +17,7 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     python3-dev \
     build-essential \
+    dbus-bin \
     network-manager \
     wireless-tools \
     iw \

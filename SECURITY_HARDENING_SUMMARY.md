@@ -246,6 +246,42 @@ Date: 2026-03-13
 - Added ignore rules for Python cache artifacts in:
   - `.gitignore`
 
+### 19. Backend CORS fallback tightened
+
+- Tightened origin validation in:
+  - `backend/src/index.js`
+- Removed the permissive fallback that trusted any origin on ports `80`, `443`, `3000`, or `3002`.
+- Backend now only allows:
+  - explicitly configured origins from `CORS_ALLOWED_ORIGINS`
+  - loopback origins
+  - private LAN IP origins
+  - `.local`, `.localdomain`, and `.ts.net` hostnames on expected ports
+- Rejected:
+  - origins with embedded credentials
+  - non-HTTP(S) origins
+  - arbitrary public hostnames that happened to use common ports
+
+### 20. Backend dependency tree remediated
+
+- Updated backend package constraints in:
+  - `backend/package.json`
+  - `backend/package-lock.json`
+- Upgraded or pinned safe versions for:
+  - `axios`
+  - `nodemon`
+  - `googleapis`
+  - `google-auth-library`
+  - `gaxios`
+  - `qs`
+  - `body-parser`
+- Replaced the legacy `dbus-next` dependency chain in:
+  - `backend/src/services/power.js`
+  - `backend/Dockerfile`
+- Power control now uses `dbus-send` via `execFile` instead of a Node DBus client library.
+- Result:
+  - `npm audit --json` now reports `0` backend vulnerabilities
+  - the vulnerable `request` / `node-gyp` / `tar` / `xml2js` chain was eliminated with the `dbus-next` removal
+
 ## New files added
 
 - `backend/src/utils/redaction.js`
@@ -290,16 +326,16 @@ Date: 2026-03-13
   - `./scripts/security-smoke-test.sh`
   - server-side admin session revocation (`GET /api/auth/session` changed from `200` before logout to `401` after logout using the same cookie jar)
   - camera raw stream access with a short-lived JWT stream token (`GET /api/camera/raw?streamToken=...` returned `200`)
+  - `GET /api/power/status` returned `{"available":true,"tokenConfigured":true}` after the `dbus-send` migration
+  - backend `npm audit --json` returned `0` vulnerabilities
 
 ## Still remaining
 
 - Voice still emits ALSA/JACK noise on startup even though it becomes functional after reconnecting to backend.
-- The backend dependency tree still reports unresolved `npm audit` findings and needs a separate remediation pass.
 
 ## Next task note
 
 - If desired, suppress the remaining ALSA/JACK noise during voice startup without regressing microphone capture.
-- Run a focused backend dependency audit/remediation pass and retest auth, WiFi, and OAuth flows after any package upgrades.
 - If desired, extend `scripts/security-smoke-test.sh` into CI or a systemd post-deploy check.
 
 ## Recommended next pass
