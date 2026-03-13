@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import './Photos.css';
+import { apiFetch, getApiUrl } from '../apiClient';
 
 /**
  * PhotosWidget - Displays rotating photos
@@ -18,9 +19,10 @@ const PhotosWidget = ({
     useEffect(() => {
         const fetchPhotos = async () => {
             try {
-                // Fetch photos from backend API
-                const baseURL = import.meta.env.VITE_WS_URL?.replace('ws://', 'http://') || 'http://localhost:3001';
-                const response = await fetch(`${baseURL}/api/photos`);
+                const baseURL = getApiUrl();
+                const imageApiKey = import.meta.env.VITE_API_KEY;
+                const imageQuery = imageApiKey ? `?apiKey=${encodeURIComponent(imageApiKey)}` : '';
+                const response = await apiFetch('/api/photos');
                 const data = await response.json();
 
                 if (data.error) {
@@ -34,7 +36,7 @@ const PhotosWidget = ({
                     // Add base URL to photo paths
                     const photosWithFullUrls = data.photos.map(photo => ({
                         ...photo,
-                        url: `${baseURL}${photo.url}`
+                        url: `${baseURL}${photo.url}${imageQuery}`
                     }));
                     setPhotos(photosWithFullUrls);
                 } else {

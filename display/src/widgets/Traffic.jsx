@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import './Traffic.css';
+import { apiFetch } from '../apiClient';
 
 const Traffic = () => {
     const [trafficData, setTrafficData] = useState(null);
@@ -19,7 +20,7 @@ const Traffic = () => {
     useEffect(() => {
         const fetchTrafficData = async () => {
             try {
-                const response = await fetch('http://localhost:3001/api/traffic/commute');
+                const response = await apiFetch('/api/traffic/commute');
                 if (!response.ok) {
                     throw new Error('Failed to fetch traffic data');
                 }
@@ -36,8 +37,8 @@ const Traffic = () => {
 
         fetchTrafficData();
 
-        // Refresh every 5 minutes
-        const interval = setInterval(fetchTrafficData, 5 * 60 * 1000);
+        // Refresh every 10 minutes
+        const interval = setInterval(fetchTrafficData, 10 * 60 * 1000);
 
         return () => clearInterval(interval);
     }, []);

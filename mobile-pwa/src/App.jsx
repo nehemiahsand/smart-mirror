@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
 import WiFiSettings from './pages/WiFiSettings';
 import Camera from './pages/Camera';
@@ -8,6 +8,7 @@ import Photos from './pages/Photos';
 import Settings from './pages/Settings';
 import SportsSettings from './pages/SportsSettings';
 import MoreMenu from './pages/MoreMenu';
+import Login from './pages/Login';
 import './components/common.css';
 import './App.css';
 
@@ -24,29 +25,39 @@ function App() {
 function AppContent() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const isLoginPage = location.pathname === '/login';
 
   useEffect(() => {
     const path = location.pathname.slice(1) || 'dashboard';
     setActiveTab(path);
   }, [location]);
 
+  const RequireAuth = ({ children }) => {
+    const token = window.localStorage.getItem('adminToken');
+    if (!token) {
+      return <Navigate to="/login" replace />;
+    }
+    return children;
+  };
+
   return (
     <>
       <main className="main-content">
         <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/wifi" element={<WiFiSettings />} />
-          <Route path="/camera" element={<Camera />} />
-          <Route path="/widgets" element={<WidgetManager />} />
-          <Route path="/photos" element={<Photos />} />
-          <Route path="/sports" element={<SportsSettings />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/more" element={<MoreMenu />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+          <Route path="/wifi" element={<RequireAuth><WiFiSettings /></RequireAuth>} />
+          <Route path="/camera" element={<RequireAuth><Camera /></RequireAuth>} />
+          <Route path="/widgets" element={<RequireAuth><WidgetManager /></RequireAuth>} />
+          <Route path="/photos" element={<RequireAuth><Photos /></RequireAuth>} />
+          <Route path="/sports" element={<RequireAuth><SportsSettings /></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><Settings /></RequireAuth>} />
+          <Route path="/more" element={<RequireAuth><MoreMenu /></RequireAuth>} />
         </Routes>
       </main>
 
-      <nav className="bottom-nav">
+      {!isLoginPage && <nav className="bottom-nav">
         <Link to="/dashboard" className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
           <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
@@ -81,7 +92,7 @@ function AppContent() {
           </svg>
           <span className="nav-label">More</span>
         </Link>
-      </nav>
+      </nav>}
     </>
   );
 }

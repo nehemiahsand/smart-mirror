@@ -2,14 +2,14 @@ import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
 import ConfirmModal from '../components/ConfirmModal';
 import AlertModal from '../components/AlertModal';
-
-const API_BASE = `http://${window.location.hostname}:3001`;
+import { apiFetch } from '../apiClient';
 
 export default function Dashboard() {
   const [sensorData, setSensorData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [trafficData, setTrafficData] = useState(null);
   const [settings, setSettings] = useState(null);
+  const [privacy, setPrivacy] = useState({ cameraEnabled: true, voiceEnabled: true });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
@@ -23,20 +23,47 @@ export default function Dashboard() {
 
   const fetchData = async () => {
     try {
-      const [sensor, weather, traffic, settingsData] = await Promise.all([
-        fetch(`${API_BASE}/api/sensor`).then(r => r.json()),
-        fetch(`${API_BASE}/api/weather`).then(r => r.json()),
-        fetch(`${API_BASE}/api/traffic/commute`).then(r => r.json()).catch(() => null),
-        fetch(`${API_BASE}/api/settings`).then(r => r.json())
+      const [sensor, weather, traffic, settingsData, privacyStatus] = await Promise.all([
+        apiFetch('/api/sensor').then(r => r.json()),
+        apiFetch('/api/weather').then(r => r.json()),
+        apiFetch('/api/traffic/commute').then(r => r.json()).catch(() => null),
+        apiFetch('/api/settings').then(r => r.json()),
+        apiFetch('/api/privacy/status').then(r => r.json())
       ]);
       setSensorData(sensor);
       setWeatherData(weather);
       setTrafficData(traffic);
       setSettings(settingsData);
+      setPrivacy({
+        cameraEnabled: privacyStatus.cameraEnabled !== false,
+        voiceEnabled: privacyStatus.voiceEnabled !== false
+      });
       setLoading(false);
     } catch (error) {
       console.error('Failed to fetch data:', error);
       setLoading(false);
+    }
+  };
+
+  const updatePrivacy = async (changes) => {
+    const newPrivacy = { ...privacy, ...changes };
+    setPrivacy(newPrivacy);
+    try {
+      const res = await apiFetch('/api/privacy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cameraEnabled: newPrivacy.cameraEnabled,
+          voiceEnabled: newPrivacy.voiceEnabled
+        })
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || `Server returned ${res.status}`);
+      }
+    } catch (error) {
+      setAlertModal({ type: 'error', message: `Failed to update privacy: ${error.message}` });
+      fetchData();
     }
   };
 
@@ -52,7 +79,7 @@ export default function Dashboard() {
     setBusy(true);
     try {
       console.log('Power request:', action);
-      const res = await fetch(`${API_BASE}/api/power/${action}`, {
+      const res = await apiFetch(`/api/power/${action}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -79,7 +106,7 @@ export default function Dashboard() {
   const refreshDisplay = async () => {
     setBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/api/display/refresh`, {
+      const res = await apiFetch('/api/display/refresh', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -101,7 +128,7 @@ export default function Dashboard() {
     setBusy(true);
     try {
       const newStandbyMode = !settings?.display?.standbyMode;
-      const res = await fetch(`${API_BASE}/api/settings`, {
+      const res = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,7 +159,7 @@ export default function Dashboard() {
   const changePage = async (page) => {
     setBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/api/broadcast`, {
+      const res = await apiFetch('/api/broadcast', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -243,6 +270,31 @@ export default function Dashboard() {
         </div>
 
         {/* Quick Actions */}
+        <div className="card">
+          <div className="card-header">
+            <span className="card-icon">🔒</span>
+            <h2>Privacy & Input</h2>
+          </div>
+          <div className="quick-actions">
+            <button
+              className={`action-btn ${privacy.cameraEnabled ? '' : 'danger'}`}
+              disabled={busy}
+              onClick={() => updatePrivacy({ cameraEnabled: !privacy.cameraEnabled })}
+            >
+              <span>{privacy.cameraEnabled ? '📷' : '🚫'}</span>
+              {privacy.cameraEnabled ? 'Disable Camera Input' : 'Enable Camera Input'}
+            </button>
+            <button
+              className={`action-btn ${privacy.voiceEnabled ? '' : 'danger'}`}
+              disabled={busy}
+              onClick={() => updatePrivacy({ voiceEnabled: !privacy.voiceEnabled })}
+            >
+              <span>{privacy.voiceEnabled ? '🎤' : '🚫'}</span>
+              {privacy.voiceEnabled ? 'Disable Voice Input' : 'Enable Voice Input'}
+            </button>
+          </div>
+        </div>
+
         <div className="card">
           <div className="card-header">
             <span className="card-icon">⚡</span>

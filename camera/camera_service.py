@@ -21,6 +21,7 @@ class PersonDetector:
     def __init__(self, camera_index=0):
         self.camera_index = camera_index
         self.camera = None
+        self.enabled = True
         
         # MediaPipe Pose with maximum optimization
         self.mp_pose = mp.solutions.pose
@@ -269,13 +270,23 @@ detector = PersonDetector(camera_index=0)
 
 def detection_loop():
     """Main camera capture loop running in background thread"""
-    if not detector.initialize_camera():
-        logger.error("Camera initialization failed - detection disabled")
-        return
-    
     logger.info("Starting camera capture loop (10 FPS capture, AI detection every 5 seconds)...")
     while True:
         try:
+            if not detector.enabled:
+                if detector.camera is not None:
+                    logger.info("Camera disabled - releasing device")
+                    detector.release()
+                    detector.camera = None
+                time.sleep(0.5)
+                continue
+
+            if detector.camera is None or not detector.camera.isOpened():
+                if not detector.initialize_camera():
+                    logger.error("Camera initialization failed - will retry in 5 seconds")
+                    time.sleep(5)
+                    continue
+
             detector.process_frame()
             time.sleep(0.1)  # Capture at 10 FPS for smoother video
         except Exception as e:
@@ -298,6 +309,7 @@ def health():
 def detection_status():
     """Get current person detection status"""
     return jsonify({
+        'enabled': detector.enabled,
         'person_detected': detector.person_detected,
         'motion_detected': detector.motion_detected,
         'last_detection': detector.last_detection_time,
@@ -307,6 +319,21 @@ def detection_status():
         'brightness': detector.brightness,
         'is_dark': detector.is_dark
     })
+
+@app.route('/control/enable', methods=['POST'])
+def enable_camera():
+    """Enable camera capture and AI detection"""
+    detector.enabled = True
+    logger.info("Camera input ENABLED via control endpoint")
+    return jsonify({'success': True, 'enabled': True})
+
+@app.route('/control/disable', methods=['POST'])
+def disable_camera():
+    """Disable camera capture and AI detection (releases device)"""
+    detector.enabled = False
+    # Actual release happens in detection loop
+    logger.info("Camera input DISABLED via control endpoint")
+    return jsonify({'success': True, 'enabled': False})
 
 @app.route('/video/raw')
 def video_raw():
@@ -330,4 +357,4 @@ def video_raw():
 
 if __name__ == '__main__':
     logger.info("Camera service starting on port 5556...")
-    app.run(host='0.0.0.0', port=5556, threaded=True, debug=False)
+    app.run(host='127.0.0.1', port=5556, threaded=True, debug=False)

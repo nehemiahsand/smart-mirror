@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './WidgetManager.css';
 import AlertModal from '../components/AlertModal';
-
-const API_BASE = `http://${window.location.hostname}:3001`;
+import { apiFetch } from '../apiClient';
 
 const WIDGETS = [
   { id: 'timedate', name: 'Time & Date', icon: '🕐' },
@@ -23,7 +22,7 @@ export default function WidgetManager() {
 
   const loadWidgets = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/settings`);
+      const response = await apiFetch('/api/settings');
       const settings = await response.json();
 
       const widgetOrder = settings.widgetOrder || [];
@@ -64,7 +63,7 @@ export default function WidgetManager() {
         widgetOrder: widgets.map(w => w.id),
       };
 
-      await fetch(`${API_BASE}/api/settings`, {
+      await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedSettings)

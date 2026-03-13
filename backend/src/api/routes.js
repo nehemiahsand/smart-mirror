@@ -34,9 +34,108 @@ const upload = multer({
 });
 
 const router = express.Router();
+const adminAuth = require('../middleware/adminAuth');
+
+const SENSITIVE_KEY_PATTERNS = [/token/i, /secret/i, /password/i, /api.?key/i, /authorization/i];
+
+function isSensitiveKey(key) {
+  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(String(key)));
+}
+
+function redactSensitive(value, parentKey = '') {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitive(item, parentKey));
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  const redacted = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (isSensitiveKey(key) || isSensitiveKey(parentKey)) {
+      redacted[key] = nestedValue == null ? nestedValue : '[REDACTED]';
+    } else {
+      redacted[key] = redactSensitive(nestedValue, key);
+    }
+  }
+
+  return redacted;
+}
 
 // Mount layout routes
 router.use(layoutRoutes);
+
+// ===== Auth Endpoints =====
+// Simple admin login using ADMIN_PASSWORD env and signed tokens
+const { createToken } = require('../utils/auth');
+
+router.post('/auth/login', (req, res) => {
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminPassword) {
+    return res.status(500).json({ error: 'Admin password not configured on server' });
+  }
+
+  const { password } = req.body || {};
+  if (!password) {
+    return res.status(400).json({ error: 'Password is required' });
+  }
+
+  if (password !== adminPassword) {
+    return res.status(401).json({ error: 'Invalid password' });
+  }
+
+  const token = createToken({ role: 'admin', username: 'admin' });
+  res.json({ token });
+});
+
+// ===== Privacy / Input Control Endpoints =====
+router.get('/privacy/status', (req, res) => {
+  try {
+    const settings = settingsService.getAll();
+    const cameraEnabled = settings.camera?.enabled !== false;
+    const voiceEnabled = settings.voice?.enabled !== false;
+    res.json({ cameraEnabled, voiceEnabled });
+  } catch (error) {
+    logger.error('Failed to get privacy status', { error: error.message });
+    res.status(500).json({ error: 'Failed to get privacy status' });
+  }
+});
+
+router.post('/privacy', adminAuth, async (req, res) => {
+  try {
+    const { cameraEnabled, voiceEnabled } = req.body || {};
+    const updates = {};
+    const currentSettings = settingsService.getAll();
+    const isStandby = currentSettings?.display?.standbyMode === true;
+
+    if (typeof cameraEnabled === 'boolean') {
+      updates['camera.enabled'] = cameraEnabled;
+    }
+    if (typeof voiceEnabled === 'boolean') {
+      updates['voice.enabled'] = isStandby ? false : voiceEnabled;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'No valid privacy fields provided' });
+    }
+
+    const updatedSettings = await settingsService.updateMultiple(updates);
+
+    // Apply camera toggle immediately
+    if (typeof cameraEnabled === 'boolean') {
+      await cameraService.setCameraEnabled(cameraEnabled);
+    }
+
+    // Broadcast settings update
+    websocketServer.broadcastSettingsUpdate(updatedSettings);
+
+    res.json({ success: true, settings: updatedSettings });
+  } catch (error) {
+    logger.error('Failed to update privacy settings', { error: error.message });
+    res.status(500).json({ error: 'Failed to update privacy settings' });
+  }
+});
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -53,7 +152,7 @@ router.get('/power/status', async (req, res) => {
   res.json({ available: powerService.isAvailable(), tokenConfigured: true });
 });
 
-router.post('/power/reboot', async (req, res) => {
+router.post('/power/reboot', adminAuth, async (req, res) => {
   try {
     if (!powerService.isAvailable()) {
       return res.status(503).json({ error: 'Power service unavailable' });
@@ -69,7 +168,7 @@ router.post('/power/reboot', async (req, res) => {
   }
 });
 
-router.post('/power/shutdown', async (req, res) => {
+router.post('/power/shutdown', adminAuth, async (req, res) => {
   try {
     if (!powerService.isAvailable()) {
       return res.status(503).json({ error: 'Power service unavailable' });
@@ -84,7 +183,7 @@ router.post('/power/shutdown', async (req, res) => {
   }
 });
 
-router.post('/display/refresh', (req, res) => {
+router.post('/display/refresh', adminAuth, (req, res) => {
   try {
     // Notify all connected WebSocket clients to refresh
     const wss = req.app.get('websocket');
@@ -112,7 +211,7 @@ router.get('/camera/status', async (req, res) => {
   }
 });
 
-router.get('/camera/raw', async (req, res) => {
+router.get('/camera/raw', adminAuth, async (req, res) => {
   try {
     const http = require('http');
     const CAMERA_URL = process.env.CAMERA_URL || 'http://127.0.0.1:5556';
@@ -161,7 +260,7 @@ router.get('/camera/raw', async (req, res) => {
   }
 });
 
-router.post('/camera/auto-standby', async (req, res) => {
+router.post('/camera/auto-standby', adminAuth, async (req, res) => {
   try {
     const { enabled } = req.body;
     if (typeof enabled !== 'boolean') {
@@ -201,7 +300,7 @@ router.post('/display/power', async (req, res) => {
 router.get('/settings', (req, res) => {
   try {
     const settings = settingsService.getAll();
-    res.json(settings);
+    res.json(redactSensitive(settings));
   } catch (error) {
     logger.error('Failed to get settings', { error: error.message });
     res.status(500).json({ error: 'Failed to retrieve settings' });
@@ -215,7 +314,10 @@ router.get('/settings/:key', (req, res) => {
     if (value === undefined) {
       return res.status(404).json({ error: 'Setting not found' });
     }
-    res.json({ key: req.params.key, value });
+    if (isSensitiveKey(req.params.key)) {
+      return res.json({ key: req.params.key, value: value == null ? value : '[REDACTED]' });
+    }
+    res.json({ key: req.params.key, value: redactSensitive(value, req.params.key) });
   } catch (error) {
     logger.error('Failed to get setting', { error: error.message });
     res.status(500).json({ error: 'Failed to retrieve setting' });
@@ -223,7 +325,7 @@ router.get('/settings/:key', (req, res) => {
 });
 
 // Update single setting
-router.put('/settings/:key', async (req, res) => {
+router.put('/settings/:key', adminAuth, async (req, res) => {
   try {
     const { value } = req.body;
     if (value === undefined) {
@@ -243,11 +345,17 @@ router.put('/settings/:key', async (req, res) => {
 });
 
 // Update multiple settings (POST method)
-router.post('/settings', async (req, res) => {
+router.post('/settings', adminAuth, async (req, res) => {
   try {
-    const updates = req.body;
+    const updates = { ...(req.body || {}) };
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ error: 'Invalid request body' });
+    }
+
+    if (updates['display.standbyMode'] === true) {
+      updates['voice.enabled'] = false;
+    } else if (updates['display.standbyMode'] === false) {
+      updates['voice.enabled'] = true;
     }
     
     const settings = await settingsService.updateMultiple(updates);
@@ -296,11 +404,17 @@ router.post('/settings', async (req, res) => {
 });
 
 // Update multiple settings (PUT method)
-router.put('/settings', async (req, res) => {
+router.put('/settings', adminAuth, async (req, res) => {
   try {
-    const updates = req.body;
+    const updates = { ...(req.body || {}) };
     if (!updates || typeof updates !== 'object') {
       return res.status(400).json({ error: 'Invalid request body' });
+    }
+
+    if (updates['display.standbyMode'] === true) {
+      updates['voice.enabled'] = false;
+    } else if (updates['display.standbyMode'] === false) {
+      updates['voice.enabled'] = true;
     }
     
     const settings = await settingsService.updateMultiple(updates);
@@ -349,7 +463,7 @@ router.put('/settings', async (req, res) => {
 });
 
 // Reset settings to defaults
-router.post('/settings/reset', async (req, res) => {
+router.post('/settings/reset', adminAuth, async (req, res) => {
   try {
     const settings = await settingsService.reset();
     websocketServer.broadcastSettingsUpdate(settings);
@@ -543,7 +657,7 @@ router.get('/wifi/captive-portal', async (req, res) => {
 });
 
 // Scan for WiFi networks
-router.get('/wifi/scan', async (req, res) => {
+router.get('/wifi/scan', adminAuth, async (req, res) => {
   try {
     const networks = await wifiService.scanNetworks();
     res.json({ networks, count: networks.length });
@@ -554,7 +668,7 @@ router.get('/wifi/scan', async (req, res) => {
 });
 
 // Connect to WiFi network
-router.post('/wifi/connect', async (req, res) => {
+router.post('/wifi/connect', adminAuth, async (req, res) => {
   try {
     const { ssid, password } = req.body;
     
@@ -591,7 +705,7 @@ router.post('/wifi/connect', async (req, res) => {
 });
 
 // Forget/disconnect from WiFi
-router.post('/wifi/forget', async (req, res) => {
+router.post('/wifi/forget', adminAuth, async (req, res) => {
   try {
     const { ssid, forgetAll } = req.body || {};
     const result = await wifiService.forgetNetwork(ssid, !!forgetAll);
@@ -609,7 +723,7 @@ router.post('/wifi/forget', async (req, res) => {
 });
 
 // Disconnect from WiFi
-router.post('/wifi/disconnect', async (req, res) => {
+router.post('/wifi/disconnect', adminAuth, async (req, res) => {
   try {
     const result = await wifiService.disconnect();
     
@@ -625,7 +739,7 @@ router.post('/wifi/disconnect', async (req, res) => {
 });
 
 // Hotspot status
-router.get('/wifi/hotspot/status', async (req, res) => {
+router.get('/wifi/hotspot/status', adminAuth, async (req, res) => {
   try {
     const status = await wifiService.hotspotStatus();
     res.json(status);
@@ -636,7 +750,7 @@ router.get('/wifi/hotspot/status', async (req, res) => {
 });
 
 // Start hotspot
-router.post('/wifi/hotspot/start', async (req, res) => {
+router.post('/wifi/hotspot/start', adminAuth, async (req, res) => {
   try {
     const { ssid, password } = req.body || {};
     const result = await wifiService.startHotspot(ssid, password);
@@ -648,7 +762,7 @@ router.post('/wifi/hotspot/start', async (req, res) => {
 });
 
 // Stop hotspot
-router.post('/wifi/hotspot/stop', async (req, res) => {
+router.post('/wifi/hotspot/stop', adminAuth, async (req, res) => {
   try {
     const result = await wifiService.stopHotspot();
     res.json(result);
@@ -714,7 +828,7 @@ router.get('/sensor/status', (req, res) => {
 // ===== Display Endpoints =====
 
 // Display a message on the mirror
-router.post('/display/message', async (req, res) => {
+router.post('/display/message', adminAuth, async (req, res) => {
   try {
     const { message, duration = 5000, priority = 'normal' } = req.body;
     
@@ -825,17 +939,52 @@ router.get('/calendar/list', async (req, res) => {
 // Get system info
 router.get('/system/info', (req, res) => {
   try {
+    const os = require('os');
+    const fs = require('fs');
+    const cpuCount = os.cpus().length || 1;
+    const [load1, load5, load15] = os.loadavg();
+
+    let disk = null;
+    try {
+      const diskPath = '/app/data';
+      const stat = fs.statfsSync(diskPath);
+      const blockSize = stat.bsize || stat.frsize || 4096;
+      const totalBytes = Number(stat.blocks) * Number(blockSize);
+      const freeBytes = Number(stat.bavail) * Number(blockSize);
+      const usedBytes = Math.max(0, totalBytes - freeBytes);
+      const usedPercent = totalBytes > 0 ? Math.round((usedBytes / totalBytes) * 100) : 0;
+
+      disk = {
+        path: diskPath,
+        totalBytes,
+        freeBytes,
+        usedBytes,
+        usedPercent
+      };
+    } catch (diskError) {
+      logger.warn('Failed to read disk stats', { error: diskError.message });
+    }
+
     res.json({
+      hostname: os.hostname(),
       platform: process.platform,
       arch: process.arch,
       nodeVersion: process.version,
       memory: {
-        total: Math.round(require('os').totalmem() / 1024 / 1024),
-        free: Math.round(require('os').freemem() / 1024 / 1024),
-        used: Math.round((require('os').totalmem() - require('os').freemem()) / 1024 / 1024)
+        total: Math.round(os.totalmem() / 1024 / 1024),
+        free: Math.round(os.freemem() / 1024 / 1024),
+        used: Math.round((os.totalmem() - os.freemem()) / 1024 / 1024)
       },
-      uptime: process.uptime(),
-      cpus: require('os').cpus().length
+      uptime: os.uptime(),
+      processUptime: process.uptime(),
+      cpus: cpuCount,
+      cpuLoad: {
+        load1,
+        load5,
+        load15,
+        normalized1mPercent: Math.round((load1 / cpuCount) * 100)
+      },
+      disk
     });
   } catch (error) {
     logger.error('Failed to get system info', { error: error.message });
@@ -879,17 +1028,17 @@ router.get('/traffic/commute', async (req, res) => {
       return res.status(400).json({ error: 'Traffic widget not configured' });
     }
 
-    const { origin, destination, googleMapsApiKey } = settings.traffic;
+    const { origin, destination, tomtomApiKey } = settings.traffic;
     
     if (!origin || !destination) {
       return res.status(400).json({ error: 'Origin and destination must be configured in settings' });
     }
 
-    if (!googleMapsApiKey) {
-      return res.status(400).json({ error: 'Google Maps API key not configured' });
+    if (!tomtomApiKey) {
+      return res.status(400).json({ error: 'TomTom API key not configured' });
     }
 
-    const data = await trafficService.getCommuteData(origin, destination, googleMapsApiKey);
+    const data = await trafficService.getCommuteData(origin, destination, tomtomApiKey);
     res.json(data);
   } catch (error) {
     logger.error('Failed to get traffic data', { error: error.message });
@@ -897,7 +1046,7 @@ router.get('/traffic/commute', async (req, res) => {
   }
 });
 
-router.post('/traffic/clear-cache', async (req, res) => {
+router.post('/traffic/clear-cache', adminAuth, async (req, res) => {
   try {
     trafficService.clearCache();
     res.json({ success: true, message: 'Cache cleared' });
@@ -936,7 +1085,7 @@ router.get('/sports/:sport/scores', async (req, res) => {
 });
 
 // Clear cache for specific sport or all sports
-router.post('/sports/clear-cache', async (req, res) => {
+router.post('/sports/clear-cache', adminAuth, async (req, res) => {
   try {
     const sport = req.body.sport || null;
     sportsService.clearCache(sport);
@@ -959,7 +1108,7 @@ router.get('/nba/scores', async (req, res) => {
   }
 });
 
-router.post('/nba/clear-cache', async (req, res) => {
+router.post('/nba/clear-cache', adminAuth, async (req, res) => {
   try {
     sportsService.clearCache('nba');
     res.json({ success: true, message: 'Cache cleared' });

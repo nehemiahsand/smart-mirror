@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import './WeatherTraffic.css';
+import { apiFetch } from '../apiClient';
 
 /**
  * WeatherTrafficWidget - Combined weather, indoor temp, and traffic display
@@ -21,7 +22,7 @@ const WeatherTrafficWidget = ({ weatherData, sensorData, className = '' }) => {
     useEffect(() => {
         const fetchTrafficData = async () => {
             try {
-                const response = await fetch('http://localhost:3001/api/traffic/commute');
+                const response = await apiFetch('/api/traffic/commute');
                 if (!response.ok) {
                     throw new Error('Failed to fetch traffic data');
                 }

@@ -8,6 +8,11 @@ const logger = require('../utils/logger');
 
 const SETTINGS_DIR = path.join(__dirname, '../../data');
 const SETTINGS_FILE = path.join(SETTINGS_DIR, 'settings.json');
+const SENSITIVE_KEY_PATTERNS = [/token/i, /secret/i, /password/i, /api.?key/i, /authorization/i];
+
+function isSensitiveKey(key) {
+  return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(String(key)));
+}
 
 const DEFAULT_SETTINGS = {
   display: {
@@ -115,7 +120,10 @@ class SettingsService {
     
     target[keys[keys.length - 1]] = value;
     await this.save();
-    logger.info('Setting updated', { key, value });
+    logger.info('Setting updated', {
+      key,
+      value: isSensitiveKey(key) ? '[REDACTED]' : value
+    });
     
     return this.settings;
   }
@@ -137,7 +145,8 @@ class SettingsService {
     }
     
     await this.save();
-    logger.info('Multiple settings updated', { count: Object.keys(updates).length });
+    const updatedKeys = Object.keys(updates).map((key) => (isSensitiveKey(key) ? `${key}:[REDACTED]` : key));
+    logger.info('Multiple settings updated', { count: Object.keys(updates).length, keys: updatedKeys });
     
     return this.settings;
   }

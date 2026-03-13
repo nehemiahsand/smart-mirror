@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import './GoogleCalendar.css';
+import { apiFetch } from '../apiClient';
 
 /**
  * GoogleCalendar Widget - Displays upcoming events from Google Calendar
@@ -20,7 +21,7 @@ const GoogleCalendarWidget = ({ className = '' }) => {
 
     const fetchEvents = async () => {
         try {
-            const response = await fetch('http://localhost:3001/api/calendar/events');
+            const response = await apiFetch('/api/calendar/events');
             if (!response.ok) {
                 const errorData = await response.json();
                 throw new Error(errorData.error || 'Failed to fetch calendar events');

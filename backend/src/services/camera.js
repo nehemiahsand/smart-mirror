@@ -25,6 +25,8 @@ class CameraService {
     this.isDark = false;
     this.brightness = 100;
     this.darkStandbyEnabled = true; // Enable standby when room goes dark
+    this.cameraEnabled = true;
+    this.cameraWarmupUntil = 0;
   }
 
   async initialize() {
@@ -97,6 +99,9 @@ class CameraService {
   }
 
   async checkPersonDetection() {
+    if (!this.cameraEnabled) {
+      return;
+    }
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
       const { person_detected, total_detections, fps, is_dark, brightness } = response.data;
@@ -106,6 +111,15 @@ class CameraService {
       this.personDetected = person_detected;
       this.isDark = is_dark;
       this.brightness = brightness;
+
+      // After camera is re-enabled, allow a short warmup period to avoid
+      // false dark/no-person standby transitions while exposure stabilizes.
+      if (Date.now() < this.cameraWarmupUntil) {
+        if (person_detected) {
+          this.lastDetectionTime = Date.now();
+        }
+        return;
+      }
 
       // Check for dark room - enter standby immediately when lights go off
       if (this.darkStandbyEnabled && is_dark && !previousDarkState) {
@@ -174,7 +188,10 @@ class CameraService {
         }
         
         // Use the same logic as the standby button
-        await settingsService.updateMultiple({ 'display.standbyMode': false });
+        await settingsService.updateMultiple({
+          'display.standbyMode': false,
+          'voice.enabled': true
+        });
         await displayService.turnOn();
         
         // Broadcast settings change to update PWA immediately
@@ -198,7 +215,10 @@ class CameraService {
         logger.info('Entering standby mode (no person for 5 minutes)...');
         
         // Use the same logic as the standby button
-        await settingsService.updateMultiple({ 'display.standbyMode': true });
+        await settingsService.updateMultiple({
+          'display.standbyMode': true,
+          'voice.enabled': false
+        });
         await displayService.turnOff();
         
         // Broadcast settings change to update PWA immediately
@@ -221,6 +241,7 @@ class CameraService {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
       return {
         available: this.isAvailable,
+        enabled: response.data.enabled !== false,
         person_detected: response.data.person_detected,
         total_detections: response.data.total_detections,
         fps: response.data.fps,
@@ -259,6 +280,25 @@ class CameraService {
       this.shutdownTimer = null;
       this.standbyStartTime = null;
       logger.info('Auto-shutdown timer cancelled');
+    }
+  }
+
+  async setCameraEnabled(enabled) {
+    this.cameraEnabled = enabled;
+    if (enabled) {
+      this.cameraWarmupUntil = Date.now() + 20000;
+      this.lastDetectionTime = Date.now();
+      this.personDetected = false;
+      this.isDark = false;
+    } else {
+      this.cameraWarmupUntil = 0;
+    }
+    const path = enabled ? '/control/enable' : '/control/disable';
+    try {
+      await axios.post(`${CAMERA_URL}${path}`, {}, { timeout: 3000 });
+      logger.info(`Camera input ${enabled ? 'enabled' : 'disabled'} via camera service`);
+    } catch (error) {
+      logger.error('Failed to toggle camera input', { error: error.message });
     }
   }
 

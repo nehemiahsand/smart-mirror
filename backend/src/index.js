@@ -17,6 +17,7 @@ const dht22Service = require('./sensors/dht22');
 const websocketServer = require('./api/websocket');
 const apiRoutes = require('./api/routes');
 const spotifyRoutes = require('./api/spotify-routes');
+const apiKeyMiddleware = require('./middleware/apiKey');
 
 const PORT = process.env.PORT || 3001;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -46,8 +47,9 @@ app.use((req, res, next) => {
 });
 
 // API Routes
-app.use('/api', apiRoutes);
-app.use('/api/spotify', spotifyRoutes);
+// Protect all API endpoints with API key middleware when API_KEY is configured
+app.use('/api/spotify', apiKeyMiddleware, spotifyRoutes);
+app.use('/api', apiKeyMiddleware, apiRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {

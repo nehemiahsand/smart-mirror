@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './SportsSettings.css';
 import AlertModal from '../components/AlertModal';
-
-const API_BASE = `http://${window.location.hostname}:3001`;
+import { apiFetch } from '../apiClient';
 
 export default function SportsSettings() {
   const [settings, setSettings] = useState(null);
@@ -19,8 +18,8 @@ export default function SportsSettings() {
   const loadData = async () => {
     try {
       const [settingsData, sportsData] = await Promise.all([
-        fetch(`${API_BASE}/api/settings`).then(r => r.json()),
-        fetch(`${API_BASE}/api/sports`).then(r => r.json())
+        apiFetch('/api/settings').then(r => r.json()),
+        apiFetch('/api/sports').then(r => r.json())
       ]);
 
       setSettings(settingsData);
@@ -41,7 +40,7 @@ export default function SportsSettings() {
   const handleSportSelect = async (sportId) => {
     setSaving(true);
     try {
-      const response = await fetch(`${API_BASE}/api/settings`, {
+      const response = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

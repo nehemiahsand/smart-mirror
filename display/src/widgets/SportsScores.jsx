@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './SportsScores.css';
+import { apiFetch } from '../apiClient';
 
 function SportsScores({ sport = 'nba', teams = [] }) {
     const [games, setGames] = useState([]);
@@ -45,9 +46,9 @@ function SportsScores({ sport = 'nba', teams = [] }) {
         console.log(`SportsScores: fetching scores for ${sport}`);
         try {
             const teamsParam = teams && teams.length > 0 ? `?teams=${teams.join(',')}` : '';
-            const url = `http://localhost:3001/api/sports/${sport}/scores${teamsParam}`;
+            const url = `/api/sports/${sport}/scores${teamsParam}`;
             console.log(`SportsScores: URL =`, url);
-            const response = await fetch(url);
+            const response = await apiFetch(url);
 
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);

@@ -1,9 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import './Camera.css';
-
-const API_BASE = `http://${window.location.hostname}:3001`;
+import { apiFetch, getApiBase } from '../apiClient';
 
 export default function Camera() {
+    const API_KEY = import.meta.env.VITE_API_KEY;
+    const adminToken = window.localStorage.getItem('adminToken') || '';
+    const streamQuery = new URLSearchParams();
+    if (API_KEY) {
+        streamQuery.set('apiKey', API_KEY);
+    }
+    if (adminToken) {
+        streamQuery.set('authToken', adminToken);
+    }
+    const streamUrl = `${getApiBase()}/api/camera/raw${streamQuery.toString() ? `?${streamQuery.toString()}` : ''}`;
+
     const [cameraStatus, setCameraStatus] = useState(null);
     const [autoStandby, setAutoStandby] = useState(true);
     const [loading, setLoading] = useState(true);
@@ -17,7 +27,7 @@ export default function Camera() {
 
     const loadCameraStatus = async () => {
         try {
-            const response = await fetch(`${API_BASE}/api/camera/status`);
+            const response = await apiFetch('/api/camera/status');
             const data = await response.json();
             setCameraStatus(data);
             if (data.auto_standby_enabled !== undefined) {
@@ -33,7 +43,7 @@ export default function Camera() {
     const toggleAutoStandby = async () => {
         try {
             const newValue = !autoStandby;
-            const response = await fetch(`${API_BASE}/api/camera/auto-standby`, {
+            const response = await apiFetch('/api/camera/auto-standby', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ enabled: newValue })
@@ -174,7 +184,7 @@ export default function Camera() {
                         {streamEnabled ? (
                             <div className="video-container">
                                 <img
-                                    src={`${API_BASE}/api/camera/raw`}
+                                    src={streamUrl}
                                     alt="Live camera feed"
                                     className="video-stream"
                                     onError={(e) => {

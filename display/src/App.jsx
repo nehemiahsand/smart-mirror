@@ -14,6 +14,7 @@ import StatusIndicator from './components/StatusIndicator';
 import LayoutContainer from './components/LayoutContainer';
 import StandbyMode from './components/StandbyMode';
 import SpotifyPlayer from './components/SpotifyPlayer';
+import { apiFetch } from './apiClient';
 
 function App() {
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -44,6 +45,25 @@ function App() {
         settings,
         message
     } = useWebSocket(handlePageChange, handleListeningChange);
+
+    useEffect(() => {
+        const broadcastPage = async () => {
+            try {
+                await apiFetch('/api/broadcast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        type: 'page_change',
+                        page: currentPage
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to broadcast page change:', error);
+            }
+        };
+
+        broadcastPage();
+    }, [currentPage]);
 
     // Initialize layout engine
     const {

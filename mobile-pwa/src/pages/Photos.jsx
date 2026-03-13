@@ -2,10 +2,12 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './Photos.css';
 import ConfirmModal from '../components/ConfirmModal';
 import AlertModal from '../components/AlertModal';
-
-const API_BASE = `http://${window.location.hostname}:3001`;
+import { apiFetch, getApiBase } from '../apiClient';
 
 export default function Photos() {
+  const API_BASE = getApiBase();
+  const API_KEY = import.meta.env.VITE_API_KEY;
+  const imageQuery = API_KEY ? `?apiKey=${encodeURIComponent(API_KEY)}` : '';
   const [photos, setPhotos] = useState([]);
   const [settings, setSettings] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -22,7 +24,7 @@ export default function Photos() {
 
   const fetchPhotos = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/photos`);
+      const response = await apiFetch('/api/photos');
       const data = await response.json();
       setPhotos(data.photos || []);
     } catch (error) {
@@ -34,7 +36,7 @@ export default function Photos() {
 
   const fetchSettings = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/settings`);
+      const response = await apiFetch('/api/settings');
       const data = await response.json();
       setSettings(data);
     } catch (error) {
@@ -54,7 +56,7 @@ export default function Photos() {
       formData.append('photo', file);
 
       try {
-        const response = await fetch(`${API_BASE}/api/photos`, {
+        const response = await apiFetch('/api/photos', {
           method: 'POST',
           body: formData
         });
@@ -85,7 +87,7 @@ export default function Photos() {
     setConfirmModal(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/photos/${photoId}`, {
+      const response = await apiFetch(`/api/photos/${photoId}`, {
         method: 'DELETE'
       });
 
@@ -104,7 +106,7 @@ export default function Photos() {
 
   const updateInterval = async (newInterval) => {
     try {
-      const response = await fetch(`${API_BASE}/api/settings`, {
+      const response = await apiFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -208,7 +210,7 @@ export default function Photos() {
 
   const saveOrder = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/photos/reorder`, {
+      const response = await apiFetch('/api/photos/reorder', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -348,7 +350,7 @@ export default function Photos() {
               onClick={() => openModal(photo)}
             >
               <img
-                src={`${API_BASE}/api/photos/image/${photo.filename}`}
+                src={`${API_BASE}/api/photos/image/${photo.filename}${imageQuery}`}
                 alt="Photo"
                 loading="lazy"
                 decoding="async"
@@ -373,7 +375,7 @@ export default function Photos() {
             </button>
             <img
               className="modal-image"
-              src={`${API_BASE}/api/photos/image/${selectedPhoto.filename}`}
+              src={`${API_BASE}/api/photos/image/${selectedPhoto.filename}${imageQuery}`}
               alt="Photo preview"
             />
             <div className="modal-details">

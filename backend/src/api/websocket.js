@@ -35,10 +35,29 @@ class WebSocketServer {
   }
 
   initialize(server) {
+    const apiKey = process.env.API_KEY;
+
     this.wss = new WebSocket.Server({ server });
 
     this.wss.on('connection', (ws, req) => {
       const clientIp = req.socket.remoteAddress;
+
+      // If API_KEY is configured, require matching apiKey query param for WebSocket
+      if (apiKey) {
+        try {
+          const url = new URL(req.url, 'ws://localhost');
+          const clientKey = url.searchParams.get('apiKey');
+          if (!clientKey || clientKey !== apiKey) {
+            logger.warn('WebSocket connection rejected due to missing/invalid apiKey', { ip: clientIp });
+            ws.close(1008, 'Invalid API key');
+            return;
+          }
+        } catch (err) {
+          logger.error('Failed to parse WebSocket URL', { error: err.message });
+          ws.close(1008, 'Invalid request');
+          return;
+        }
+      }
       logger.info('WebSocket client connected', { ip: clientIp });
       
       this.clients.add(ws);

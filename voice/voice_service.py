@@ -27,6 +27,7 @@ BACKEND_URL = "http://localhost:3001"
 WEBSOCKET_URL = "ws://localhost:3001"
 WEBSOCKET_BROADCAST_URL = f"{BACKEND_URL}/api/broadcast"
 VOSK_MODEL_PATH = "/app/model"
+API_KEY = os.environ.get("API_KEY")
 
 # Audio configuration
 SAMPLE_RATE = 16000
@@ -59,6 +60,8 @@ class VoiceRecognitionService:
         self.recognizer = None
         self.audio = None
         self.stream = None
+        self.voice_enabled = True
+        self._last_settings_check = 0
         
         # Initialize Vosk model
         logger.info("Initializing Vosk speech recognition (100% offline)...")
@@ -107,12 +110,19 @@ class VoiceRecognitionService:
         """Sync current page state from display via WebSocket subscription"""
         try:
             # Try to get stored page from localStorage via API
-            response = requests.get(f"{BACKEND_URL}/api/settings", timeout=2)
+            headers = {"X-API-Key": API_KEY} if API_KEY else {}
+            response = requests.get(f"{BACKEND_URL}/api/settings", timeout=2, headers=headers)
             if response.status_code == 200:
                 data = response.json()
                 # Check if there's a current_page stored
                 stored_page = data.get('current_page', 'home')
                 self.current_page = stored_page
+                # Read voice enabled flag from settings
+                try:
+                    voice_cfg = data.get('voice', {}) or {}
+                    self.voice_enabled = bool(voice_cfg.get('enabled', True))
+                except Exception:
+                    self.voice_enabled = True
                 logger.info(f"📱 Synced page state: {self.current_page}")
             else:
                 logger.info("📱 No stored page, defaulting to: home")
@@ -134,6 +144,8 @@ class VoiceRecognitionService:
                 elif data.get('type') == 'standby_change':
                     # When standby mode changes, re-sync the page
                     is_standby = data.get('standby', False)
+                    self.voice_enabled = not is_standby
+                    logger.info(f"🎤 Voice {'disabled' if is_standby else 'enabled'} due to standby_change")
                     if not is_standby:
                         logger.info(f"📱 Exiting standby mode, re-syncing page...")
                         time.sleep(1)  # Wait for display to update
@@ -153,8 +165,13 @@ class VoiceRecognitionService:
             logger.info("📡 WebSocket connected - listening for page changes")
         
         def run_websocket():
+            ws_url = WEBSOCKET_URL
+            if API_KEY:
+                separator = '&' if '?' in WEBSOCKET_URL else '?'
+                ws_url = f"{WEBSOCKET_URL}{separator}apiKey={API_KEY}"
+
             self.ws = websocket.WebSocketApp(
-                WEBSOCKET_URL,
+                ws_url,
                 on_open=on_open,
                 on_message=on_message,
                 on_error=on_error,
@@ -173,7 +190,8 @@ class VoiceRecognitionService:
                 'type': 'page_change',
                 'page': page
             }
-            response = requests.post(WEBSOCKET_BROADCAST_URL, json=payload, timeout=2)
+            headers = {"X-API-Key": API_KEY} if API_KEY else {}
+            response = requests.post(WEBSOCKET_BROADCAST_URL, json=payload, timeout=2, headers=headers)
             if response.status_code == 200:
                 logger.info(f"✅ Page changed to: {page}")
                 self.current_page = page
@@ -204,12 +222,13 @@ class VoiceRecognitionService:
             endpoint = endpoints[action]
             url = f"{BACKEND_URL}{endpoint['url']}"
             data = endpoint.get('data', {})
+            headers = {"X-API-Key": API_KEY} if API_KEY else {}
             
             method = endpoint['method']
             if method == 'PUT':
-                response = requests.put(url, json=data, timeout=2)
+                response = requests.put(url, json=data, timeout=2, headers=headers)
             else:
-                response = requests.post(url, json=data, timeout=2)
+                response = requests.post(url, json=data, timeout=2, headers=headers)
             if response.status_code == 200:
                 logger.info(f"✅ Spotify command executed: {action}")
                 return True
@@ -276,6 +295,35 @@ class VoiceRecognitionService:
         
         while True:
             try:
+                # Periodically refresh voice_enabled flag from settings
+                now = time.time()
+                if now - self._last_settings_check > 5:
+                    self.sync_page_from_display()
+                    self._last_settings_check = now
+
+                if not self.voice_enabled:
+                    if self.stream is not None:
+                        logger.info("🔇 Voice input disabled - closing microphone stream")
+                        try:
+                            self.stream.stop_stream()
+                            self.stream.close()
+                        except Exception:
+                            pass
+                        self.stream = None
+                    time.sleep(0.5)
+                    continue
+
+                # Ensure microphone stream is open when enabled
+                if self.stream is None and self.audio is not None:
+                    logger.info("🎤 Voice enabled - opening microphone stream")
+                    self.stream = self.audio.open(
+                        format=pyaudio.paInt16,
+                        channels=1,
+                        rate=SAMPLE_RATE,
+                        input=True,
+                        frames_per_buffer=CHUNK_SIZE
+                    )
+
                 # Read audio data from stream
                 data = self.stream.read(CHUNK_SIZE, exception_on_overflow=False)
                 

@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './WiFiSettings.css';
 import ConfirmModal from '../components/ConfirmModal';
 import AlertModal from '../components/AlertModal';
-
-const API_BASE = `http://${window.location.hostname}:3001`;
+import { apiFetch } from '../apiClient';
 
 export default function WiFiSettings() {
   const [networks, setNetworks] = useState([]);
@@ -23,7 +22,7 @@ export default function WiFiSettings() {
 
   const loadCurrentNetwork = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/wifi/current`);
+      const response = await apiFetch('/api/wifi/current');
       const data = await response.json();
       if (data.ssid) {
         setCurrentNetwork(data);
@@ -36,7 +35,7 @@ export default function WiFiSettings() {
   const scanNetworks = async () => {
     setScanning(true);
     try {
-      const response = await fetch(`${API_BASE}/api/wifi/scan`);
+      const response = await apiFetch('/api/wifi/scan');
       const data = await response.json();
       setNetworks(data.networks || []);
     } catch (error) {
@@ -51,7 +50,7 @@ export default function WiFiSettings() {
 
     setConnecting(true);
     try {
-      const response = await fetch(`${API_BASE}/api/wifi/connect`, {
+      const response = await apiFetch('/api/wifi/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

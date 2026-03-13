@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import TimeDateWidget from '../widgets/TimeDate';
 import './SpotifyPlayer.css';
+import { apiFetch } from '../apiClient';
 
-const API_BASE = `http://${window.location.hostname}:3001/api/spotify`;
+const API_BASE = '/api/spotify';
 
 export default function SpotifyPlayer({ onGoHome }) {
     const [currentTrack, setCurrentTrack] = useState(null);
@@ -37,7 +38,7 @@ export default function SpotifyPlayer({ onGoHome }) {
                 const playlistId = context.uri.split(':')[2];
                 if (playlistId) {
                     try {
-                        const response = await fetch(`${API_BASE}/playlist/${playlistId}`);
+                        const response = await apiFetch(`${API_BASE}/playlist/${playlistId}`);
                         const data = await response.json();
                         if (data.name) {
                             setPlaylistName(data.name);
@@ -58,7 +59,7 @@ export default function SpotifyPlayer({ onGoHome }) {
 
     const checkAuth = async () => {
         try {
-            const response = await fetch(`${API_BASE}/status`);
+            const response = await apiFetch(`${API_BASE}/status`);
             const data = await response.json();
             setIsAuthenticated(data.authenticated);
         } catch (error) {
@@ -68,7 +69,7 @@ export default function SpotifyPlayer({ onGoHome }) {
 
     const fetchCurrentTrack = async () => {
         try {
-            const response = await fetch(`${API_BASE}/player`);
+            const response = await apiFetch(`${API_BASE}/player`);
             const data = await response.json();
 
             if (data.item) {
@@ -104,7 +105,7 @@ export default function SpotifyPlayer({ onGoHome }) {
 
     const handlePlay = async () => {
         try {
-            await fetch(`${API_BASE}/play`, { method: 'PUT' });
+            await apiFetch(`${API_BASE}/play`, { method: 'PUT' });
             setIsPlaying(true);
         } catch (error) {
             console.error('Error playing:', error);
@@ -113,7 +114,7 @@ export default function SpotifyPlayer({ onGoHome }) {
 
     const handlePause = async () => {
         try {
-            await fetch(`${API_BASE}/pause`, { method: 'PUT' });
+            await apiFetch(`${API_BASE}/pause`, { method: 'PUT' });
             setIsPlaying(false);
         } catch (error) {
             console.error('Error pausing:', error);
@@ -122,7 +123,7 @@ export default function SpotifyPlayer({ onGoHome }) {
 
     const handleNext = async () => {
         try {
-            await fetch(`${API_BASE}/next`, { method: 'POST' });
+            await apiFetch(`${API_BASE}/next`, { method: 'POST' });
             setTimeout(fetchCurrentTrack, 500);
         } catch (error) {
             console.error('Error skipping:', error);
@@ -131,7 +132,7 @@ export default function SpotifyPlayer({ onGoHome }) {
 
     const handlePrevious = async () => {
         try {
-            await fetch(`${API_BASE}/previous`, { method: 'POST' });
+            await apiFetch(`${API_BASE}/previous`, { method: 'POST' });
             setTimeout(fetchCurrentTrack, 500);
         } catch (error) {
             console.error('Error going back:', error);
@@ -144,7 +145,7 @@ export default function SpotifyPlayer({ onGoHome }) {
         const position = Math.floor(duration * percent);
 
         try {
-            await fetch(`${API_BASE}/seek`, {
+            await apiFetch(`${API_BASE}/seek`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ position })
@@ -166,7 +167,7 @@ export default function SpotifyPlayer({ onGoHome }) {
 
     useEffect(() => {
         if (!isAuthenticated) {
-            fetch(`${API_BASE}/auth-url`)
+            apiFetch(`${API_BASE}/auth-url`)
                 .then(res => res.json())
                 .then(data => setAuthUrl(data.authUrl))
                 .catch(err => console.error('Error getting auth URL:', err));
