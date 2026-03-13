@@ -159,19 +159,19 @@ export default function Dashboard() {
   const changePage = async (page) => {
     setBusy(true);
     try {
-      const res = await apiFetch('/api/broadcast', {
+      const res = await apiFetch('/api/display/page', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type: 'page_change',
           page: page
         })
       });
 
       if (!res.ok) {
-        throw new Error('Failed to change page');
+        const json = await res.json().catch(() => ({}));
+        throw new Error(json.error || 'Failed to change page');
       }
-
+      setAlertModal({ type: 'success', message: `Display switched to ${page === 'spotify' ? 'Spotify' : 'Home'} page` });
     } catch (e) {
       console.error('Page change failed:', e);
       setAlertModal({ type: 'error', message: `Failed to change page: ${e.message}` });
