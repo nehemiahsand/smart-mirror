@@ -361,12 +361,7 @@ class WebSocketServer {
           });
           return;
         }
-        logger.info('Page sync from display', { page: data.page });
-        this.broadcast({
-          type: 'page_change',
-          page: data.page,
-          timestamp: Date.now()
-        });
+        this.broadcastPageChange(data.page, { source: 'display_sync' });
         break;
 
       default:
@@ -412,6 +407,31 @@ class WebSocketServer {
       // Don't log time broadcasts to reduce noise
       logger.debug('Broadcast sent', { clients: sentCount, type: data.type });
     }
+  }
+
+  async persistCurrentPage(page) {
+    await settingsService.update('current_page', page);
+  }
+
+  broadcastPageChange(page, context = {}) {
+    if (!ALLOWED_SYNC_PAGES.has(page)) {
+      throw new Error('Invalid page change request');
+    }
+
+    this.persistCurrentPage(page).catch((error) => {
+      logger.error('Failed to persist current page', {
+        error: error.message,
+        page,
+        source: context.source || 'unknown',
+      });
+    });
+
+    logger.info('Broadcasting page change', { page, source: context.source || 'unknown' });
+    this.broadcast({
+      type: 'page_change',
+      page,
+      timestamp: Date.now()
+    });
   }
 
   /**
