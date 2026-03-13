@@ -3,21 +3,11 @@ import './Camera.css';
 import { apiFetch, getApiBase } from '../apiClient';
 
 export default function Camera() {
-    const API_KEY = import.meta.env.VITE_API_KEY;
-    const adminToken = window.localStorage.getItem('adminToken') || '';
-    const streamQuery = new URLSearchParams();
-    if (API_KEY) {
-        streamQuery.set('apiKey', API_KEY);
-    }
-    if (adminToken) {
-        streamQuery.set('authToken', adminToken);
-    }
-    const streamUrl = `${getApiBase()}/api/camera/raw${streamQuery.toString() ? `?${streamQuery.toString()}` : ''}`;
-
     const [cameraStatus, setCameraStatus] = useState(null);
     const [autoStandby, setAutoStandby] = useState(true);
     const [loading, setLoading] = useState(true);
     const [streamEnabled, setStreamEnabled] = useState(false);
+    const [streamUrl, setStreamUrl] = useState('');
 
     useEffect(() => {
         loadCameraStatus();
@@ -57,12 +47,37 @@ export default function Camera() {
         }
     };
 
+    const enableStream = async () => {
+        try {
+            const response = await apiFetch('/api/auth/stream-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scope: 'camera_raw' })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.token) {
+                throw new Error(data.error || 'Failed to create stream token');
+            }
+
+            const query = new URLSearchParams({ streamToken: data.token });
+            setStreamUrl(`${getApiBase()}/api/camera/raw?${query.toString()}`);
+            setStreamEnabled(true);
+        } catch (error) {
+            console.error('Failed to enable stream:', error);
+        }
+    };
+
     const formatTime = (ms) => {
         if (!ms) return 'N/A';
         const minutes = Math.floor(ms / 60000);
         const seconds = Math.floor((ms % 60000) / 1000);
         return `${minutes}m ${seconds}s`;
     };
+
+    const streamDetails = cameraStatus?.stream_resolution
+        ? `${cameraStatus.stream_resolution.width}x${cameraStatus.stream_resolution.height}`
+        : 'optimized preview';
 
     return (
         <div className="page">
@@ -165,9 +180,13 @@ export default function Camera() {
                             className={`stream-button ${streamEnabled ? 'enabled' : 'disabled'}`}
                             onClick={() => {
                                 const newState = !streamEnabled;
-                                setStreamEnabled(newState);
+                                if (newState) {
+                                    enableStream();
+                                    return;
+                                }
 
-                                // If turning OFF, refresh page to kill stream connection
+                                setStreamEnabled(false);
+                                setStreamUrl('');
                                 if (!newState) {
                                     setTimeout(() => {
                                         window.location.reload();
@@ -192,9 +211,9 @@ export default function Camera() {
                                     }}
                                 />
                                 <div className="feed-info">
-                                    <p>🟢 Live stream active (1280x720 HD)</p>
+                                    <p>🟢 Live stream active ({streamDetails})</p>
                                     <p className="feed-detail">
-                                        AI detection continues in background regardless of stream status
+                                        Preview is capped for lower CPU while AI detection continues in the background
                                     </p>
                                 </div>
                             </div>
