@@ -241,6 +241,18 @@ router.post('/display/refresh', adminAuth, (req, res) => {
   }
 });
 
+router.post('/display/page', adminAuth, (req, res) => {
+  try {
+    const { page } = req.body || {};
+    websocketServer.broadcastPageChange(page, { source: 'admin_route' });
+    res.json({ success: true, page });
+  } catch (error) {
+    const status = error.message === 'Invalid page change request' ? 400 : 500;
+    logger.error('Failed to change display page', { error: error.message });
+    res.status(status).json({ error: error.message || 'Failed to change display page' });
+  }
+});
+
 // ===== Camera / Person Detection Endpoints =====
 router.get('/camera/status', async (req, res) => {
   try {
@@ -1041,6 +1053,11 @@ router.post('/broadcast', apiKeyMiddleware, (req, res) => {
     const { type, page, command, listening } = req.body;
     
     logger.info('Broadcasting voice command:', { type, page, command, listening });
+
+    if ((type === 'page_change' || type === 'voice_command') && page !== undefined) {
+      websocketServer.broadcastPageChange(page, { source: 'internal_broadcast' });
+      return res.json({ success: true, broadcasted: true });
+    }
     
     // Broadcast to all connected WebSocket clients
     const payload = {
