@@ -1,262 +1,137 @@
-# Smart Mirror - Test Suite
+# Smart Mirror Testing
 
-## Test Categories
+This repo currently relies on build checks, API smoke checks, a focused security smoke test, and manual hardware validation.
 
-This document describes comprehensive test cases for all major features of the Smart Mirror system. Tests are organized by service/component.
+## Core Build Checks
 
-## 1. Backend API Tests
+Backend/container build:
 
-### 1.1 Weather Service Tests
-
-#### Test Case: Weather API Integration
-**Description:** Verify OpenWeather API integration returns correct data  
-**Preconditions:** Valid OPENWEATHER_API_KEY in .env  
-**Test Steps:**
-1. Send GET request to `/api/weather`
-2. Verify response status is 200
-3. Verify response contains `temperature`, `description`, `icon`
-4. Verify temperature is reasonable (-50 to 150°F)
-
-**Expected Result:**
-```json
-{
-  "temperature": 72,
-  "description": "Clear sky",
-  "icon": "01d",
-  "humidity": 45,
-  "feels_like": 70
-}
+```bash
+docker compose up -d --build
+docker compose ps
 ```
 
-**Status:** ✅ PASS
+ESP32 firmware build:
 
-#### Test Case: Weather Caching
-**Description:** Verify weather data is cached for 10 minutes  
-**Test Steps:**
-1. Send GET request to `/api/weather`
-2. Note timestamp in logs
-3. Send second GET request within 10 minutes
-4. Verify no second API call made (check logs)
-5. Wait 10 minutes
-6. Send third GET request
-7. Verify new API call made
-
-**Expected Result:** Only 2 API calls made (1st and 3rd requests)  
-**Status:** ✅ PASS
-
-### 1.2 Sports Service Tests
-
-#### Test Case: NBA Scores - Live Game Priority
-**Description:** Verify live games appear even when games are in progress  
-**Preconditions:** Live NBA games happening today  
-**Test Steps:**
-1. Send GET request to `/api/sports/nba/scores`
-2. Verify response contains ongoing games
-3. Verify `status` shows current quarter/time
-4. Verify scores are current
-
-**Expected Result:**
-```json
-{
-  "games": [
-    {
-      "home_team": "Lakers",
-      "away_team": "Celtics",
-      "home_score": 98,
-      "away_score": 92,
-      "status": "3rd Qtr - 5:23",
-      "is_final": false,
-      "broadcast": "ESPN"
-    }
-  ]
-}
+```bash
+cd esp32-console
+~/.venv-pio/bin/pio run
 ```
 
-**Status:** ✅ PASS (Fixed - was failing before date logic fix)
+## Backend Smoke Checks
 
-#### Test Case: Sports Scores - No Games Today
-**Description:** Verify upcoming games shown when no games today  
-**Preconditions:** No NBA games scheduled for today  
-**Test Steps:**
-1. Send GET request to `/api/sports/nba/scores`
-2. Verify response contains upcoming games
-3. Verify dates are in the future
-4. Verify correct date format
+Health:
 
-**Expected Result:** Games from next 7 days returned  
-**Status:** ✅ PASS
-
-#### Test Case: Sports Scores - Invalid Sport
-**Description:** Verify error handling for unsupported sport  
-**Test Steps:**
-1. Send GET request to `/api/sports/cricket/scores`
-2. Verify response status is 400 or 404
-3. Verify error message is clear
-
-**Expected Result:** Error message indicating unsupported sport  
-**Status:** ✅ PASS
-
-### 1.3 Traffic Service Tests
-
-#### Test Case: Traffic ETA Calculation
-**Description:** Verify Google Maps API returns valid drive time  
-**Preconditions:** Valid GOOGLE_MAPS_API_KEY, origin/destination configured  
-**Test Steps:**
-1. Send GET request to `/api/traffic/commute`
-2. Verify response contains `durationMinutes` and `distance`
-3. Verify duration is reasonable (0-120 minutes)
-4. Verify distance format (e.g., "8.9 mi")
-
-**Expected Result:**
-```json
-{
-  "durationMinutes": 15,
-  "distance": "8.9 mi",
-  "durationText": "15 mins"
-}
+```bash
+curl http://localhost/api/health
 ```
 
-**Status:** ✅ PASS
+Privacy status:
 
-#### Test Case: Traffic Error Handling - Invalid API Key
-**Description:** Verify graceful failure when API key is invalid  
-**Test Steps:**
-1. Set invalid GOOGLE_MAPS_API_KEY
-2. Send GET request to `/api/traffic/commute`
-3. Verify response indicates error
-4. Verify system doesn't crash
-
-**Expected Result:** Error message returned, service remains operational  
-**Status:** ✅ PASS
-
-### 1.4 Spotify Service Tests
-
-#### Test Case: Spotify OAuth Flow
-**Description:** Verify complete OAuth 2.0 authentication flow  
-**Test Steps:**
-1. Navigate to `/api/spotify/login`
-2. Verify redirect to Spotify authorization page
-3. Approve permissions
-4. Verify callback to `/api/spotify/callback`
-5. Verify access token and refresh token saved
-6. Verify redirect to display
-
-**Expected Result:** User successfully authenticated, tokens saved  
-**Status:** ✅ PASS
-
-#### Test Case: Spotify Play Command
-**Description:** Verify play command starts playback  
-**Preconditions:** User authenticated, Spotify app open somewhere  
-**Test Steps:**
-1. Ensure playback is paused
-2. Send PUT request to `/api/spotify/play`
-3. Verify response status is 200 or 204
-4. Verify playback starts in Spotify app
-
-**Expected Result:** Music begins playing  
-**Status:** ✅ PASS (Fixed - was POST, now PUT)
-
-#### Test Case: Spotify Pause Command
-**Description:** Verify pause command stops playback  
-**Preconditions:** Active playback  
-**Test Steps:**
-1. Ensure music is playing
-2. Send PUT request to `/api/spotify/pause`
-3. Verify response status is 200 or 204
-4. Verify playback stops
-
-**Expected Result:** Music pauses  
-**Status:** ✅ PASS (Fixed - was POST, now PUT)
-
-#### Test Case: Spotify Token Refresh
-**Description:** Verify expired access tokens are refreshed automatically  
-**Test Steps:**
-1. Wait for access token to expire (~1 hour)
-2. Send playback command
-3. Verify backend detects 401 error
-4. Verify refresh token used to get new access token
-5. Verify command retried successfully
-
-**Expected Result:** Playback command succeeds after token refresh  
-**Status:** ✅ PASS
-
-### 1.5 Calendar Service Tests
-
-#### Test Case: Google Calendar Event Fetch
-**Description:** Verify calendar events are fetched correctly  
-**Preconditions:** Google Calendar authorized, events exist  
-**Test Steps:**
-1. Send GET request to `/api/calendar/events`
-2. Verify response contains array of events
-3. Verify each event has `summary`, `start`, `end`
-4. Verify events are sorted chronologically
-
-**Expected Result:**
-```json
-{
-  "events": [
-    {
-      "summary": "Team Meeting",
-      "start": "2025-12-10T14:00:00Z",
-      "end": "2025-12-10T15:00:00Z",
-      "location": "Conference Room A"
-    }
-  ]
-}
+```bash
+curl http://localhost/api/privacy/status
 ```
 
-**Status:** ✅ PASS
+ESP32 compact console state:
 
-### 1.6 Settings Service Tests
+```bash
+curl 'http://localhost/api/console/state?device=esp32'
+```
 
-#### Test Case: Settings Read
-**Description:** Verify settings are read from JSON file  
-**Test Steps:**
-1. Send GET request to `/api/settings`
-2. Verify response contains all settings
-3. Verify standbyMode, selectedTeams, photoOrder present
+Useful fields to verify:
 
-**Expected Result:** Complete settings object returned  
-**Status:** ✅ PASS
+- `screenMode`
+- `activePageId`
+- `softButtons.button1`
+- `softButtons.button5`
+- `statsLine1` through `statsLine4`
 
-#### Test Case: Settings Write
-**Description:** Verify settings persist to file  
-**Test Steps:**
-1. Send POST request to `/api/settings` with `{"standbyMode": true}`
-2. Verify response confirms update
-3. Restart backend container
-4. Send GET request to `/api/settings`
-5. Verify standbyMode is still true
+Camera status:
 
-**Expected Result:** Settings persist across restarts  
-**Status:** ✅ PASS
+```bash
+curl http://localhost/api/camera/status
+```
 
-### 1.7 WebSocket Tests
+Scene state:
 
-#### Test Case: Page Change Event
-**Description:** Verify page changes broadcast to all clients  
-**Test Steps:**
-1. Connect two WebSocket clients
-2. Send page change from client 1
-3. Verify client 2 receives `page_change` event
-4. Verify event contains correct page name
+```bash
+curl http://localhost/api/scene/state
+```
 
-**Expected Result:** All connected clients notified of page change  
-**Status:** ✅ PASS
+## Security Smoke Test
 
-#### Test Case: Standby Mode Broadcast
-**Description:** Verify standby mode changes broadcast  
-**Test Steps:**
-1. Connect display and voice service via WebSocket
-2. Send standby mode change via API
-3. Verify both clients receive `standby_change` event
+Run the scripted security regression check:
 
-**Expected Result:** All clients synchronized on standby state  
-**Status:** ✅ PASS
+```bash
+./scripts/security-smoke-test.sh
+```
 
-## 2. Voice Service Tests
+The script currently verifies:
 
-### 2.1 Command Recognition Tests
+- admin login/session/logout
+- login rate limiting
+- Spotify invalid OAuth state rejection
+- Google Calendar invalid OAuth state rejection
+- voice container connectivity to backend
+- audio device visibility in the voice container
+
+## Manual Mirror Checks
+
+### Display and PWA
+
+- `http://localhost:3000` loads the mirror display
+- `http://localhost/` loads the admin/mobile PWA
+- page switching stays limited to `home` and `spotify`
+- standby toggle is reflected in both PWA and display behavior
+
+### Standby and Privacy
+
+- entering standby reports `cameraEnabled: false` and `voiceEnabled: false` from `/api/privacy/status`
+- PIR motion wakes the mirror from standby
+- camera alone does not wake standby
+- camera can still drive standby later once the mirror is awake
+
+### ESP32 Console
+
+After flashing the current firmware:
+
+- button 1 toggles between `Main Page` and `Spotify`
+- on Spotify:
+  - button 2 = play/pause
+  - button 3 = previous
+  - button 4 = next
+- button 5 opens and closes stats
+- standby shows `Turn On` on button 1 and still allows stats on button 5
+
+### OLED Stats Overlay
+
+Verify the stats overlay shows:
+
+- line 1: camera state and mic state
+- line 2: CPU and RAM
+- line 3: uptime and CPU temp
+- line 4: person detected yes/no
+
+## Useful Logs
+
+Backend:
+
+```bash
+docker compose logs --tail=200 backend
+```
+
+Mosquitto:
+
+```bash
+docker compose logs --tail=200 mosquitto
+```
+
+ESP32 serial monitor:
+
+```bash
+cd esp32-console
+~/.venv-pio/bin/pio device monitor
+```
 
 #### Test Case: Play Command Recognition
 **Description:** Verify "play" command triggers Spotify play  

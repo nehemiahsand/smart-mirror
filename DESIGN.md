@@ -1,263 +1,141 @@
-# Smart Mirror - Technical Design Document
+# Smart Mirror Design
 
-## Architecture Overview
+## Overview
 
-The Smart Mirror is a distributed, containerized system built on Raspberry Pi 5, consisting of 6 microservices that communicate via REST APIs and WebSockets.
+The current system is a Raspberry Pi 5 smart mirror with a split UI model:
 
-## System Architecture Diagram
+- a dedicated mirror display app on port `3000`
+- an admin/mobile PWA served by the backend on port `80`
+- an ESP32 side console that both publishes inputs over MQTT and polls a compact backend state feed for its OLED
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           RASPBERRY PI 5 HARDWARE                            │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │
-│  │   DHT22      │  │  USB Camera  │  │ USB Mic      │  │ HDMI Display │   │
-│  │   Sensor     │  │              │  │              │  │              │   │
-│  │  (GPIO 4)    │  │              │  │              │  │              │   │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └──────▲───────┘   │
-│         │                 │                 │                 │            │
-└─────────┼─────────────────┼─────────────────┼─────────────────┼────────────┘
-          │                 │                 │                 │
-          │                 │                 │                 │
-┌─────────▼─────────────────▼─────────────────▼─────────────────┼────────────┐
-│                        DOCKER CONTAINERS                       │            │
-│                                                                │            │
-│  ┌──────────────────────────────────────────────────────────┐ │            │
-│  │               SENSOR SERVICE (Port 5555)                  │ │            │
-│  │  - Python Flask server                                    │ │            │
-│  │  - Reads DHT22 temperature/humidity via GPIO              │ │            │
-│  │  - Exposes /sensor endpoint                               │ │            │
-│  └────────────────────────┬─────────────────────────────────┘ │            │
-│                           │ HTTP                               │            │
-│  ┌────────────────────────▼─────────────────────────────────┐ │            │
-│  │               CAMERA SERVICE                              │ │            │
-│  │  - Python OpenCV service                                  │ │            │
-│  │  - Person detection using Haar Cascade AI model           │ │            │
-│  │  - Auto-triggers standby mode when no person detected     │ │            │
-│  │  - Sends standby commands to backend                      │ │            │
-│  └────────────────────────┬─────────────────────────────────┘ │            │
-│                           │ HTTP                               │            │
-│  ┌────────────────────────▼─────────────────────────────────┐ │            │
-│  │               VOICE SERVICE                               │ │            │
-│  │  - Python SpeechRecognition (Google API)                  │ │            │
-│  │  - Continuous listening (no wake word)                    │ │            │
-│  │  - Page-aware command processing                          │ │            │
-│  │  - WebSocket client for page sync                         │ │            │
-│  └────────────────────────┬─────────────────────────────────┘ │            │
-│                           │ WebSocket + HTTP                   │            │
-│                           │                                    │            │
-│  ┌────────────────────────▼─────────────────────────────────┐ │            │
-│  │            BACKEND API (Port 3001)                        │ │            │
-│  │  ┌──────────────────────────────────────────────────┐    │ │            │
-│  │  │  Express.js REST API Server                      │    │ │            │
-│  │  │  - /api/weather (OpenWeather API)                │    │ │            │
-│  │  │  - /api/traffic/commute (Google Maps API)        │    │ │            │
-│  │  │  - /api/sports/:sport/scores (ESPN API)          │    │ │            │
-│  │  │  - /api/calendar/events (Google Calendar OAuth)  │    │ │            │
-│  │  │  - /api/photos (File management)                 │    │ │            │
-│  │  │  - /api/spotify/* (Spotify Web API OAuth)        │    │ │            │
-│  │  │  - /api/sensor (Proxy to sensor service)         │    │ │            │
-│  │  │  - /api/settings (JSON file persistence)         │    │ │            │
-│  │  │  - /api/wifi/* (NetworkManager D-Bus)            │    │ │            │
-│  │  └──────────────────────────────────────────────────┘    │ │            │
-│  │  ┌──────────────────────────────────────────────────┐    │ │            │
-│  │  │  Socket.IO WebSocket Server                      │    │ │            │
-│  │  │  - Real-time data broadcast                      │    │ │            │
-│  │  │  - Page change events                            │    │ │            │
-│  │  │  - Standby mode events                           │    │ │            │
-│  │  │  - Settings update events                        │    │ │            │
-│  │  └──────────────────────────────────────────────────┘    │ │            │
-│  └────────┬──────────────────────┬────────────────────────┘ │            │
-│           │ WebSocket            │ HTTP                      │            │
-│           │                      │                           │            │
-│  ┌────────▼──────────┐  ┌────────▼──────────────────────┐   │            │
-│  │  DISPLAY          │  │  PWA                          │   │            │
-│  │  (Port 3000)      │  │  (Port 3002)                  │   │            │
-│  │  ┌─────────────┐  │  │  ┌─────────────────────────┐  │   │            │
-│  │  │ React App   │  │  │  │ React Progressive Web   │  │   │            │
-│  │  │ - TimeDate  │  │  │  │ - Dashboard (Quick Info)│  │   │            │
-│  │  │ - Weather   │  │  │  │ - Widget Manager        │  │   │            │
-│  │  │ - Traffic   │  │  │  │ - Photo Upload          │  │   │            │
-│  │  │ - Calendar  │  │  │  │ - Sports Config         │  │   │            │
-│  │  │ - Sports    │  │  │  │ - Settings Editor       │  │   │            │
-│  │  │ - Photos    │  │  │  │ - WiFi Setup            │  │   │            │
-│  │  │ - Spotify   │  │  │  │ - System Controls       │  │   │            │
-│  │  └─────────────┘  │  │  └─────────────────────────┘  │   │            │
-│  └────────┬──────────┘  └────────────────────────────────┘   │            │
-│           │                                                   │            │
-└───────────┼───────────────────────────────────────────────────┘            │
-            │                                                                │
-            └────────────────────────────────────────────────────────────────┘
-                                    HDMI Output
-```
+The backend is the source of truth for page state, standby state, privacy state, and ESP32 console state.
 
-## Component Details
+## Runtime Topology
 
-### 1. Sensor Service (Python/Flask)
-**Technology:** Python 3.11, Flask, Adafruit DHT library  
-**Purpose:** Hardware interface for DHT22 temperature/humidity sensor  
-**AI Assistance:** 75% - Service structure, GPIO handling, error recovery  
-**Key Features:**
-- Reads GPIO pin 4 for DHT22 data
-- Auto-retry on sensor read failures
-- Caches last valid reading for 5 seconds
-- REST endpoint: GET `/sensor` → `{temperature, humidity, fahrenheit}`
+### Containers
 
-### 2. Camera Service (Python/OpenCV)
-**Technology:** Python 3.11, OpenCV, Haar Cascade Classifier  
-**Purpose:** Person detection for automatic standby mode  
-**AI Assistance:** 80% - OpenCV integration, cascade model usage, HTTP requests  
-**Key Features:**
-- Uses pre-trained Haar Cascade AI model for face detection
-- Captures frame every 2 seconds
-- Triggers standby if no person detected for 30 minutes
-- Auto-wakes display when person appears
-- Sends commands to backend: POST `/api/settings`
+- `mosquitto`
+  - authenticated MQTT broker for ESP32 events
+- `sensor`
+  - Python DHT22 sidecar exposed internally on `5555`
+- `camera`
+  - Python/Flask camera service exposed internally on `5556`
+- `backend`
+  - Node/Express API, WebSocket hub, auth/session layer, scene engine, console service, and built PWA
+- `display`
+  - React/Vite mirror display on `3000`
+- `voice`
+  - Python/Vosk voice controller connected to backend HTTP + WebSocket
 
-### 3. Voice Service (Python/SpeechRecognition)
-**Technology:** Python 3.11, SpeechRecognition, Google Speech API, WebSocket  
-**Purpose:** Continuous voice command recognition  
-**AI Assistance:** 85% - Command parsing logic, WebSocket sync, keyword expansion  
-**Key Features:**
-- No wake word required (always listening)
-- Page-aware command processing (different commands per page)
-- WebSocket connection for real-time page state sync
-- Phonetic variations for improved recognition
-- Commands: navigation (Spotify/Home), playback (play/pause/next/previous)
+### External Hardware
 
-### 4. Backend Service (Node.js/Express)
-**Technology:** Node.js 18, Express, Socket.IO, Axios  
-**Purpose:** Central API hub and data aggregation  
-**AI Assistance:** 70% - Route structure, service integrations, WebSocket broadcasts  
-**Key Features:**
-- **Weather Service:** OpenWeather API with 10-min cache
-- **Traffic Service:** Google Maps Directions API with live ETA
-- **Sports Service:** ESPN API with current-day game prioritization
-- **Calendar Service:** Google Calendar OAuth 2.0 with token refresh
-- **Photos Service:** Local file management with drag-drop ordering
-- **Spotify Service:** Spotify Web API OAuth with playback control
-- **Settings Service:** JSON file persistence
-- **WiFi Service:** NetworkManager D-Bus integration
-- **Display Control:** LCD backlight via wlr-randr/vcgencmd
-- **WebSocket Hub:** Real-time broadcasts to all clients
+- DHT22 on Pi GPIO `4`
+- USB camera
+- USB microphone
+- HDMI display
+- ESP32 console with five buttons, PIR, and SSD1306 OLED
 
-### 5. Display Service (React/Vite)
-**Technology:** React 18, Vite, Socket.IO Client, date-fns  
-**Purpose:** Main mirror interface  
-**AI Assistance:** 65% - Component structure, styling, WebSocket hooks  
-**Key Features:**
-- Fullscreen dark glass aesthetic
-- Real-time widget updates via WebSocket
-- Standby mode (black screen overlay)
-- Widget positioning system
-- Widgets: TimeDate, WeatherTraffic, GoogleCalendar, SportsScores, Photos, SpotifyPlayer
-- Page navigation (Home ↔ Spotify)
+## Main Backend Responsibilities
 
-### 6. PWA Service (React/Vite)
-**Technology:** React 18, Vite, Workbox, React Router  
-**Purpose:** Mobile control interface  
-**AI Assistance:** 60% - UI components, routing, API integration  
-**Key Features:**
-- Progressive Web App (installable)
-- Quick Info dashboard (indoor temp/humidity, outdoor temp, traffic)
-- Widget management (reorder, enable/disable)
-- Photo upload and organization
-- Sports team selection
-- Settings editor
-- WiFi configuration
-- System controls (reboot, shutdown, standby)
+The backend currently owns:
 
-## Data Flow Examples
+- session auth and admin-protected write routes
+- settings persistence
+- weather, traffic, sports, photos, Spotify, Google Calendar, Wi-Fi, power, and privacy APIs
+- WebSocket broadcast of scene, page, sensor, weather, and console state
+- scene/standby coordination
+- ESP32 input ingestion over MQTT
+- OLED state generation for `GET /api/console/state?device=esp32`
 
-### Example 1: Voice Command Flow
-```
-User says "play" → USB Mic → Voice Service
-                              ↓
-                    Google Speech API (AI model)
-                              ↓
-                    Recognized text: "play"
-                              ↓
-                    Check current page via WebSocket
-                              ↓
-                    Page = "spotify" → Match command
-                              ↓
-                    PUT /api/spotify/play → Backend
-                              ↓
-                    Spotify Web API → Start playback
-                              ↓
-                    WebSocket broadcast → Display refreshes
-```
+Important services:
 
-### Example 2: Person Detection Flow
-```
-Camera captures frame → Camera Service
-                              ↓
-                    Haar Cascade AI model
-                              ↓
-                    Person detected? NO
-                              ↓
-                    Wait 30 minutes → Still no person?
-                              ↓
-                    POST /api/settings {standbyMode: true}
-                              ↓
-                    Backend → Display power off (vcgencmd)
-                              ↓
-                    WebSocket broadcast → Display shows overlay
-```
+- `sceneEngine`
+  - decides standby and page-sync behavior
+- `consoleService`
+  - builds the OLED-facing state and handles button actions
+- `esp32InputService`
+  - subscribes to `smartmirror/esp32/+/event` and `.../status`
+- `cameraService`
+  - tracks `person_detected`, darkness, and camera enable state
 
-### Example 3: Real-time Sports Score Update
-```
-Display renders SportsScores widget → GET /api/sports/nba/scores
-                                              ↓
-                                    Backend checks cache (2 min TTL)
-                                              ↓
-                                    Cache miss → ESPN API
-                                              ↓
-                                    Fetch today's games (including live)
-                                              ↓
-                                    Format data → Return JSON
-                                              ↓
-                                    Display updates score every 2 min
-```
+## Current Frontend Model
 
-### Example 4: Traffic ETA Calculation
-```
-WeatherTraffic widget mounts → GET /api/traffic/commute
-                                              ↓
-                                    Backend Google Maps API
-                                              ↓
-                                    {durationMinutes: 15, distance: "8.9 mi"}
-                                              ↓
-                                    Widget calculates: currentTime + 15 min
-                                              ↓
-                                    Display: "ETA 2:47 PM" (updates every 1 sec)
-                                              ↓
-                                    Re-fetch drive time every 5 min
-```
+### Mirror Display
 
-## Communication Protocols
+The display app is a separate frontend on port `3000`. It is the visual mirror UI and currently syncs around two primary pages:
 
-### REST API
-- **Format:** JSON
-- **Authentication:** 
-  - Google Calendar: OAuth 2.0 with refresh tokens
-  - Spotify: OAuth 2.0 with refresh tokens
-  - Weather/Maps/Sports: API keys
-- **Caching:** 
-  - Weather: 10 minutes
-  - Sports: 2 minutes
-  - Traffic: 5 minutes
-  - Sensor: 5 seconds
+- `home`
+- `spotify`
 
-### WebSocket (Socket.IO)
-- **Port:** 3001 (same as backend)
-- **Events:**
-  - `page_change` - Page navigation (home/spotify)
-  - `standby_change` - Display standby state
-  - `settings_update` - Settings changed
-  - `display_refresh` - Force widget refresh
-  - `sensor_update` - Real-time sensor data
-  - `connection` - Client connected
-  - `disconnect` - Client disconnected
+### Mobile/Admin PWA
+
+The PWA is built into the backend image and served from the backend root path. It is not a separate compose service anymore.
+
+It provides:
+
+- dashboard and quick info
+- standby toggle
+- privacy controls
+- page switching
+- settings and admin flows
+- power controls
+
+## Current ESP32 Model
+
+The ESP32 uses two transports:
+
+- MQTT for button/PIR events
+- HTTP polling for compact OLED state
+
+Current button mapping:
+
+- button 1: `GPIO32`
+- button 2: `GPIO26`
+- button 3: `GPIO27`
+- button 4: `GPIO25`
+- button 5: `GPIO23`
+
+Current OLED states:
+
+- `page`
+- `standby`
+- `stats`
+
+Current stats lines:
+
+- camera state and mic state
+- CPU and RAM
+- uptime and CPU temperature
+- person detected yes/no
+
+## Standby and Wake Flow
+
+The current wake/standby policy is:
+
+- PIR motion wakes the mirror from standby
+- entering standby disables camera input and voice
+- camera no-person and dark-room logic can send the mirror back into standby once awake
+- camera alone does not act as the standby wake source
+
+The PWA privacy status endpoint reports effective camera/voice state so standby appears as camera-off and mic-off.
+
+## Data Flow Notes
+
+### ESP32 Button Flow
+
+`ESP32 button` -> `MQTT broker` -> `esp32InputService` -> `sceneEngine/consoleService` -> `WebSocket + console state API`
+
+### OLED State Flow
+
+`consoleService.getEsp32State()` -> `/api/console/state?device=esp32` -> `ESP32 poll` -> OLED render
+
+### Voice Flow
+
+`Vosk transcript` -> `voice_service.py` -> backend REST/WebSocket -> display page or Spotify action
+
+### Camera Flow
+
+`camera_service.py` -> `cameraService` -> `sceneEngine.applyStandbyMode(...)` -> display/privacy broadcasts
 
 ### Hardware Interfaces
 - **DHT22 Sensor:** GPIO 4 (BCM numbering)

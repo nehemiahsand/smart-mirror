@@ -1,9 +1,16 @@
-**Utility Assessment: An analysis of whether the AI tools used were helpful, and how
-they impacted your team's development speed and code quality (positive and
-negative feedback).**
+## Utility Assessment
 
-The AI tools used were incredibly helpful! I generated 100% of the code using AI. While it was a pain getting AI to understand what I wanted it to accomplish, once it understood it could do it with much more speed than I could. The quality probably isn’t as up to standard since AI tends to program in chunks which leads to things independently not working as well wholistically. Humans do the same thing too. Overall, it was incredibly helpful!
+AI assistance was valuable for getting a broad, integrated codebase working quickly across backend, frontend, Python sidecars, Docker, and ESP32 firmware. The current repo shows that speed clearly: one project now spans a secured backend, a display app, a served PWA, camera and sensor sidecars, offline voice control, and an MQTT-driven ESP32 console.
 
-**Learning Outcomes: What was the most challenging technical problem solved by the team, and what was the most valuable lesson learned about AI-assisted development?**
+The main downside was consistency. The hardest problems were not the initial implementations, but the follow-through:
 
-The hardest challenge was implementing Wi-Fi connection since the goal was for the Raspberry Pi to be headless (no keyboard and mouse input). There is the whole chicken and egg problem that comes with remotely connecting a device to WIFI that isn’t connected to the WIFI. I ended up solving this by using the built-in hotspot of the pi itself. Overall, I learned that you have to be incredibly clear with AI so that it can know exactly what problem you are trying to solve.
+- aligning behavior across services
+- keeping security fixes intact while features changed
+- validating hardware behavior instead of assuming software was at fault
+- keeping documentation current as the architecture evolved
+
+## Learning Outcomes
+
+The most instructive technical issue was the ESP32 button-5 failure. The software path for the stats overlay worked, but the original hardware choice of `GPIO34` was wrong for a reliable button because it has no internal pull-up. That made a hardware fault look like an application bug. Moving button 5 to `GPIO23` fixed the real issue.
+
+The most valuable lesson from AI-assisted development in this project is that precise intent and end-to-end verification matter more than raw generation speed. AI can get a large system into existence quickly, but correctness still depends on clear constraints, real hardware tests, and disciplined cleanup of stale assumptions in both code and docs.

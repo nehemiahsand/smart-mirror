@@ -1,262 +1,150 @@
 # Smart Mirror
 
-A modern, full-featured smart mirror built with React, Node.js, and Raspberry Pi 5. Features real-time weather, sports scores, traffic updates, Google Calendar integration, voice control, and more.
+Smart mirror system for Raspberry Pi with a dedicated display UI, an admin/mobile PWA, offline voice control, camera-driven standby, and an ESP32 OLED/button console.
 
----
+## Current Stack
 
-## 🎯 Features
+The current Docker Compose stack runs six services:
 
-### Display & Widgets
-- 🕐 **Time & Date** - Real-time clock with customizable format
-- 🌤️ **Weather & Temperature** - Indoor (DHT22 sensor) and outdoor (OpenWeather API) with traffic
-- 📅 **Google Calendar** - OAuth-authenticated calendar sync with event display
-- 🏀 **Sports Scores** - Live scores from ESPN for NBA, NFL, NCAA Football/Basketball, MLB, and Soccer
-- 📸 **Photos Slideshow** - Local photo management with drag-and-drop ordering
-- 🚗 **Traffic Widget** - Real-time ETA calculation with live-updating arrival time
+- `mosquitto`: authenticated internal MQTT broker for the ESP32 console
+- `sensor`: DHT22 sidecar on GPIO
+- `camera`: ffmpeg + MediaPipe based detection service
+- `backend`: Node/Express API, WebSocket hub, settings, auth, ESP32 scene/console logic, and the built PWA
+- `display`: React/Vite mirror display on port `3000`
+- `voice`: offline Vosk-based voice control service
 
-### Control & Interaction
-- 🎤 **Voice Commands** - Hands-free control via continuous voice recognition
-  - Navigate between pages (Home, Spotify)
-  - Control Spotify playback (Play, Pause, Next, Previous)
-  - Volume control
-- 📱 **Mobile PWA** - Full-featured Progressive Web App for remote control
-  - Widget management and ordering
-  - Settings configuration
-  - Photo upload and management
-  - Sports team selection
-  - System controls (reboot, shutdown, standby)
+The backend is exposed on host port `80` and serves both:
 
-### Smart Features
-- 💤 **Standby Mode** - LCD backlight control with auto-standby after 30 minutes
-- 👁️ **Person Detection** - AI-powered camera service with automatic wake/sleep
-- 🌐 **WebSocket Sync** - Real-time data updates across all connected clients
-- 🔄 **Page Synchronization** - Voice service always knows the current display page
-- 🌡️ **DHT22 Sensor** - Dedicated Python service for temperature/humidity monitoring
+- the REST/WebSocket API at `/api/...`
+- the built mobile/admin PWA at `/`
 
-### Infrastructure
-- 🐳 **Docker-based** - All services containerized with Docker Compose
-- 🔌 **WiFi Provisioning** - Easy network setup via hotspot mode
-- 🌐 **Remote Access** - Secure access via Tailscale VPN
-- 🎨 **Drag-and-Drop Layout** - Visual widget arrangement (future feature)
+## Current User-Facing Features
 
----
+- Mirror display with two synced pages: `home` and `spotify`
+- Mobile/admin PWA served by the backend
+- Offline voice control with page-aware Spotify/navigation commands
+- Camera-controlled person detection and dark-room standby
+- PIR-first wake path through the ESP32 console
+- ESP32 OLED/button console with MQTT input and HTTP state polling
+- Weather, traffic, sports, photos, Google Calendar, Spotify, and sensor data
+- Admin session auth with hardened write routes and redacted settings output
 
-## 📋 System Requirements
+## Current Hardware
 
-### Hardware
-- **Raspberry Pi 5** (4GB+ RAM recommended)
-- **DHT22 Temperature/Humidity Sensor** (optional)
-- **USB Microphone** (for voice commands)
-- **USB Camera** (for person detection, optional)
-- **Display** (HDMI monitor or touch screen)
+- Raspberry Pi 5
+- DHT22 on GPIO `4`
+- USB camera
+- USB microphone
+- HDMI-connected mirror display
+- ESP32 console with:
+  - button 1 on `GPIO32`
+  - button 2 on `GPIO26`
+  - button 3 on `GPIO27`
+  - button 4 on `GPIO25`
+  - button 5 on `GPIO23`
+  - PIR motion on `GPIO33`
+  - SSD1306 OLED on `GPIO21`/`GPIO22`
 
-### Software
-- **Raspberry Pi OS** (64-bit, Bookworm or later)
-- **Docker & Docker Compose** (v2.0+)
-- **Tailscale** (for remote access, optional)
+## Start and Access
 
----
+Build and start everything:
 
-## 🚀 Quick Start
-
-### 1. Initial Setup
-
-**Clone the repository:**
-```bash
-cd ~/Downloads
-git clone <repository-url> smart-mirror
-cd smart-mirror
-```
-
-**Install Docker (if not already installed):**
-```bash
-curl -fsSL https://get.docker.com -o get-docker.sh
-sudo sh get-docker.sh
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-**Install Tailscale for remote access (optional but recommended):**
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-```
-
-### 2. Configure API Keys
-
-**Set your API keys:**
-```bash
-./set-api-key.sh
-```
-
-You'll need:
-- **OpenWeather API Key** - Get from https://openweathermap.org/api
-- **Google Maps API Key** - Get from https://console.cloud.google.com
-  - Enable: Directions API, Distance Matrix API, Geocoding API
-
-**Configure traffic addresses:**
-Edit `backend/data/settings.json`:
-```json
-{
-  "traffic": {
-    "enabled": true,
-    "origin": "Your Home Address",
-    "destination": "Your Work/School Address",
-    "googleMapsApiKey": "YOUR_API_KEY"
-  }
-}
-```
-
-### 3. Google Calendar Setup (Optional)
-
-**Download credentials:**
-1. Go to https://console.cloud.google.com
-2. Create a new project (or select existing)
-3. Enable Google Calendar API
-4. Create OAuth 2.0 credentials (Desktop App)
-5. Download credentials JSON file
-6. Save as `backend/data/calendar-credentials.json`
-
-**Authorize the calendar:**
-```bash
-cd backend
-node authorize-calendar.js
-```
-
-Follow the URL, authorize, and paste the code back.
-
-### 4. Spotify Setup (Optional)
-
-**Create Spotify Developer App:**
-1. Go to https://developer.spotify.com/dashboard
-2. Log in and click "Create an App"
-3. Fill in app name: "Smart Mirror"
-4. Add redirect URI: `http://<your-pi-ip>:3001/api/spotify/callback`
-5. Copy your Client ID and Client Secret
-
-**Configure Spotify credentials:**
-```bash
-cd backend
-nano .env
-```
-
-Add these lines:
-```env
-SPOTIFY_CLIENT_ID=your_client_id_here
-SPOTIFY_CLIENT_SECRET=your_client_secret_here
-SPOTIFY_REDIRECT_URI=http://<your-pi-ip>:3001/api/spotify/callback
-```
-
-**Authenticate:**
-1. Restart backend: `docker compose restart backend`
-2. Open display at `http://<pi-ip>:3000`
-3. Navigate to Spotify page (say "Spotify" or use PWA)
-4. Click "Connect Spotify" and authorize
-
-### 5. Start the System
-
-**Build and start all services:**
 ```bash
 docker compose up -d --build
 ```
 
-**Check all containers are running:**
+Check service state:
+
 ```bash
 docker compose ps
 ```
 
-You should see 6 containers:
-- `smart-mirror-backend` - API server (port 3001)
-- `smart-mirror-display` - React display (port 3000)
-- `smart-mirror-pwa` - Mobile app (port 3002)
-- `smart-mirror-voice` - Voice recognition
-- `smart-mirror-sensor` - DHT22 sensor service
-- `smart-mirror-camera` - Person detection
+Main entry points:
 
-### 5. Access the Mirror
+- mirror display: `http://<pi-ip>:3000`
+- admin/mobile PWA: `http://<pi-ip>/`
+- API: `http://<pi-ip>/api`
+- MQTT broker: `<pi-ip>:1883`
 
-**Display (main interface):**
-- Local: `http://localhost:3000`
-- Network: `http://<raspberry-pi-ip>:3000`
-- Tailscale: `http://<tailscale-ip>:3000`
+## Local Configuration
 
-**PWA (mobile control):**
-- Local: `http://localhost:3002`
-- Network: `http://<raspberry-pi-ip>:3002`
-- Tailscale: `http://<tailscale-ip>:3002`
+The repo expects local secrets in `backend/.env` and `esp32-console/include/config.local.h`.
 
-**API (backend):**
-- Local: `http://localhost:3001`
+Important backend env values:
 
----
+- `API_KEY`
+- `ADMIN_PASSWORD`
+- `AUTH_SECRET`
+- `OPENWEATHER_API_KEY`
+- `TOMTOM_API_KEY` or traffic API config used in settings
+- `SPOTIFY_CLIENT_ID`
+- `SPOTIFY_CLIENT_SECRET`
+- `SPOTIFY_REDIRECT_URI`
+- `MQTT_USERNAME`
+- `MQTT_PASSWORD`
 
-## 🎙️ Voice Commands
+Local-only ESP32 config:
 
-The voice service runs continuously and listens for commands. No wake word needed!
+- Wi-Fi SSID/password
+- backend base URL
+- MQTT host/port/credentials
 
-### Navigation Commands
-- **"Spotify"** / "Music" / "Player" → Go to Spotify page
-- **"Home"** / "Main" / "Back" / "Exit" → Return to home page
+`backend/data/settings.json` is local runtime data, not source-of-truth documentation. Sensitive settings are redacted from API responses.
 
-### Playback Controls (on Spotify page)
-- **"Play"** / "Resume" / "Start" → Play music
-- **"Pause"** / "Stop" → Pause music
-- **"Next"** / "Skip" → Next track
-- **"Previous"** / "Back" → Previous track
-- **"Volume up"** / "Louder" → Increase volume
-- **"Volume down"** / "Quieter" → Decrease volume
+## OAuth Helpers
 
-### How It Works
-- Voice service connects via WebSocket to stay synced with display
-- Automatically detects which page you're on
-- Commands only work on the appropriate page
-- When exiting standby, automatically re-syncs to correct page
+Spotify local auth helper:
 
----
+```bash
+cd backend
+npm run spotify:auth
+```
 
-## 📱 Mobile PWA Features
+Google Calendar still uses the backend authorization routes and stored credentials under `backend/data/`.
 
-Access the PWA at `http://<pi-ip>:3002` from any device on your network.
+## ESP32 Console Behavior
 
-### Dashboard
-- **Quick Info** - Indoor temp/humidity, outdoor temp, traffic
-- **Quick Actions** - Standby toggle, page navigation
-- **Power Controls** - Reboot, shutdown
+The ESP32 console mirrors the actual mirror page state.
 
-### Widget Manager
-- Reorder widgets via drag-and-drop
-- Save custom layout
+Normal pages:
 
-### Photos
-- Upload photos via web interface
-- Drag to reorder slideshow
-- Delete unwanted photos
-- Auto-saves order
+- `Main Page`
+- `Spotify`
 
-### Sports Settings
-- Select favorite teams
-- Choose which sport to display
-- Supports: NBA, NFL, NCAA Football, NCAA Basketball, MLB, Soccer
+Button behavior:
 
-### System Settings
-- Weather location configuration
-- Display preferences
-- Network settings
+- button 1 toggles between `home` and `spotify`
+- on Spotify, button 2 is `Play/Pause`
+- on Spotify, button 3 is `Prev`
+- on Spotify, button 4 is `Next`
+- button 5 toggles the OLED stats overlay
 
----
+Standby behavior:
 
-## 🏗️ Architecture
+- PIR motion wakes the mirror
+- standby disables camera input
+- button 1 shows `Turn On`
+- button 5 opens the OLED stats overlay without printing a separate close label
 
-### Services Overview
+## Development Notes
 
-| Service | Purpose | Port | Technology |
-|---------|---------|------|------------|
-| **Backend** | API server, WebSocket hub, settings manager | 3001 | Node.js, Express |
-| **Display** | Main mirror interface | 3000 | React, Vite |
-| **PWA** | Mobile control app | 3002 | React, Vite |
-| **Voice** | Voice recognition | - | Python, SpeechRecognition |
-| **Sensor** | DHT22 temperature/humidity | - | Python, Adafruit |
-| **Camera** | Person detection, auto-standby | - | Python, OpenCV |
+- The backend image builds the PWA bundle into `backend/public`
+- There is no separate PWA container in the current compose file
+- The display app is still a separate container on port `3000`
+- The voice service is offline/local via Vosk, not cloud speech recognition
+- The camera service uses MediaPipe pose landmarks and MJPEG capture, not the older Haar-cascade flow
+
+## Verification Commands
+
+Useful checks:
+
+```bash
+docker compose ps
+curl http://localhost/api/health
+curl http://localhost/api/privacy/status
+curl http://localhost/api/console/state?device=esp32
+./scripts/security-smoke-test.sh
+```
 
 ### Data Flow
 ```

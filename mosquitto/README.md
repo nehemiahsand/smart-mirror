@@ -1,9 +1,38 @@
-MQTT broker credentials are local-only and come from `backend/.env`.
+# Mosquitto Service
 
-Required local variables:
+The Compose stack includes an authenticated Mosquitto broker for the ESP32 console.
+
+## Current Behavior
+
+- container name: `smart-mirror-mosquitto`
+- host port: `1883`
+- config file: `mosquitto/mosquitto.conf`
+- password file: generated at container startup, not tracked in git
+
+## Required Local Variables
+
+These values come from `backend/.env`:
 
 - `MQTT_USERNAME`
 - `MQTT_PASSWORD`
 
-The compose service generates an in-memory Mosquitto password file at startup, so no broker password file is tracked in git.
-The ESP32 `include/config.local.h` values for `MQTT_USERNAME`, `MQTT_PASSWORD`, and `MQTT_USE_AUTH` must match `backend/.env`.
+The startup command creates `/mosquitto/data/mosquitto.passwd` in tmpfs from those env vars.
+
+## Current Topic Usage
+
+The backend subscribes to:
+
+- `smartmirror/esp32/+/event`
+- `smartmirror/esp32/+/status`
+
+The ESP32 publishes to:
+
+- `smartmirror/esp32/<deviceId>/event`
+- `smartmirror/esp32/<deviceId>/status`
+
+## Security Notes
+
+- anonymous access is disabled
+- no tracked password file is stored in the repo
+- broker credentials must match the ESP32 local config in `esp32-console/include/config.local.h`
+- the broker is intended for the mirror stack and ESP32 console, not general public use
