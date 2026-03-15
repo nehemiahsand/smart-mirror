@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSharedTime } from '../hooks/useSharedTime';
 import PropTypes from 'prop-types';
 import './WeatherTraffic.css';
 import { apiFetch } from '../apiClient';
@@ -9,15 +10,7 @@ import { apiFetch } from '../apiClient';
 const WeatherTrafficWidget = ({ weatherData, sensorData, className = '' }) => {
     const [trafficData, setTrafficData] = useState(null);
     const [trafficError, setTrafficError] = useState(null);
-    const [currentTime, setCurrentTime] = useState(new Date());
-
-    useEffect(() => {
-        // Update current time every second for live ETA
-        const timeInterval = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-        return () => clearInterval(timeInterval);
-    }, []);
+    const currentTime = useSharedTime();
 
     useEffect(() => {
         const fetchTrafficData = async () => {

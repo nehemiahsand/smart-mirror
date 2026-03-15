@@ -61,6 +61,7 @@ class SceneEngine {
     this.tickInterval = null;
     this.manualOverride = null;
     this.lastMotionAt = null;
+    this.motionActive = false;
     this.lastInputEvent = null;
     this.state = {
       activeSceneId: 'day',
@@ -266,6 +267,7 @@ class SceneEngine {
       ...resolved,
       console: consoleService.getState(),
       lastMotionAt: this.lastMotionAt,
+      motionActive: this.motionActive,
       lastInputEvent: this.lastInputEvent,
       updatedAt: Date.now(),
       source,
@@ -451,6 +453,7 @@ class SceneEngine {
     });
 
     if (eventType === 'motion.active') {
+      this.motionActive = true;
       this.lastMotionAt = Date.now();
       if (settingsService.get('presence.wakeOnMotion') !== false && settingsService.get('display.standbyMode') === true) {
         return this.applyStandbyMode(false, 'motion.active');
@@ -459,6 +462,7 @@ class SceneEngine {
     }
 
     if (eventType === 'motion.idle') {
+      this.motionActive = false;
       return this.refreshState({ source: 'esp32', reason: 'motion.idle', broadcast: true, persist: false });
     }
 

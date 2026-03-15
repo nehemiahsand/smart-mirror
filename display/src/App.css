@@ -118,7 +118,7 @@ body {
 .message-overlay.priority-high {
   border-color: #ff4444;
   box-shadow: 0 0 30px rgba(255, 68, 68, 0.6);
-  animation: pulse 1s ease-in-out infinite;
+  
 }
 
 .message-overlay .message-text {
@@ -164,7 +164,7 @@ body {
   height: 6px;
   border-radius: 50%;
   background: #4ade80;
-  animation: pulse 2s ease-in-out infinite;
+  
 }
 
 .status-dot.disconnected {
@@ -261,7 +261,7 @@ body {
 }
 
 .loading {
-  animation: shimmer 2s ease-in-out infinite;
+  
 }
 
 /* Voice Listening Indicator */
@@ -282,7 +282,7 @@ body {
 .voice-listening-indicator.active {
   background: rgba(30, 215, 96, 0.4);
   box-shadow: 0 0 25px rgba(30, 215, 96, 0.5);
-  animation: pulse 1.5s infinite;
+  
 }
 
 .voice-listening-indicator.inactive {

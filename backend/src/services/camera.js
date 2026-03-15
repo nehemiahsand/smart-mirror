@@ -18,7 +18,7 @@ class CameraService {
     this.personDetected = false;
     this.lastDetectionTime = null;
     this.checkInterval = null;
-    this.autoStandbyEnabled = true;
+    this.autoStandbyEnabled = false;
     this.lastStandbyState = null;
     this.shutdownTimer = null;
     this.standbyStartTime = null;
@@ -194,7 +194,7 @@ class CameraService {
       return {
         available: this.isAvailable,
         enabled: response.data.enabled !== false,
-        person_detected: response.data.person_detected,
+        person_detected: require("./sceneEngine").getState().motionActive || false,
         total_detections: response.data.total_detections,
         fps: response.data.fps,
         stream_viewers: response.data.stream_viewers || 0,

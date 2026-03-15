@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import './TimeDate.css';
+import { useSharedTime } from '../hooks/useSharedTime';
 
 /**
  * TimeDateWidget - Combined time and date display using system time
@@ -8,16 +9,7 @@ import './TimeDate.css';
  * @param {string} className - Additional CSS classes
  */
 const TimeDateWidget = ({ format = '12h', className = '' }) => {
-    const [currentTime, setCurrentTime] = useState(new Date());
-
-    useEffect(() => {
-        // Update time every second
-        const interval = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-
-        return () => clearInterval(interval);
-    }, []);
+    const currentTime = useSharedTime();
 
     const getTimeData = () => {
         // Get timezone from TZ environment variable (set in docker-compose.yml)

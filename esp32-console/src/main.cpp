@@ -468,10 +468,19 @@ void pollMotion() {
   const unsigned long nowMs = millis();
   const bool motionHigh = digitalRead(Pins::PIR_MOTION) == HIGH;
 
+  if (nowMs % 1000 == 0) { // Debug log for user to check sensor readout
+    static bool lastDebugHigh = false;
+    if (motionHigh != lastDebugHigh) {
+      Serial.printf("[debug] PIR sensor raw value changed to: %s\n", motionHigh ? "HIGH" : "LOW");
+      lastDebugHigh = motionHigh;
+    }
+  }
+
   if (motionHigh) {
     gLastMotionMs = nowMs;
     if (!gMotionActive) {
       gMotionActive = true;
+      Serial.println("[motion] Transitioned to ACTIVE state!");
       publishMotion("motion.active");
     }
     return;
@@ -479,6 +488,7 @@ void pollMotion() {
 
   if (gMotionActive && (nowMs - gLastMotionMs) >= Config::MOTION_IDLE_TIMEOUT_MS) {
     gMotionActive = false;
+    Serial.println("[motion] Idle timeout reached. Transitioned to IDLE.");
     publishMotion("motion.idle");
   }
 }
@@ -517,7 +527,7 @@ void setup() {
   gEventTopic = String(Config::MQTT_TOPIC_PREFIX) + "/" + Config::DEVICE_ID + "/event";
   gStatusTopic = String(Config::MQTT_TOPIC_PREFIX) + "/" + Config::DEVICE_ID + "/status";
 
-  pinMode(Pins::PIR_MOTION, INPUT);
+  pinMode(Pins::PIR_MOTION, INPUT_PULLDOWN); // Ensure sensor isn't floating
   initializeButtons();
   initializeDisplay();
   resetMirrorState();

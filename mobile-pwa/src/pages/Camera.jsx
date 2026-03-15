@@ -82,25 +82,30 @@ export default function Camera() {
     return (
         <div className="page">
             <div className="page-header">
-                <h1>Camera & AI Detection</h1>
+                <h1>Hardware Sensors & Camera</h1>
             </div>
 
             {/* Camera Status */}
             <div className="card">
                 <div className="card-header">
-                    <span className="card-icon">🤖</span>
-                    <h2>AI Person Detection</h2>
+                    <span className="card-icon">🏃‍♂️</span>
+                    <h2>PIR Presence Detection</h2>
                 </div>
 
                 {loading ? (
-                    <div className="loading">Loading camera status...</div>
-                ) : !cameraStatus?.available ? (
+                    <div className="loading">Loading sensor status...</div>
+                ) : !cameraStatus ? (
                     <div className="error-box">
-                        <p>⚠️ Camera service is not available</p>
-                        <p className="error-detail">Make sure the camera is connected and the service is running</p>
+                        <p>⚠️ Data service is not available</p>
                     </div>
                 ) : (
                     <div className="camera-status">
+                        <div className="info-box" style={{ marginBottom: "15px" }}>
+                            <p>
+                                💡 Your mirror uses a hardware PIR motion sensor connected directly 
+                                to the ESP32 to detect presence instead of heavy AI logic.
+                            </p>
+                        </div>
                         <div className="status-grid">
                             <div className="status-item">
                                 <span className="status-label">Person Detected</span>
@@ -110,20 +115,10 @@ export default function Camera() {
                             </div>
 
                             <div className="status-item">
-                                <span className="status-label">Total Detections</span>
-                                <span className="status-value">{cameraStatus.total_detections || 0}</span>
-                            </div>
-
-                            <div className="status-item">
-                                <span className="status-label">Camera FPS</span>
-                                <span className="status-value">{cameraStatus.fps || 0} fps</span>
-                            </div>
-
-                            <div className="status-item">
                                 <span className="status-label">Time Until Standby</span>
                                 <span className="status-value">
                                     {cameraStatus.person_detected
-                                        ? '30m 0s'
+                                        ? 'Paused while present'
                                         : formatTime(cameraStatus.time_until_standby)}
                                 </span>
                             </div>
@@ -133,7 +128,7 @@ export default function Camera() {
             </div>
 
             {/* Auto-Standby Control */}
-            {cameraStatus?.available && (
+            {cameraStatus && (
                 <div className="card">
                     <div className="card-header">
                         <span className="card-icon">💤</span>
@@ -143,8 +138,8 @@ export default function Camera() {
                     <div className="auto-standby-control">
                         <div className="info-box">
                             <p>
-                                When enabled, the mirror will automatically enter standby mode after 30 minutes
-                                of no person detected, and wake up when a person is detected.
+                                When enabled, the mirror will automatically enter standby mode after 
+                                no movement is reported from the ESP32 motion sensor.
                             </p>
                         </div>
 
@@ -166,60 +161,42 @@ export default function Camera() {
                 <div className="card">
                     <div className="card-header">
                         <span className="card-icon">📹</span>
-                        <h2>Live Camera Feed</h2>
+                        <h2>Live Stream Proxy Feed</h2>
                     </div>
 
                     <div className="camera-feed">
                         <div className="info-box">
                             <p>
-                                💡 Video streaming uses significant CPU. Enable only when needed to conserve resources.
+                                💡 Video streaming natively proxies an MJPEG stream without AI processing.
+                                Enable to preview your camera orientation.
                             </p>
                         </div>
 
                         <button
                             className={`stream-button ${streamEnabled ? 'enabled' : 'disabled'}`}
-                            onClick={() => {
-                                const newState = !streamEnabled;
-                                if (newState) {
-                                    enableStream();
-                                    return;
-                                }
-
-                                setStreamEnabled(false);
-                                setStreamUrl('');
-                                if (!newState) {
-                                    setTimeout(() => {
-                                        window.location.reload();
-                                    }, 100);
-                                }
-                            }}
+                            onClick={streamEnabled ? () => setStreamEnabled(false) : enableStream}
                         >
-                            <span className="button-icon">{streamEnabled ? '🎥' : '⏸️'}</span>
-                            <span className="button-text">
-                                Video Stream: {streamEnabled ? 'ON' : 'OFF'}
+                            <span className="button-icon">
+                                {streamEnabled ? '⏹' : '▶'}
                             </span>
+                            {streamEnabled ? 'Stop Video Stream' : `Start Video Stream (${streamDetails})`}
                         </button>
 
-                        {streamEnabled ? (
-                            <div className="video-container">
+                        {streamEnabled && (
+                            <div className="feed-container">
                                 <img
                                     src={streamUrl}
-                                    alt="Live camera feed"
-                                    className="video-stream"
+                                    alt="Live Camera Feed"
+                                    className="video-feed"
                                     onError={(e) => {
-                                        console.error('Stream error:', e);
+                                        console.error('Stream load error');
+                                        e.target.parentNode.innerHTML = '<div class="feed-error">Failed to load stream.<br/>Check container connection.</div>';
                                     }}
                                 />
-                                <div className="feed-info">
-                                    <p>🟢 Live stream active ({streamDetails})</p>
-                                    <p className="feed-detail">
-                                        Preview is capped for lower CPU while AI detection continues in the background
-                                    </p>
+                                <div className="feed-status">
+                                    <span className="live-indicator">🔴 LIVE</span>
+                                    <span>MJPEG Proxy Feed</span>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="stream-off-message">
-                                <p>📹 Stream is off - click button above to view live feed</p>
                             </div>
                         )}
                     </div>

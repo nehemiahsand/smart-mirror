@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useSharedTime } from '../hooks/useSharedTime';
 import './Traffic.css';
 import { apiFetch } from '../apiClient';
 
@@ -6,16 +7,7 @@ const Traffic = () => {
     const [trafficData, setTrafficData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [currentTime, setCurrentTime] = useState(new Date());
-
-    useEffect(() => {
-        // Update current time every second
-        const timeInterval = setInterval(() => {
-            setCurrentTime(new Date());
-        }, 1000);
-
-        return () => clearInterval(timeInterval);
-    }, []);
+    const currentTime = useSharedTime();
 
     useEffect(() => {
         const fetchTrafficData = async () => {

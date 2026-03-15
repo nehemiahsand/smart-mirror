@@ -31,7 +31,7 @@
 .spotify-icon {
     font-size: 120px;
     margin-bottom: 30px;
-    animation: float 3s ease-in-out infinite;
+    
 }
 
 @keyframes float {

@@ -14,6 +14,7 @@ from threading import Thread
 import websocket
 from vosk import Model, KaldiRecognizer
 import pyaudio
+import webrtcvad
 
 # Setup logging
 logging.basicConfig(
@@ -32,7 +33,7 @@ API_KEY = os.environ.get("API_KEY")
 
 # Audio configuration
 SAMPLE_RATE = 16000
-CHUNK_SIZE = 4000
+CHUNK_SIZE = 480
 
 # Voice commands mapping
 COMMANDS = {
@@ -60,6 +61,8 @@ class VoiceRecognitionService:
         self.ws = None
         self.model = None
         self.recognizer = None
+        self.vad = webrtcvad.Vad(3)
+        self.inactive_chunks = 100
         self.audio = None
         self.stream = None
         self.voice_enabled = True
@@ -348,18 +351,31 @@ class VoiceRecognitionService:
                 # Read audio data from stream
                 data = self.stream.read(CHUNK_SIZE, exception_on_overflow=False)
                 
-                # Process with Vosk
-                if self.recognizer.AcceptWaveform(data):
-                    result = json.loads(self.recognizer.Result())
-                    text = result.get('text', '').strip()
-                    
-                    if text:
-                        self.process_command(text)
+                # VAD Processing
+                is_speech = False
+                try:
+                    is_speech = self.vad.is_speech(data, SAMPLE_RATE)
+                except Exception:
+                    pass
+
+                if is_speech:
+                    self.inactive_chunks = 0
                 else:
-                    # Partial result - can be used for faster response
-                    partial = json.loads(self.recognizer.PartialResult())
-                    partial_text = partial.get('partial', '').strip()
-                    # Could process partial results for faster response if needed
+                    self.inactive_chunks += 1
+                
+                # Process with Vosk only if there's been recent speech (within ~1.5s -> 50 chunks of 30ms)
+                if self.inactive_chunks < 50:
+                    if self.recognizer.AcceptWaveform(data):
+                        result = json.loads(self.recognizer.Result())
+                        text = result.get('text', '').strip()
+                        
+                        if text:
+                            self.process_command(text)
+                    else:
+                        # Partial result - can be used for faster response
+                        partial = json.loads(self.recognizer.PartialResult())
+                        partial_text = partial.get('partial', '').strip()
+                        # Could process partial results for faster response if needed
                     
             except Exception as e:
                 logger.error(f"Error in listening loop: {e}")
