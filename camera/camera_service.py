@@ -135,7 +135,7 @@ class CameraStreamer:
         buffer = bytearray()
         stdout = process.stdout
 
-        while self.enabled and process.poll() is None:
+        while self.enabled and self.stream_viewers > 0 and process.poll() is None:
             chunk = stdout.read(65536)
             if not chunk:
                 break
