@@ -10,10 +10,10 @@
 #include "config.h"
 
 namespace Pins {
-constexpr uint8_t BUTTON_1 = 25;
+constexpr uint8_t BUTTON_1 = 32;
 constexpr uint8_t BUTTON_2 = 26;
 constexpr uint8_t BUTTON_3 = 27;
-constexpr uint8_t BUTTON_4 = 32;
+constexpr uint8_t BUTTON_4 = 25;
 constexpr uint8_t BUTTON_5 = 34;
 constexpr uint8_t PIR_MOTION = 33;
 constexpr uint8_t OLED_SDA = 21;
