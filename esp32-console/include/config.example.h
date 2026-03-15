@@ -27,7 +27,7 @@ constexpr unsigned long CONSOLE_STATE_POLL_INTERVAL_MS = 2000UL;
 constexpr unsigned long OLED_REFRESH_INTERVAL_MS = 150UL;
 
 constexpr int SCREEN_WIDTH = 128;
-constexpr int SCREEN_HEIGHT = 64;
+constexpr int SCREEN_HEIGHT = 32;
 constexpr int OLED_ADDRESS = 0x3C;
 constexpr int POT_MIN_DELTA = 80;
 constexpr int POT_STEP_SIZE = 96;

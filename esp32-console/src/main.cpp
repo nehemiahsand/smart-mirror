@@ -116,6 +116,8 @@ String clipLine(const String& value, size_t maxLength = 20) {
   return value.substring(0, maxLength - 1) + "~";
 }
 
+bool isCompactScreen() { return Config::SCREEN_HEIGHT <= 32; }
+
 String backendUrl(const char* path) {
   return String(Config::BACKEND_BASE_URL) + path;
 }
@@ -364,6 +366,12 @@ void drawButtonLine(int16_t y, uint8_t buttonNumber, const String& label, size_t
 
 void renderStandbyScreen() {
   renderHeader("Standby");
+  if (isCompactScreen()) {
+    drawButtonLine(16, 1, gMirrorState.button1, 20);
+    drawButtonLine(24, 5, gMirrorState.button5, 20);
+    return;
+  }
+
   drawLineIfPresent(18, gMirrorState.statusLabel);
   drawButtonLine(42, 1, gMirrorState.button1);
   drawButtonLine(54, 5, gMirrorState.button5);
@@ -371,6 +379,12 @@ void renderStandbyScreen() {
 
 void renderStatsScreen() {
   renderHeader("Stats");
+  if (isCompactScreen()) {
+    drawLineIfPresent(16, gMirrorState.statsLine2.isEmpty() ? gMirrorState.statsLine1 : gMirrorState.statsLine2, 20);
+    drawLineIfPresent(24, String("5 ") + (gMirrorState.button5.isEmpty() ? "Close" : gMirrorState.button5), 20);
+    return;
+  }
+
   drawLineIfPresent(16, gMirrorState.statsLine1);
   drawLineIfPresent(28, gMirrorState.statsLine2);
   drawLineIfPresent(40, gMirrorState.statsLine3);
@@ -379,6 +393,20 @@ void renderStatsScreen() {
 
 void renderPageScreen() {
   renderHeader(gMirrorState.pageTitle);
+
+  if (isCompactScreen()) {
+    if (gMirrorState.activePageId == "spotify") {
+      drawLineIfPresent(16, String("1 ") + gMirrorState.button1 + "  5 " + gMirrorState.button5, 20);
+      drawLineIfPresent(24, String("2 ") + gMirrorState.button2 + " 3 " + gMirrorState.button3 + " 4 " +
+                                 gMirrorState.button4,
+                        20);
+      return;
+    }
+
+    drawButtonLine(16, 1, gMirrorState.button1, 20);
+    drawButtonLine(24, 5, gMirrorState.button5, 20);
+    return;
+  }
 
   if (gMirrorState.activePageId == "spotify") {
     drawButtonLine(16, 1, gMirrorState.button1);
