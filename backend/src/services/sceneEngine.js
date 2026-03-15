@@ -311,6 +311,10 @@ class SceneEngine {
       'voice.enabled': !standbyMode,
     });
 
+    if (standbyMode) {
+      consoleService.handleStandbyActivated(reason);
+    }
+
     websocketServer.broadcastSettingsUpdate(updatedSettings);
     websocketServer.broadcast({
       type: 'standby_change',
@@ -461,11 +465,19 @@ class SceneEngine {
     }
 
     if (eventType === 'display.page.toggle') {
-      if (isStandby) {
-        logger.info('Ignoring page toggle while standby is active', {
+      const consoleState = consoleService.getState();
+      if (consoleState.screenMode === 'stats') {
+        logger.info('Ignoring page toggle while stats overlay is active', {
           deviceId: event.deviceId || 'unknown',
         });
-        return this.refreshState({ source: 'esp32', reason: 'standby_ignored:display.page.toggle', broadcast: true, persist: false });
+        return this.refreshState({ source: 'esp32', reason: 'overlay_ignored:display.page.toggle', broadcast: true, persist: false });
+      }
+
+      if (isStandby) {
+        logger.info('Waking display from standby via page toggle button', {
+          deviceId: event.deviceId || 'unknown',
+        });
+        return this.applyStandbyMode(false, 'button:turn_on');
       }
 
       const websocketServer = require('../api/websocket');

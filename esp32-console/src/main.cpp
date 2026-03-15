@@ -30,6 +30,7 @@ enum class ButtonCommand : uint8_t {
 
 struct ButtonState {
   uint8_t pin;
+  const char* id;
   ButtonCommand command;
   bool stablePressed;
   bool lastRawPressed;
@@ -41,15 +42,22 @@ struct ButtonState {
 struct MirrorState {
   bool backendReachable = false;
   bool interactiveActive = false;
+  bool standby = false;
   String activePageId = "home";
+  String screenMode = "page";
   String pageTitle = "Main Page";
   String statusLabel = "Waiting for backend";
   String lastAction = "Booting";
   String button1 = "Spotify";
-  String button2 = "Prev";
-  String button3 = "Play";
+  String button2 = "Play/Pause";
+  String button3 = "Prev";
   String button4 = "Next";
-  String button5 = "Home";
+  String button5 = "Stats";
+  String overlayTitle = "Mirror Stats";
+  String overlayLine1 = "";
+  String overlayLine2 = "";
+  String overlayLine3 = "";
+  String overlayLine4 = "";
 };
 
 namespace {
@@ -58,11 +66,11 @@ WiFiClient gWiFiClient;
 PubSubClient gMqttClient(gWiFiClient);
 
 ButtonState gButtons[] = {
-    {Pins::BUTTON_TOGGLE_PAGE, ButtonCommand::TogglePage, false, false, false, 0, 0},
-    {Pins::BUTTON_PREV, ButtonCommand::Previous, false, false, false, 0, 0},
-    {Pins::BUTTON_PRIMARY, ButtonCommand::Primary, false, false, false, 0, 0},
-    {Pins::BUTTON_NEXT, ButtonCommand::Next, false, false, false, 0, 0},
-    {Pins::BUTTON_BACK, ButtonCommand::Back, false, false, false, 0, 0},
+    {Pins::BUTTON_TOGGLE_PAGE, "button1", ButtonCommand::TogglePage, false, false, false, 0, 0},
+    {Pins::BUTTON_PREV, "button2", ButtonCommand::Primary, false, false, false, 0, 0},
+    {Pins::BUTTON_PRIMARY, "button3", ButtonCommand::Previous, false, false, false, 0, 0},
+    {Pins::BUTTON_NEXT, "button4", ButtonCommand::Next, false, false, false, 0, 0},
+    {Pins::BUTTON_BACK, "button5", ButtonCommand::Back, false, false, false, 0, 0},
 };
 
 MirrorState gMirrorState;
@@ -97,23 +105,6 @@ const char* buttonAction(ButtonCommand command) {
   }
 }
 
-const char* buttonId(ButtonCommand command) {
-  switch (command) {
-    case ButtonCommand::TogglePage:
-      return "button1";
-    case ButtonCommand::Previous:
-      return "button2";
-    case ButtonCommand::Primary:
-      return "button3";
-    case ButtonCommand::Next:
-      return "button4";
-    case ButtonCommand::Back:
-      return "button5";
-    default:
-      return "button3";
-  }
-}
-
 String clipLine(const String& value, size_t maxLength = 20) {
   if (value.length() <= maxLength) {
     return value;
@@ -135,15 +126,22 @@ bool wifiConnected() { return WiFi.status() == WL_CONNECTED; }
 void resetMirrorState() {
   gMirrorState.backendReachable = false;
   gMirrorState.interactiveActive = false;
+  gMirrorState.standby = false;
   gMirrorState.activePageId = "home";
+  gMirrorState.screenMode = "page";
   gMirrorState.pageTitle = "Main Page";
   gMirrorState.statusLabel = wifiConnected() ? "Waiting for backend" : "Waiting for WiFi";
   gMirrorState.lastAction = gLastEvent;
   gMirrorState.button1 = "Spotify";
-  gMirrorState.button2 = "Prev";
-  gMirrorState.button3 = "Play";
+  gMirrorState.button2 = "Play/Pause";
+  gMirrorState.button3 = "Prev";
   gMirrorState.button4 = "Next";
-  gMirrorState.button5 = "Home";
+  gMirrorState.button5 = "Stats";
+  gMirrorState.overlayTitle = "Mirror Stats";
+  gMirrorState.overlayLine1 = "";
+  gMirrorState.overlayLine2 = "";
+  gMirrorState.overlayLine3 = "";
+  gMirrorState.overlayLine4 = "";
 }
 
 bool publishStatus(bool online) {
@@ -181,7 +179,8 @@ bool publishJson(const char* type, JsonDocument& payload) {
   return published;
 }
 
-bool publishAction(ButtonCommand command, bool hold) {
+bool publishAction(const ButtonState& button, bool hold) {
+  const ButtonCommand command = button.command;
   if (command == ButtonCommand::TogglePage) {
     StaticJsonDocument<64> payload;
     payload["pageId"] = gMirrorState.activePageId;
@@ -191,7 +190,7 @@ bool publishAction(ButtonCommand command, bool hold) {
 
   StaticJsonDocument<192> payload;
   payload["pageId"] = gMirrorState.activePageId;
-  payload["buttonId"] = buttonId(command);
+  payload["buttonId"] = button.id;
   payload["action"] = buttonAction(command);
   payload["hold"] = hold;
   return publishJson("ui.action", payload);
@@ -281,11 +280,12 @@ void pollConsoleState() {
   }
 
   gMirrorState.backendReachable = true;
-  gMirrorState.interactiveActive =
-      document["interactiveActive"].as<bool>() || document["active"].as<bool>();
+  gMirrorState.interactiveActive = document["interactiveActive"].as<bool>() || document["active"].as<bool>();
+  gMirrorState.standby = document["standby"].as<bool>();
+  gMirrorState.screenMode = String(document["screenMode"] | (gMirrorState.standby ? "standby" : "page"));
   gMirrorState.activePageId = String(document["activePageId"] | "home");
-  gMirrorState.pageTitle = String(document["pageTitle"] | "Main Page");
-  gMirrorState.statusLabel = String(document["statusLabel"] | "Ready");
+  gMirrorState.pageTitle = String(document["pageTitle"] | (gMirrorState.standby ? "Standby" : "Main Page"));
+  gMirrorState.statusLabel = String(document["statusLabel"] | (gMirrorState.standby ? "Motion or 1 wakes" : "Ready"));
   gMirrorState.lastAction = String(document["lastAction"] | gLastEvent);
 
   JsonObject softButtons = document["softButtons"].as<JsonObject>();
@@ -296,6 +296,70 @@ void pollConsoleState() {
     gMirrorState.button4 = String(softButtons["button4"] | gMirrorState.button4);
     gMirrorState.button5 = String(softButtons["button5"] | gMirrorState.button5);
   }
+
+  JsonObject overlay = document["overlay"].as<JsonObject>();
+  if (!overlay.isNull()) {
+    gMirrorState.overlayTitle = String(overlay["title"] | "Mirror Stats");
+    JsonArray lines = overlay["lines"].as<JsonArray>();
+    gMirrorState.overlayLine1 = String(lines[0] | "");
+    gMirrorState.overlayLine2 = String(lines[1] | "");
+    gMirrorState.overlayLine3 = String(lines[2] | "");
+    gMirrorState.overlayLine4 = String(lines[3] | "");
+  } else {
+    gMirrorState.overlayTitle = "Mirror Stats";
+    gMirrorState.overlayLine1 = "";
+    gMirrorState.overlayLine2 = "";
+    gMirrorState.overlayLine3 = "";
+    gMirrorState.overlayLine4 = "";
+  }
+}
+
+void renderHeader(const String& title) {
+  gDisplay.setCursor(0, 0);
+  gDisplay.print(clipLine(title, 12));
+  gDisplay.setCursor(84, 0);
+  gDisplay.printf("%c%c%c", wifiConnected() ? 'W' : '-', gMqttClient.connected() ? 'M' : '-',
+                  gMirrorState.backendReachable ? 'B' : '-');
+  gDisplay.drawLine(0, 10, Config::SCREEN_WIDTH - 1, 10, SSD1306_WHITE);
+}
+
+void drawLineIfPresent(int16_t y, const String& value, size_t maxLength = 20) {
+  if (value.isEmpty()) {
+    return;
+  }
+
+  gDisplay.setCursor(0, y);
+  gDisplay.print(clipLine(value, maxLength));
+}
+
+void renderStandbyScreen() {
+  renderHeader("Standby");
+  drawLineIfPresent(18, gMirrorState.statusLabel);
+  drawLineIfPresent(42, String("1 ") + gMirrorState.button1);
+}
+
+void renderPageScreen() {
+  renderHeader(gMirrorState.pageTitle);
+
+  if (gMirrorState.activePageId == "spotify") {
+    drawLineIfPresent(16, String("1 ") + gMirrorState.button1);
+    drawLineIfPresent(28, String("2 ") + gMirrorState.button2);
+    drawLineIfPresent(40, String("3 ") + gMirrorState.button3 + "  4 " + gMirrorState.button4);
+    drawLineIfPresent(52, String("5 ") + gMirrorState.button5);
+    return;
+  }
+
+  drawLineIfPresent(22, String("1 ") + gMirrorState.button1);
+  drawLineIfPresent(44, String("5 ") + gMirrorState.button5);
+}
+
+void renderStatsScreen() {
+  renderHeader(gMirrorState.overlayTitle);
+  drawLineIfPresent(14, gMirrorState.overlayLine1);
+  drawLineIfPresent(24, gMirrorState.overlayLine2);
+  drawLineIfPresent(34, gMirrorState.overlayLine3);
+  drawLineIfPresent(44, gMirrorState.overlayLine4);
+  drawLineIfPresent(54, String("5 ") + gMirrorState.button5);
 }
 
 void renderDisplay() {
@@ -313,27 +377,13 @@ void renderDisplay() {
   gDisplay.setTextSize(1);
   gDisplay.setTextColor(SSD1306_WHITE);
 
-  gDisplay.setCursor(0, 0);
-  gDisplay.print(clipLine(gMirrorState.pageTitle, 12));
-  gDisplay.setCursor(84, 0);
-  gDisplay.printf("%c%c%c", wifiConnected() ? 'W' : '-', gMqttClient.connected() ? 'M' : '-',
-                  gMirrorState.backendReachable ? 'B' : '-');
-  gDisplay.drawLine(0, 10, Config::SCREEN_WIDTH - 1, 10, SSD1306_WHITE);
-
-  gDisplay.setCursor(0, 14);
-  gDisplay.print(clipLine(gMirrorState.statusLabel));
-
-  gDisplay.setCursor(0, 24);
-  gDisplay.print(clipLine(gMirrorState.lastAction));
-
-  gDisplay.setCursor(0, 34);
-  gDisplay.print(clipLine(String("1 ") + gMirrorState.button1));
-
-  gDisplay.setCursor(0, 44);
-  gDisplay.print(clipLine(String("2 ") + gMirrorState.button2 + "  3 " + gMirrorState.button3));
-
-  gDisplay.setCursor(0, 54);
-  gDisplay.print(clipLine(String("4 ") + gMirrorState.button4 + "  5 " + gMirrorState.button5));
+  if (gMirrorState.screenMode == "standby" || gMirrorState.standby) {
+    renderStandbyScreen();
+  } else if (gMirrorState.screenMode == "stats") {
+    renderStatsScreen();
+  } else {
+    renderPageScreen();
+  }
 
   gDisplay.display();
 }
@@ -359,14 +409,14 @@ void pollButtons() {
         button.pressedAtMs = nowMs;
         button.longSent = false;
       } else if (!button.longSent) {
-        publishAction(button.command, false);
+        publishAction(button, false);
       }
     }
 
     if (button.stablePressed && !button.longSent &&
         (nowMs - button.pressedAtMs) >= Config::BUTTON_LONG_PRESS_MS) {
       button.longSent = true;
-      publishAction(button.command, true);
+      publishAction(button, true);
     }
   }
 }

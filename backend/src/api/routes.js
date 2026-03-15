@@ -199,9 +199,9 @@ router.get('/console/state', (req, res) => {
   }
 });
 
-router.get('/console/page/:pageId', (req, res) => {
+router.get('/console/page/:pageId', async (req, res) => {
   try {
-    res.json(consoleService.getPageData(req.params.pageId));
+    res.json(await consoleService.getPageData(req.params.pageId));
   } catch (error) {
     logger.error('Failed to get console page state', {
       error: error.message,
