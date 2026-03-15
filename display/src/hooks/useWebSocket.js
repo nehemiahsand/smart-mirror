@@ -21,6 +21,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
   const [time, setTime] = useState(null);
   const [sensorData, setSensorData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
+  const [consolePageData, setConsolePageData] = useState({});
   const [settings, setSettings] = useState(null);
   const [message, setMessage] = useState(null);
   const wsRef = useRef(null);
@@ -79,6 +80,14 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
               break;
             case 'weather_data':
               setWeatherData(data.data);
+              break;
+            case 'console_page_data':
+              if (data.pageId) {
+                setConsolePageData(prev => ({
+                  ...prev,
+                  [data.pageId]: data.data
+                }));
+              }
               break;
             case 'page_change':
             case 'voice_command':
@@ -184,6 +193,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
     time,
     sensorData,
     weatherData,
+    consolePageData,
     settings,
     message,
     syncPage

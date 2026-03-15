@@ -373,9 +373,11 @@ void renderStatsScreen() {
 
 void renderPageScreen() {
   renderHeader(gMirrorState.pageTitle);
+  const bool showExtendedControls =
+      gMirrorState.activePageId == "spotify" || gMirrorState.activePageId == "fun";
 
   if (isCompactScreen()) {
-    if (gMirrorState.activePageId == "spotify") {
+    if (showExtendedControls) {
       drawLineIfPresent(16, String("1 ") + gMirrorState.button1 + "  5 " + gMirrorState.button5, 20);
       drawLineIfPresent(24, String("2 ") + gMirrorState.button2 + " 3 " + gMirrorState.button3 + " 4 " +
                                  gMirrorState.button4,
@@ -388,7 +390,7 @@ void renderPageScreen() {
     return;
   }
 
-  if (gMirrorState.activePageId == "spotify") {
+  if (showExtendedControls) {
     drawButtonLine(16, 1, gMirrorState.button1);
     drawButtonLine(28, 2, gMirrorState.button2);
     if (!gMirrorState.button3.isEmpty() || !gMirrorState.button4.isEmpty()) {

@@ -45,6 +45,7 @@ function App() {
         time,
         sensorData,
         weatherData,
+        consolePageData,
         settings,
         message,
         syncPage
@@ -171,7 +172,7 @@ function App() {
     if (currentPage === 'fun') {
         return (
             <>
-                <FunPage />
+                <FunPage pageData={consolePageData.fun} />
                 <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
             </>
         );

@@ -8,6 +8,7 @@ const PROVIDER_ID = 'calvin-and-hobbes';
 const ITEM_TYPE = 'comic';
 const ITEM_TITLE = 'Calvin & Hobbes';
 const USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36';
+const FIRST_STRIP_DATE = '1985-11-18';
 
 function pad(value) {
   return String(value).padStart(2, '0');
@@ -20,6 +21,30 @@ function getDateKey(date = new Date()) {
 function getSourceUrl(dateKey) {
   const [year, month, day] = String(dateKey).split('-');
   return `https://www.gocomics.com/calvinandhobbes/${year}/${month}/${day}`;
+}
+
+function parseDateKey(dateKey) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || ''));
+  if (!match) {
+    return null;
+  }
+
+  const [, yearText, monthText, dayText] = match;
+  const year = Number.parseInt(yearText, 10);
+  const month = Number.parseInt(monthText, 10);
+  const day = Number.parseInt(dayText, 10);
+  const date = new Date(year, month - 1, day);
+
+  if (
+    Number.isNaN(date.getTime())
+    || date.getFullYear() !== year
+    || date.getMonth() !== (month - 1)
+    || date.getDate() !== day
+  ) {
+    return null;
+  }
+
+  return date;
 }
 
 function inferExtension(contentType = '', imageUrl = '') {
@@ -72,6 +97,21 @@ function extractOgImage(html) {
 }
 
 class FunContentService {
+  getCurrentDateKey() {
+    return getDateKey();
+  }
+
+  normalizeDateKey(dateKey) {
+    const parsed = parseDateKey(dateKey);
+    return parsed ? getDateKey(parsed) : null;
+  }
+
+  shiftDateKey(dateKey, deltaDays = 0) {
+    const parsed = parseDateKey(dateKey) || new Date();
+    parsed.setDate(parsed.getDate() + deltaDays);
+    return getDateKey(parsed);
+  }
+
   async ensureDataDir() {
     await fs.mkdir(DATA_DIR, { recursive: true });
   }
@@ -126,17 +166,24 @@ class FunContentService {
   }
 
   buildItem(metadata, stale = false) {
+    const todayDateKey = this.getCurrentDateKey();
+    const normalizedDateKey = this.normalizeDateKey(metadata.date) || metadata.date;
+    const isCurrent = normalizedDateKey === todayDateKey;
+
     return {
       pageId: 'fun',
       itemType: ITEM_TYPE,
       provider: PROVIDER_ID,
       title: metadata.title || ITEM_TITLE,
-      date: metadata.date,
-      imageUrl: '/api/fun/current/image',
+      date: normalizedDateKey,
+      imageUrl: `/api/fun/image?date=${encodeURIComponent(normalizedDateKey)}`,
       sourceUrl: metadata.sourceUrl,
       cached: true,
       stale,
       fetchedAt: metadata.fetchedAt,
+      isCurrent,
+      canGoNewer: normalizedDateKey < todayDateKey,
+      canGoOlder: normalizedDateKey > FIRST_STRIP_DATE,
       unavailable: false,
     };
   }
@@ -152,6 +199,9 @@ class FunContentService {
       cached: false,
       stale: false,
       fetchedAt: null,
+      isCurrent: true,
+      canGoNewer: false,
+      canGoOlder: false,
       unavailable: true,
       message,
     };
@@ -208,9 +258,10 @@ class FunContentService {
     };
   }
 
-  async getCurrentItem(options = {}) {
+  async getItemByDate(dateKeyInput, options = {}) {
     const forceRefresh = options.forceRefresh === true;
-    const dateKey = getDateKey();
+    const fallbackToLatest = options.fallbackToLatest === true;
+    const dateKey = this.normalizeDateKey(dateKeyInput) || this.getCurrentDateKey();
 
     await this.ensureDataDir();
 
@@ -237,12 +288,22 @@ class FunContentService {
         date: dateKey,
       });
 
-      const fallback = await this.getLatestCachedMetadata();
-      if (fallback) {
+      const cachedForDate = await this.readMetadata(dateKey);
+      if (cachedForDate) {
         return {
-          item: this.buildItem(fallback, true),
-          imagePath: fallback.imagePath,
+          item: this.buildItem(cachedForDate, true),
+          imagePath: cachedForDate.imagePath,
         };
+      }
+
+      if (fallbackToLatest) {
+        const fallback = await this.getLatestCachedMetadata();
+        if (fallback) {
+          return {
+            item: this.buildItem(fallback, true),
+            imagePath: fallback.imagePath,
+          };
+        }
       }
 
       return {
@@ -250,6 +311,22 @@ class FunContentService {
         imagePath: null,
       };
     }
+  }
+
+  async getCurrentItem(options = {}) {
+    return this.getItemByDate(this.getCurrentDateKey(), {
+      ...options,
+      fallbackToLatest: true,
+    });
+  }
+
+  async getImagePathForDate(dateKeyInput, options = {}) {
+    const normalizedDateKey = this.normalizeDateKey(dateKeyInput) || this.getCurrentDateKey();
+    const { imagePath } = await this.getItemByDate(normalizedDateKey, {
+      ...options,
+      fallbackToLatest: normalizedDateKey === this.getCurrentDateKey(),
+    });
+    return imagePath;
   }
 
   async getCurrentImagePath(options = {}) {

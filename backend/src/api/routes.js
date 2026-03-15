@@ -218,6 +218,21 @@ router.get('/fun/current/image', async (req, res) => {
   }
 });
 
+router.get('/fun/image', async (req, res) => {
+  try {
+    const imagePath = await funContentService.getImagePathForDate(req.query?.date);
+    if (!imagePath) {
+      return res.status(404).json({ error: 'Fun image unavailable' });
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.sendFile(imagePath);
+  } catch (error) {
+    logger.error('Failed to get dated fun image', { error: error.message, date: req.query?.date });
+    return res.status(500).json({ error: 'Failed to get fun image' });
+  }
+});
+
 router.post('/fun/refresh', adminAuth, async (req, res) => {
   try {
     const { item } = await funContentService.getCurrentItem({ forceRefresh: true });

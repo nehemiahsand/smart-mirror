@@ -189,6 +189,7 @@ class ConsoleService {
       alarmRinging: false,
       alarmTriggeredDate: null,
       snoozeUntil: null,
+      funDateKey: null,
       focusStatus: 'idle',
       focusPhase: 'work',
       focusEndsAt: null,
@@ -301,6 +302,21 @@ class ConsoleService {
     return this.getPages()[normalizedPageId]?.enabled !== false;
   }
 
+  getFunDateKey() {
+    const normalized = funContentService.normalizeDateKey(this.runtime.funDateKey);
+    if (normalized) {
+      return normalized;
+    }
+
+    const todayDateKey = funContentService.getCurrentDateKey();
+    this.runtime.funDateKey = todayDateKey;
+    return todayDateKey;
+  }
+
+  setFunDateKey(dateKey) {
+    this.runtime.funDateKey = funContentService.normalizeDateKey(dateKey) || funContentService.getCurrentDateKey();
+  }
+
   buildAlarmSummary() {
     const alarmSettings = settingsService.get('alarm') || {};
     const nextTriggerAt = this.getNextAlarmTriggerAt(new Date());
@@ -397,9 +413,9 @@ class ConsoleService {
       case 'fun':
         return {
           button1: pageToggleTarget.name,
-          button2: '',
-          button3: '',
-          button4: '',
+          button2: 'Prev',
+          button3: 'Next',
+          button4: 'Today',
           button5: 'Stats',
         };
       case 'media':
@@ -805,6 +821,18 @@ class ConsoleService {
       return this.openStatsOverlay('fun:stats');
     }
 
+    const currentDateKey = this.getFunDateKey();
+    const todayDateKey = funContentService.getCurrentDateKey();
+
+    if (['primary'].includes(action)) {
+      this.setFunDateKey(funContentService.shiftDateKey(currentDateKey, -1));
+    } else if (['previous'].includes(action)) {
+      const nextDateKey = funContentService.shiftDateKey(currentDateKey, 1);
+      this.setFunDateKey(nextDateKey > todayDateKey ? todayDateKey : nextDateKey);
+    } else if (['next', 'refresh', 'confirm'].includes(action)) {
+      this.setFunDateKey(todayDateKey);
+    }
+
     this.touchInteraction(`fun:${action}`);
     this.broadcastState();
     await this.broadcastPageData('fun');
@@ -1004,13 +1032,15 @@ class ConsoleService {
   }
 
   async getFunPageData() {
-    const { item } = await funContentService.getCurrentItem();
+    const selectedDateKey = this.getFunDateKey();
+    const { item } = await funContentService.getItemByDate(selectedDateKey);
 
     return {
       pageId: 'fun',
       canonicalPageId: 'fun',
       title: this.getPages().fun?.title || 'Fun',
       item,
+      selectedDateKey,
       summary: item.unavailable ? 'No fun content available' : (item.title || 'Fun content ready'),
       softButtons: this.getSoftButtons('fun'),
     };
@@ -1128,6 +1158,7 @@ class ConsoleService {
     if (!WEATHER_TABS.includes(this.state.weatherTabId)) {
       this.state.weatherTabId = 'current';
     }
+    this.setFunDateKey(this.runtime.funDateKey);
     this.state.lastAction = reason;
     this.state.updatedAt = Date.now();
     this.broadcastState();

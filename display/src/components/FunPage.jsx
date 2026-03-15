@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import TimeDateWidget from '../widgets/TimeDate';
 import { apiFetch, getApiUrl } from '../apiClient';
 import './FunPage.css';
@@ -53,7 +54,7 @@ function FunContent({ item, loading }) {
     );
 }
 
-export default function FunPage() {
+export default function FunPage({ pageData }) {
     const [item, setItem] = useState(null);
     const [loading, setLoading] = useState(true);
 
@@ -62,10 +63,10 @@ export default function FunPage() {
 
         const fetchFunContent = async () => {
             try {
-                const response = await apiFetch('/api/fun/current');
+                const response = await apiFetch('/api/console/page/fun');
                 const data = await response.json();
                 if (mounted) {
-                    setItem(data);
+                    setItem(data.item || null);
                 }
             } catch (error) {
                 console.error('Failed to fetch fun content:', error);
@@ -91,6 +92,13 @@ export default function FunPage() {
         };
     }, []);
 
+    useEffect(() => {
+        if (pageData?.item) {
+            setItem(pageData.item);
+            setLoading(false);
+        }
+    }, [pageData]);
+
     return (
         <div className="mirror fun-page">
             <div className="fun-page-content">
@@ -104,3 +112,9 @@ export default function FunPage() {
         </div>
     );
 }
+
+FunPage.propTypes = {
+    pageData: PropTypes.shape({
+        item: PropTypes.object
+    })
+};
