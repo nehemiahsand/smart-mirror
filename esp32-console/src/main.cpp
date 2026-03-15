@@ -142,11 +142,10 @@ void buildConsoleStateFilter(JsonDocument& filter) {
 
   JsonObject overlay = filter["overlay"].to<JsonObject>();
   overlay["title"] = true;
-  JsonArray overlayLines = overlay["lines"].to<JsonArray>();
-  overlayLines.add(true);
-  overlayLines.add(true);
-  overlayLines.add(true);
-  overlayLines.add(true);
+  overlay["line1"] = true;
+  overlay["line2"] = true;
+  overlay["line3"] = true;
+  overlay["line4"] = true;
 }
 
 void resetMirrorState() {
@@ -330,11 +329,10 @@ void pollConsoleState() {
   JsonObject overlay = document["overlay"].as<JsonObject>();
   if (!overlay.isNull()) {
     gMirrorState.overlayTitle = String(overlay["title"] | "Mirror Stats");
-    JsonArray lines = overlay["lines"].as<JsonArray>();
-    gMirrorState.overlayLine1 = String(lines[0] | "");
-    gMirrorState.overlayLine2 = String(lines[1] | "");
-    gMirrorState.overlayLine3 = String(lines[2] | "");
-    gMirrorState.overlayLine4 = String(lines[3] | "");
+    gMirrorState.overlayLine1 = String(overlay["line1"] | "");
+    gMirrorState.overlayLine2 = String(overlay["line2"] | "");
+    gMirrorState.overlayLine3 = String(overlay["line3"] | "");
+    gMirrorState.overlayLine4 = String(overlay["line4"] | "");
   } else {
     gMirrorState.overlayTitle = "Mirror Stats";
     gMirrorState.overlayLine1 = "";

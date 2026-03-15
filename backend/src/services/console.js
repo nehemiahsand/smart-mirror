@@ -472,17 +472,22 @@ class ConsoleService {
     const cpuSummary = stats.cpuTempC != null
       ? `CPU ${stats.cpuPercent ?? '--'}% ${stats.cpuTempC}C`
       : `CPU ${stats.cpuPercent ?? '--'}%`;
+    const lines = [
+      cpuSummary,
+      `RAM ${stats.ramPercent}% ${stats.usedMemMb}/${stats.totalMemMb}M`,
+      `Up ${formatUptimeShort(stats.uptimeSeconds)}`,
+      `Load ${stats.loadAvg1m} C${stats.cpuCount}`,
+    ];
 
     return {
       id: 'stats',
       title: 'Mirror Stats',
       sourcePageTitle: currentPageTitle,
-      lines: [
-        cpuSummary,
-        `RAM ${stats.ramPercent}% ${stats.usedMemMb}/${stats.totalMemMb}M`,
-        `Up ${formatUptimeShort(stats.uptimeSeconds)}`,
-        `Load ${stats.loadAvg1m} C${stats.cpuCount}`,
-      ],
+      line1: lines[0],
+      line2: lines[1],
+      line3: lines[2],
+      line4: lines[3],
+      lines,
       stats,
     };
   }

@@ -467,10 +467,11 @@ class SceneEngine {
     if (eventType === 'display.page.toggle') {
       const consoleState = consoleService.getState();
       if (consoleState.screenMode === 'stats') {
-        logger.info('Ignoring page toggle while stats overlay is active', {
+        logger.info('Closing stats overlay via page toggle button', {
           deviceId: event.deviceId || 'unknown',
         });
-        return this.refreshState({ source: 'esp32', reason: 'overlay_ignored:display.page.toggle', broadcast: true, persist: false });
+        await consoleService.toggleStatsOverlay('button1_close');
+        return this.refreshState({ source: 'esp32', reason: 'overlay_closed:display.page.toggle', broadcast: true, persist: false });
       }
 
       if (isStandby) {
