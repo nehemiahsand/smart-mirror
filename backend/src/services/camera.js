@@ -39,9 +39,9 @@ class CameraService {
         const response = await axios.get(`${CAMERA_URL}/health`, { timeout: 5000 });
         const cameraActive = response.data.camera_active;
         
-        if (cameraActive) {
+        if (response.data.status === 'ok') {
           this.isAvailable = true;
-          logger.info('Camera service is available and active');
+          logger.info('Camera service is available and responded ok');
           this.startMonitoring();
           return;
         } else {
