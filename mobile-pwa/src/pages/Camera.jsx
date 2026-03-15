@@ -157,12 +157,11 @@ export default function Camera() {
             )}
 
             {/* Live Camera Feed */}
-            {cameraStatus?.available && (
-                <div className="card">
-                    <div className="card-header">
-                        <span className="card-icon">📹</span>
-                        <h2>Live Stream Proxy Feed</h2>
-                    </div>
+            <div className="card">
+                <div className="card-header">
+                    <span className="card-icon">📹</span>
+                    <h2>Live Stream Proxy Feed</h2>
+                </div>
 
                     <div className="camera-feed">
                         <div className="info-box">
@@ -201,7 +200,6 @@ export default function Camera() {
                         )}
                     </div>
                 </div>
-            )}
         </div>
     );
 }
