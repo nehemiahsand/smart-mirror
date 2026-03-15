@@ -1,11 +1,14 @@
 const fs = require('fs');
 const os = require('os');
+const bibleVerseClockService = require('./bibleVerseClock');
 const cameraService = require('./camera');
 const climateService = require('./climate');
 const funContentService = require('./funContent');
 const logger = require('../utils/logger');
+const moonPhaseService = require('./moonPhase');
 const settingsService = require('./settings');
 const spotifyService = require('./spotify');
+const sportsService = require('./sports');
 const weatherService = require('./weather');
 
 const DEFAULT_PAGES = {
@@ -317,6 +320,42 @@ class ConsoleService {
     this.runtime.funDateKey = funContentService.normalizeDateKey(dateKey) || funContentService.getCurrentDateKey();
   }
 
+  getSportsOptions() {
+    return sportsService.getSupportedSports().map((sport) => sport.id);
+  }
+
+  getDefaultSportId() {
+    const availableSports = this.getSportsOptions();
+    const configuredDefault = String(settingsService.get('sports.defaultSport') || settingsService.get('sports.sport') || 'nba').toLowerCase();
+    if (availableSports.includes(configuredDefault)) {
+      return configuredDefault;
+    }
+    return availableSports[0] || 'nba';
+  }
+
+  getCurrentSportId() {
+    const availableSports = this.getSportsOptions();
+    const currentSport = String(settingsService.get('sports.sport') || this.getDefaultSportId()).toLowerCase();
+    if (availableSports.includes(currentSport)) {
+      return currentSport;
+    }
+    return this.getDefaultSportId();
+  }
+
+  async setCurrentSportId(sportId) {
+    const availableSports = this.getSportsOptions();
+    const nextSportId = availableSports.includes(sportId) ? sportId : this.getDefaultSportId();
+    const updates = {
+      'sports.enabled': true,
+      'sports.sport': nextSportId,
+      'widgets.sports': true,
+    };
+    const updatedSettings = await settingsService.updateMultiple(updates);
+    const websocketServer = require('../api/websocket');
+    websocketServer.broadcastSettingsUpdate(updatedSettings);
+    return nextSportId;
+  }
+
   buildAlarmSummary() {
     const alarmSettings = settingsService.get('alarm') || {};
     const nextTriggerAt = this.getNextAlarmTriggerAt(new Date());
@@ -440,9 +479,9 @@ class ConsoleService {
       default:
         return {
           button1: pageToggleTarget.name,
-          button2: '',
-          button3: '',
-          button4: '',
+          button2: 'Next',
+          button3: 'Prev',
+          button4: 'Default',
           button5: 'Stats',
         };
     }
@@ -811,6 +850,24 @@ class ConsoleService {
       return this.openStatsOverlay('dynamic:stats');
     }
 
+    if (action === 'primary') {
+      const availableSports = this.getSportsOptions();
+      const currentSportId = this.getCurrentSportId();
+      const currentIndex = availableSports.indexOf(currentSportId);
+      const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+      const nextSportId = availableSports[cycleIndex(safeIndex, availableSports.length, 1)];
+      await this.setCurrentSportId(nextSportId);
+    } else if (action === 'previous') {
+      const availableSports = this.getSportsOptions();
+      const currentSportId = this.getCurrentSportId();
+      const currentIndex = availableSports.indexOf(currentSportId);
+      const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+      const previousSportId = availableSports[cycleIndex(safeIndex, availableSports.length, -1)];
+      await this.setCurrentSportId(previousSportId);
+    } else if (['next', 'refresh', 'confirm'].includes(action)) {
+      await this.setCurrentSportId(this.getDefaultSportId());
+    }
+
     this.touchInteraction(`dynamic:${action}`);
     this.broadcastState();
     return this.getState();
@@ -1034,11 +1091,20 @@ class ConsoleService {
   async getFunPageData() {
     const selectedDateKey = this.getFunDateKey();
     const { item } = await funContentService.getItemByDate(selectedDateKey);
+    const clockFormat = settingsService.get('display.clockFormat') === '12h' ? '12h' : '24h';
+    const widgets = await Promise.all([
+      Promise.resolve(moonPhaseService.getCurrentWidget()),
+      bibleVerseClockService.getCurrentWidget({ clockFormat }),
+    ]);
 
     return {
       pageId: 'fun',
       canonicalPageId: 'fun',
       title: this.getPages().fun?.title || 'Fun',
+      widgets: {
+        left: widgets[0],
+        right: widgets[1],
+      },
       item,
       selectedDateKey,
       summary: item.unavailable ? 'No fun content available' : (item.title || 'Fun content ready'),

@@ -11,7 +11,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2.5rem;
+    gap: 2rem;
 }
 
 .fun-time-section {
@@ -25,15 +25,24 @@
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
+    flex-direction: column;
     align-items: stretch;
-    justify-content: center;
+    justify-content: flex-start;
+    gap: 1.5rem;
 }
 
-.fun-card {
+.fun-widget-row {
     width: 100%;
     max-width: 1320px;
+    align-self: center;
     display: flex;
-    flex-direction: column;
+    align-items: stretch;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.fun-panel {
+    flex: 1 1 0;
     min-height: 0;
     padding: 1.5rem;
     border-radius: 14px;
@@ -42,8 +51,17 @@
     box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
 }
 
-.fun-card-header,
-.fun-card-footer {
+.fun-panel-title {
+    font-size: 0.92rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.68;
+}
+
+.fun-panel-header,
+.fun-panel-footer,
+.fun-comic-header,
+.fun-comic-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -51,17 +69,92 @@
     flex-wrap: wrap;
 }
 
-.fun-card-header {
-    margin-bottom: 1rem;
+.fun-panel-header {
+    margin-bottom: 0.85rem;
 }
 
-.fun-card-body {
+.fun-panel-footer {
+    margin-top: 0.85rem;
+    font-size: 0.9rem;
+    opacity: 0.7;
+}
+
+.fun-moon-widget {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    margin-top: 1rem;
+}
+
+.fun-moon-emoji {
+    flex: 0 0 auto;
+    font-size: 5rem;
+    line-height: 1;
+    filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.4));
+}
+
+.fun-moon-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.fun-moon-phase {
+    font-size: 1.9rem;
+    font-weight: 300;
+    letter-spacing: 0.03em;
+}
+
+.fun-moon-meta {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+.fun-verse-time {
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    opacity: 0.72;
+}
+
+.fun-verse-reference {
+    margin-top: 0.3rem;
+    font-size: 1.3rem;
+    font-weight: 500;
+    line-height: 1.35;
+}
+
+.fun-verse-text {
+    margin-top: 0.85rem;
+    font-size: 1.02rem;
+    line-height: 1.6;
+    opacity: 0.9;
+}
+
+.fun-verse-text-muted,
+.fun-widget-empty {
+    opacity: 0.72;
+}
+
+.fun-comic-section {
+    width: 100%;
     flex: 1 1 auto;
     min-height: 0;
     display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
+}
+
+.fun-comic-frame {
+    width: 100%;
+    max-width: 1320px;
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1.4rem;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
 }
 
 .fun-item-pill,
@@ -82,6 +175,19 @@
     opacity: 0.88;
 }
 
+.fun-comic-header {
+    margin-bottom: 1rem;
+}
+
+.fun-comic-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+}
+
 .fun-comic-image {
     max-width: 100%;
     max-height: 100%;
@@ -90,25 +196,19 @@
     border-radius: 8px;
 }
 
-.fun-card-footer {
+.fun-comic-footer {
     margin-top: 1rem;
     font-size: 0.95rem;
     opacity: 0.75;
 }
 
 .fun-empty-state {
-    width: 100%;
-    max-width: 860px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 0.75rem;
     text-align: center;
-    padding: 2rem;
-    border-radius: 14px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .fun-empty-title {
@@ -127,8 +227,21 @@
         gap: 1.5rem;
     }
 
-    .fun-card {
+    .fun-widget-row {
+        flex-direction: column;
+    }
+
+    .fun-panel,
+    .fun-comic-frame {
         padding: 1rem;
+    }
+
+    .fun-moon-emoji {
+        font-size: 4rem;
+    }
+
+    .fun-moon-phase {
+        font-size: 1.5rem;
     }
 
     .fun-empty-title {

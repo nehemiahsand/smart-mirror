@@ -34,6 +34,12 @@ const DEFAULT_SETTINGS = {
     units: 'imperial',
     updateInterval: 600000
   },
+  sports: {
+    enabled: false,
+    sport: 'nba',
+    defaultSport: 'nba',
+    teams: []
+  },
   traffic: {
     enabled: false,
     origin: '',

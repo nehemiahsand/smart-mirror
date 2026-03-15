@@ -45,6 +45,7 @@ export default function SportsSettings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           'sports.enabled': true,
+          'sports.defaultSport': sportId,
           'sports.sport': sportId,
           'widgets.sports': true
         })
