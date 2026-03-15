@@ -16,6 +16,10 @@ const weatherService = require('./services/weather');
 const googleCalendarService = require('./services/googleCalendar');
 const powerService = require('./services/power');
 const cameraService = require('./services/camera');
+const climateService = require('./services/climate');
+const consoleService = require('./services/console');
+const sceneEngine = require('./services/sceneEngine');
+const esp32InputService = require('./services/esp32Input');
 const dht22Service = require('./sensors/dht22');
 const websocketServer = require('./api/websocket');
 const apiRoutes = require('./api/routes');
@@ -258,6 +262,12 @@ async function start() {
     await cameraService.initialize();
     logger.info('Camera service initialized');
 
+    sceneEngine.initialize();
+    logger.info('Scene engine initialized');
+
+    consoleService.initialize();
+    logger.info('Console service initialized');
+
     if (googleCalendarService.isInitialized()) {
       logger.info('Google Calendar service initialized');
     } else {
@@ -269,6 +279,9 @@ async function start() {
     
     // Make websocket server available to routes
     app.set('websocket', websocketServer);
+
+    esp32InputService.initialize();
+    logger.info('ESP32 input integration initialized');
 
     // Start continuous sensor reading (if available and not in standby mode)
     let sensorIntervalId = null;
@@ -286,7 +299,7 @@ async function start() {
           sensorIntervalId = setInterval(async () => {
             const currentSettings = settingsService.getAll();
             if (!currentSettings?.display?.standbyMode) {
-              const reading = await dht22Service.getCurrentReading();
+              const reading = await climateService.getCurrentReading();
               if (!reading.error) {
                 // Reduced logging - only log on websocket broadcast
                 websocketServer.broadcastSensorData(reading);
@@ -354,6 +367,9 @@ function shutdown() {
   logger.info('Shutting down gracefully...');
   
   websocketServer.close();
+  sceneEngine.close();
+  consoleService.close();
+  esp32InputService.close();
   
   server.close(() => {
     logger.info('Server closed');

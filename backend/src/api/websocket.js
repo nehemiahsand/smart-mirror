@@ -6,6 +6,9 @@
 
 const WebSocket = require('ws');
 const logger = require('../utils/logger');
+const climateService = require('../services/climate');
+const consoleService = require('../services/console');
+const sceneEngine = require('../services/sceneEngine');
 const settingsService = require('../services/settings');
 const weatherService = require('../services/weather');
 const dht22Service = require('../sensors/dht22');
@@ -42,6 +45,18 @@ class WebSocketServer {
 
       // Send initial weather and sensor data immediately
       this.sendInitialData(ws);
+
+      this.send(ws, {
+        type: 'scene_state',
+        data: sceneEngine.getState(),
+        timestamp: Date.now(),
+      });
+
+      this.send(ws, {
+        type: 'console_state',
+        data: consoleService.getState(),
+        timestamp: Date.now(),
+      });
 
       ws.on('message', (message) => {
         try {
@@ -413,24 +428,63 @@ class WebSocketServer {
     await settingsService.update('current_page', page);
   }
 
-  broadcastPageChange(page, context = {}) {
+  broadcastPageAlias(page, context = {}) {
     if (!ALLOWED_SYNC_PAGES.has(page)) {
       throw new Error('Invalid page change request');
     }
 
-    this.persistCurrentPage(page).catch((error) => {
-      logger.error('Failed to persist current page', {
-        error: error.message,
-        page,
-        source: context.source || 'unknown',
+    if (context.persist !== false) {
+      this.persistCurrentPage(page).catch((error) => {
+        logger.error('Failed to persist current page', {
+          error: error.message,
+          page,
+          source: context.source || 'unknown',
+        });
       });
-    });
+    }
 
     logger.info('Broadcasting page change', { page, source: context.source || 'unknown' });
     this.broadcast({
       type: 'page_change',
       page,
       timestamp: Date.now()
+    });
+  }
+
+  broadcastPageChange(page, context = {}) {
+    this.broadcastPageAlias(page, context);
+  }
+
+  broadcastSceneState(sceneState) {
+    this.broadcast({
+      type: 'scene_state',
+      data: sceneState,
+      timestamp: Date.now(),
+    });
+  }
+
+  broadcastSceneChange(sceneState) {
+    this.broadcast({
+      type: 'scene_changed',
+      data: sceneState,
+      timestamp: Date.now(),
+    });
+  }
+
+  broadcastConsoleState(consoleState) {
+    this.broadcast({
+      type: 'console_state',
+      data: consoleState,
+      timestamp: Date.now(),
+    });
+  }
+
+  broadcastConsolePageData(pageId, data) {
+    this.broadcast({
+      type: 'console_page_data',
+      pageId,
+      data,
+      timestamp: Date.now(),
     });
   }
 

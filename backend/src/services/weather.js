@@ -165,6 +165,56 @@ class WeatherService {
     }
   }
 
+  async getDetailedWeather(city, units = 'metric') {
+    const [current, forecastResult] = await Promise.all([
+      this.getCurrentWeather(city, units),
+      this.getForecast(city, units),
+    ]);
+
+    if (current?.error) {
+      return current;
+    }
+
+    const forecast = Array.isArray(forecastResult?.forecast) ? forecastResult.forecast : [];
+    const hourly = forecast.slice(0, 8).map((item) => ({
+      timestamp: item.timestamp,
+      temperature: item.temperature,
+      description: item.description,
+      icon: item.icon,
+      humidity: item.humidity,
+      windSpeed: item.windSpeed,
+    }));
+
+    const dailyByDate = new Map();
+    for (const item of forecast) {
+      const date = new Date(item.timestamp * 1000);
+      const dateKey = date.toISOString().slice(0, 10);
+      const existing = dailyByDate.get(dateKey);
+      if (!existing) {
+        dailyByDate.set(dateKey, {
+          date: dateKey,
+          min: item.temperature,
+          max: item.temperature,
+          description: item.description,
+          icon: item.icon,
+        });
+        continue;
+      }
+      existing.min = Math.min(existing.min, item.temperature);
+      existing.max = Math.max(existing.max, item.temperature);
+    }
+
+    return {
+      city: current.city,
+      country: current.country,
+      units,
+      current,
+      hourly,
+      daily: Array.from(dailyByDate.values()),
+      alerts: [],
+    };
+  }
+
   clearCache() {
     this.cache = null;
     this.cacheExpiry = null;

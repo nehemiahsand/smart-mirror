@@ -128,13 +128,6 @@ class CameraService {
         return; // Don't process person detection when dark
       }
 
-      // Wake from standby when lights come back on (if someone is there)
-      if (this.darkStandbyEnabled && !is_dark && previousDarkState && person_detected) {
-        logger.info(`Room is now light (brightness: ${brightness}) and person detected - waking display`);
-        await this.wakeDisplay();
-        return;
-      }
-
       // Skip person detection logic if room is dark
       if (is_dark) {
         return;
@@ -143,10 +136,8 @@ class CameraService {
       if (person_detected) {
         this.lastDetectionTime = Date.now();
         
-        // Person detected - wake from standby if needed and auto-standby is enabled
-        if (!previousState && this.autoStandbyEnabled) {
-          logger.info('Person detected by AI - waking display');
-          await this.wakeDisplay();
+        if (!previousState) {
+          logger.info('Person detected by AI while awake');
         }
       } else {
         // No person detected - check if we should enter standby
@@ -175,32 +166,9 @@ class CameraService {
   async wakeDisplay() {
     try {
       const currentSettings = settingsService.getAll();
-      
-      if (currentSettings && currentSettings.display && currentSettings.display.standbyMode) {
-        logger.info('Waking display from standby (person detected)...');
-        
-        // Cancel auto-shutdown timer if running
-        if (this.shutdownTimer) {
-          clearTimeout(this.shutdownTimer);
-          this.shutdownTimer = null;
-          this.standbyStartTime = null;
-          logger.info('Cancelled auto-shutdown timer');
-        }
-        
-        // Use the same logic as the standby button
-        await settingsService.updateMultiple({
-          'display.standbyMode': false,
-          'voice.enabled': true
-        });
-        await displayService.turnOn();
-        
-        // Broadcast settings change to update PWA immediately
-        const websocketServer = require('../api/websocket');
-        if (websocketServer && typeof websocketServer.broadcastSettingsUpdate === 'function') {
-          websocketServer.broadcastSettingsUpdate(settingsService.getAll());
-        }
-        
-        logger.info('Display woken from standby successfully');
+      if (currentSettings?.display?.standbyMode) {
+        const sceneEngine = require('./sceneEngine');
+        await sceneEngine.applyStandbyMode(false, 'camera:wake_request');
       }
     } catch (error) {
       logger.error('Error waking display:', { error: error.message, stack: error.stack });
@@ -210,26 +178,10 @@ class CameraService {
   async enterStandby() {
     try {
       const currentSettings = settingsService.getAll();
-      
-      if (currentSettings && currentSettings.display && !currentSettings.display.standbyMode) {
-        logger.info('Entering standby mode (no person for 5 minutes)...');
-        
-        // Use the same logic as the standby button
-        await settingsService.updateMultiple({
-          'display.standbyMode': true,
-          'voice.enabled': false
-        });
-        await displayService.turnOff();
-        
-        // Broadcast settings change to update PWA immediately
-        const websocketServer = require('../api/websocket');
-        if (websocketServer && typeof websocketServer.broadcastSettingsUpdate === 'function') {
-          websocketServer.broadcastSettingsUpdate(settingsService.getAll());
-        }
-        
-        logger.info('Display entered standby mode successfully');
-      } else if (currentSettings && currentSettings.display && currentSettings.display.standbyMode) {
-        logger.info('Display already in standby mode');
+
+      if (currentSettings?.display && !currentSettings.display.standbyMode) {
+        const sceneEngine = require('./sceneEngine');
+        await sceneEngine.applyStandbyMode(true, 'camera:auto_standby');
       }
     } catch (error) {
       logger.error('Error entering standby:', { error: error.message, stack: error.stack });

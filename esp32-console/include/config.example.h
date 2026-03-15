@@ -10,9 +10,9 @@ constexpr char WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";
 
 constexpr char MQTT_HOST[] = "192.168.1.100";
 constexpr uint16_t MQTT_PORT = 1883;
-constexpr char MQTT_USERNAME[] = "";
-constexpr char MQTT_PASSWORD[] = "";
-constexpr bool MQTT_USE_AUTH = false;
+constexpr char MQTT_USERNAME[] = "YOUR_MQTT_USERNAME";
+constexpr char MQTT_PASSWORD[] = "YOUR_MQTT_PASSWORD";
+constexpr bool MQTT_USE_AUTH = true;
 constexpr char MQTT_TOPIC_PREFIX[] = "smartmirror/esp32";
 
 constexpr char BACKEND_BASE_URL[] = "http://192.168.1.100";

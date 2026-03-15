@@ -17,6 +17,7 @@ const cameraService = require('../services/camera');
 const trafficService = require('../services/traffic');
 const nbaService = require('../services/nba');
 const sportsService = require('../services/sports');
+const sceneEngine = require('../services/sceneEngine');
 const consoleService = require('../services/console');
 const websocketServer = require('./websocket');
 const layoutRoutes = require('./layout-routes');
@@ -200,13 +201,114 @@ router.get('/console/state', (req, res) => {
 
 router.get('/console/page/:pageId', (req, res) => {
   try {
-    res.json(consoleService.getPageState(req.params.pageId));
+    res.json(consoleService.getPageData(req.params.pageId));
   } catch (error) {
     logger.error('Failed to get console page state', {
       error: error.message,
       pageId: req.params.pageId,
     });
     res.status(500).json({ error: 'Failed to get console page state' });
+  }
+});
+
+router.get('/scene/state', (req, res) => {
+  try {
+    res.json(sceneEngine.getState());
+  } catch (error) {
+    logger.error('Failed to get scene state', { error: error.message });
+    res.status(500).json({ error: 'Failed to retrieve scene state' });
+  }
+});
+
+router.post('/scene/activate', adminAuth, async (req, res) => {
+  try {
+    const { sceneId, durationMs } = req.body || {};
+    const state = sceneId === 'auto'
+      ? await sceneEngine.clearManualOverride('api_activate')
+      : await sceneEngine.activateSceneOverride(sceneId, 'api_activate', durationMs);
+    res.json({ success: true, state });
+  } catch (error) {
+    logger.error('Failed to activate scene', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to activate scene' });
+  }
+});
+
+router.post('/scene/clear-override', adminAuth, async (req, res) => {
+  try {
+    const state = await sceneEngine.clearManualOverride('api_clear_override');
+    res.json({ success: true, state });
+  } catch (error) {
+    logger.error('Failed to clear scene override', { error: error.message });
+    res.status(500).json({ error: 'Failed to clear scene override' });
+  }
+});
+
+router.post('/scene/resume-auto', adminAuth, async (req, res) => {
+  try {
+    const state = await sceneEngine.clearManualOverride('api_resume_auto');
+    res.json({ success: true, state });
+  } catch (error) {
+    logger.error('Failed to resume automatic scenes', { error: error.message });
+    res.status(500).json({ error: 'Failed to resume automatic scenes' });
+  }
+});
+
+router.post('/esp32/event', adminAuth, async (req, res) => {
+  try {
+    const state = await sceneEngine.handleEsp32Event(req.body || {});
+    res.json({ success: true, state });
+  } catch (error) {
+    logger.error('Failed to ingest ESP32 event', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to ingest event' });
+  }
+});
+
+router.post('/console/open', adminAuth, async (req, res) => {
+  try {
+    const pageId = req.body?.pageId || 'dynamic';
+    if (settingsService.get('display.standbyMode') === true) {
+      await sceneEngine.applyStandbyMode(false, `console_open:${pageId}`);
+    }
+    const state = await consoleService.openPage(pageId, 'api_open');
+    const pageData = state.active ? await consoleService.getPageData(pageId) : null;
+    res.json({ success: true, state, pageData });
+  } catch (error) {
+    logger.error('Failed to open console page', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to open console page' });
+  }
+});
+
+router.post('/console/close', adminAuth, async (req, res) => {
+  try {
+    const state = await consoleService.closeInteractive('api_close');
+    res.json({ success: true, state, pageData: null });
+  } catch (error) {
+    logger.error('Failed to close console page', { error: error.message });
+    res.status(500).json({ error: 'Failed to close console page' });
+  }
+});
+
+router.post('/console/action', adminAuth, async (req, res) => {
+  try {
+    const { action, delta, pageId, targetPageId } = req.body || {};
+    if (settingsService.get('display.standbyMode') === true) {
+      await sceneEngine.applyStandbyMode(false, `console_action:${action || 'adjust'}`);
+    }
+    let state;
+    if (delta !== undefined) {
+      state = await consoleService.handleAdjust(delta, { pageId, source: 'api_adjust' });
+    } else {
+      state = await consoleService.handleAction(action || 'primary', {
+        pageId,
+        targetPageId,
+        source: 'api_action',
+      });
+    }
+    const pageData = state.active ? await consoleService.getPageData(pageId || state.activePageId) : null;
+    res.json({ success: true, state, pageData });
+  } catch (error) {
+    logger.error('Failed to apply console action', { error: error.message });
+    res.status(400).json({ error: error.message || 'Failed to apply console action' });
   }
 });
 
@@ -411,6 +513,8 @@ router.put('/settings/:key', adminAuth, async (req, res) => {
     
     // Broadcast settings update via WebSocket
     websocketServer.broadcastSettingsUpdate(settings);
+    await sceneEngine.handleSettingsChanged(`setting:${req.params.key}`);
+    await consoleService.handleSettingsChanged(`setting:${req.params.key}`);
     
     res.json(settings);
   } catch (error) {
@@ -452,10 +556,14 @@ router.post('/settings', adminAuth, async (req, res) => {
       // Turn display on/off based on standby mode
       try {
         if (standbyMode) {
+          await cameraService.setCameraEnabled(false);
           await displayService.turnOff();
           // Start 30-minute auto-shutdown timer
           cameraService.startShutdownTimer();
         } else {
+          if (settings.camera?.enabled !== false) {
+            await cameraService.setCameraEnabled(true);
+          }
           await displayService.turnOn();
           // Cancel auto-shutdown timer when waking manually
           cameraService.cancelShutdownTimer();
@@ -470,6 +578,9 @@ router.post('/settings', adminAuth, async (req, res) => {
         restartSensorReading();
       }
     }
+
+    await sceneEngine.handleSettingsChanged('settings:post');
+    await consoleService.handleSettingsChanged('settings:post');
     
     res.json(settings);
   } catch (error) {
@@ -511,10 +622,14 @@ router.put('/settings', adminAuth, async (req, res) => {
       // Turn display on/off based on standby mode
       try {
         if (standbyMode) {
+          await cameraService.setCameraEnabled(false);
           await displayService.turnOff();
           // Start 30-minute auto-shutdown timer
           cameraService.startShutdownTimer();
         } else {
+          if (settings.camera?.enabled !== false) {
+            await cameraService.setCameraEnabled(true);
+          }
           await displayService.turnOn();
           // Cancel auto-shutdown timer when waking manually
           cameraService.cancelShutdownTimer();
@@ -529,6 +644,9 @@ router.put('/settings', adminAuth, async (req, res) => {
         restartSensorReading();
       }
     }
+
+    await sceneEngine.handleSettingsChanged('settings:put');
+    await consoleService.handleSettingsChanged('settings:put');
     
     res.json(settings);
   } catch (error) {
@@ -542,6 +660,8 @@ router.post('/settings/reset', adminAuth, async (req, res) => {
   try {
     const settings = await settingsService.reset();
     websocketServer.broadcastSettingsUpdate(settings);
+    await sceneEngine.handleSettingsChanged('settings:reset');
+    await consoleService.handleSettingsChanged('settings:reset');
     res.json(settings);
   } catch (error) {
     logger.error('Failed to reset settings', { error: error.message });

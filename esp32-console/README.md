@@ -34,13 +34,21 @@ Published event types:
 
 Before flashing:
 
-1. Edit `include/config.h`.
-2. Set your Wi-Fi, MQTT broker, and backend base URL.
+1. Copy `include/config.example.h` to `include/config.local.h`.
+2. Fill in your Wi-Fi, MQTT broker, MQTT credentials, and backend base URL in `config.local.h`.
 3. Build from `esp32-console/` with PlatformIO.
 
 Example:
 
 ```bash
 cd esp32-console
+cp include/config.example.h include/config.local.h
 ~/.venv-pio/bin/pio run
 ```
+
+Security notes:
+
+- `include/config.local.h` is ignored by git and is the only place real device credentials should live.
+- `include/config.h` is just a tracked wrapper that loads `config.local.h`.
+- Keep `MQTT_USERNAME` and `MQTT_PASSWORD` in sync with the local values in `backend/.env`.
+- Do not commit real Wi-Fi credentials, LAN IPs, or broker settings back into the repo.

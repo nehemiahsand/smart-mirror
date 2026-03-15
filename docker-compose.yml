@@ -1,4 +1,29 @@
 services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smart-mirror-mosquitto
+    env_file:
+      - ./backend/.env
+    command: >
+      sh -lc '
+        test -n "$$MQTT_USERNAME" &&
+        test -n "$$MQTT_PASSWORD" &&
+        mosquitto_passwd -b -c /mosquitto/data/mosquitto.passwd "$$MQTT_USERNAME" "$$MQTT_PASSWORD" &&
+        chown mosquitto:mosquitto /mosquitto/data/mosquitto.passwd &&
+        chmod 600 /mosquitto/data/mosquitto.passwd &&
+        exec mosquitto -c /mosquitto/config/mosquitto.conf
+      '
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /mosquitto/data
+      - /mosquitto/log
+    restart: unless-stopped
+
   sensor:
     build:
       context: ./sensor
@@ -66,6 +91,7 @@ services:
       - DISPLAY=:0
       - WAYLAND_DISPLAY=wayland-0
       - XDG_RUNTIME_DIR=/run/user/1000
+      - MQTT_BROKER_URL=mqtt://mosquitto:1883
     ports:
       - "80:3001"
     user: "1000:1000"
@@ -79,6 +105,7 @@ services:
       - /sys/class/drm:/sys/class/drm
       - /run/user/1000:/run/user/1000
     depends_on:
+      - mosquitto
       - sensor
       - camera
     cap_drop:
