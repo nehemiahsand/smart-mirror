@@ -1,4 +1,6 @@
+const fs = require('fs');
 const os = require('os');
+const cameraService = require('./camera');
 const climateService = require('./climate');
 const logger = require('../utils/logger');
 const settingsService = require('./settings');
@@ -78,6 +80,19 @@ function formatUptime(seconds) {
   }
 
   return `${minutes}m`;
+}
+
+function readCpuTempC() {
+  try {
+    const raw = fs.readFileSync('/sys/class/thermal/thermal_zone0/temp', 'utf8').trim();
+    const milliC = Number.parseInt(raw, 10);
+    if (!Number.isFinite(milliC)) {
+      return null;
+    }
+    return Math.round(milliC / 1000);
+  } catch (_) {
+    return null;
+  }
 }
 
 function cycleIndex(currentIndex, length, delta) {
@@ -389,17 +404,25 @@ class ConsoleService {
   }
 
   buildStatsLines(presentedPage) {
+    const standby = this.isStandbyActive();
+    const cameraEnabled = !standby && settingsService.get('camera.enabled') !== false;
+    const micEnabled = !standby && settingsService.get('voice.enabled') !== false;
+    const personDetected = cameraEnabled && cameraService.personDetected === true;
     const cpuCount = os.cpus().length || 1;
     const [load1] = os.loadavg();
     const cpuPercent = Math.round((load1 / cpuCount) * 100);
     const totalMemMb = Math.round(os.totalmem() / 1024 / 1024);
     const usedMemMb = Math.round((os.totalmem() - os.freemem()) / 1024 / 1024);
     const memPercent = totalMemMb > 0 ? Math.round((usedMemMb / totalMemMb) * 100) : 0;
+    const cpuTempC = readCpuTempC();
 
     return {
-      line1: `Page ${presentedPage.title}`,
+      line1: `Cam ${cameraEnabled ? 'On' : 'Off'} Mic ${micEnabled ? 'On' : 'Off'}`,
       line2: `CPU ${cpuPercent}% RAM ${memPercent}%`,
-      line3: `Up ${formatUptime(os.uptime())}`,
+      line3: cpuTempC == null
+        ? `Up ${formatUptime(os.uptime())}`
+        : `Up ${formatUptime(os.uptime())} T ${cpuTempC}C`,
+      line4: `Person ${personDetected ? 'Yes' : 'No'}`,
     };
   }
 
@@ -418,7 +441,7 @@ class ConsoleService {
     });
     const statsLines = statsOverlayActive
       ? this.buildStatsLines(presentedPage)
-      : { line1: '', line2: '', line3: '' };
+      : { line1: '', line2: '', line3: '', line4: '' };
 
     return clone({
       ...this.state,
@@ -440,6 +463,7 @@ class ConsoleService {
       statsLine1: statsLines.line1,
       statsLine2: statsLines.line2,
       statsLine3: statsLines.line3,
+      statsLine4: statsLines.line4,
       alarm: this.buildAlarmSummary(),
       timer: this.buildTimerSummary(),
       focus: this.buildFocusSummary(),
@@ -466,6 +490,7 @@ class ConsoleService {
       statsLine1: state.statsLine1,
       statsLine2: state.statsLine2,
       statsLine3: state.statsLine3,
+      statsLine4: state.statsLine4,
       softButtons: state.softButtons,
       updatedAt: state.updatedAt,
     };

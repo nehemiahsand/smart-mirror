@@ -51,6 +51,7 @@ struct MirrorState {
   String statsLine1 = "";
   String statsLine2 = "";
   String statsLine3 = "";
+  String statsLine4 = "";
   String button1 = "Spotify";
   String button2 = "Play/Pause";
   String button3 = "Prev";
@@ -136,6 +137,7 @@ void resetMirrorState() {
   gMirrorState.statsLine1 = "";
   gMirrorState.statsLine2 = "";
   gMirrorState.statsLine3 = "";
+  gMirrorState.statsLine4 = "";
   gMirrorState.button1 = "Spotify";
   gMirrorState.button2 = "Play/Pause";
   gMirrorState.button3 = "Prev";
@@ -302,6 +304,7 @@ void pollConsoleState() {
   gMirrorState.statsLine1 = String(document["statsLine1"] | "");
   gMirrorState.statsLine2 = String(document["statsLine2"] | "");
   gMirrorState.statsLine3 = String(document["statsLine3"] | "");
+  gMirrorState.statsLine4 = String(document["statsLine4"] | "");
 
   JsonObject softButtons = document["softButtons"].as<JsonObject>();
   if (!softButtons.isNull()) {
@@ -353,17 +356,19 @@ void renderStandbyScreen() {
 }
 
 void renderStatsScreen() {
-  renderHeader("Stats");
   if (isCompactScreen()) {
-    drawLineIfPresent(16, gMirrorState.statsLine2.isEmpty() ? gMirrorState.statsLine1 : gMirrorState.statsLine2, 20);
-    drawLineIfPresent(24, String("5 ") + (gMirrorState.button5.isEmpty() ? "Close" : gMirrorState.button5), 20);
+    drawLineIfPresent(0, gMirrorState.statsLine1, 20);
+    drawLineIfPresent(8, gMirrorState.statsLine2, 20);
+    drawLineIfPresent(16, gMirrorState.statsLine3, 20);
+    drawLineIfPresent(24, gMirrorState.statsLine4, 20);
     return;
   }
 
+  renderHeader("Stats");
   drawLineIfPresent(16, gMirrorState.statsLine1);
   drawLineIfPresent(28, gMirrorState.statsLine2);
   drawLineIfPresent(40, gMirrorState.statsLine3);
-  drawButtonLine(52, 5, gMirrorState.button5);
+  drawLineIfPresent(52, gMirrorState.statsLine4);
 }
 
 void renderPageScreen() {
