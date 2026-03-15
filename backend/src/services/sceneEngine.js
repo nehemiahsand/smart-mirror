@@ -312,7 +312,6 @@ class SceneEngine {
 
     const updatedSettings = await settingsService.updateMultiple({
       'display.standbyMode': standbyMode,
-      'voice.enabled': !standbyMode,
     });
 
     websocketServer.broadcastSettingsUpdate(updatedSettings);

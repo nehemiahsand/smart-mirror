@@ -75,7 +75,7 @@ Standby:
 
 Current stats lines:
 
-- camera state and mic state
+- camera state
 - CPU and RAM
 - uptime and CPU temp
 - person detected yes/no

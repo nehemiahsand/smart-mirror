@@ -519,7 +519,6 @@ class ConsoleService {
   buildStatsLines(presentedPage) {
     const standby = this.isStandbyActive();
     const cameraEnabled = !standby && settingsService.get('camera.enabled') !== false;
-    const micEnabled = !standby && settingsService.get('voice.enabled') !== false;
     const sceneEngine = require('./sceneEngine');
     const personDetected = sceneEngine.getState().motionActive === true;
     const cpuCount = os.cpus().length || 1;

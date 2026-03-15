@@ -140,8 +140,8 @@ router.get('/privacy/status', (req, res) => {
     const settings = settingsService.getAll();
     const standbyActive = settings.display?.standbyMode === true;
     const cameraEnabled = !standbyActive && settings.camera?.enabled !== false;
-    const voiceEnabled = !standbyActive && settings.voice?.enabled !== false;
-    res.json({ cameraEnabled, voiceEnabled });
+    
+    res.json({ cameraEnabled });
   } catch (error) {
     logger.error('Failed to get privacy status', { error: error.message });
     res.status(500).json({ error: 'Failed to get privacy status' });
@@ -150,16 +150,13 @@ router.get('/privacy/status', (req, res) => {
 
 router.post('/privacy', adminAuth, async (req, res) => {
   try {
-    const { cameraEnabled, voiceEnabled } = req.body || {};
+    const { cameraEnabled } = req.body || {};
     const updates = {};
     const currentSettings = settingsService.getAll();
     const isStandby = currentSettings?.display?.standbyMode === true;
 
     if (typeof cameraEnabled === 'boolean') {
       updates['camera.enabled'] = cameraEnabled;
-    }
-    if (typeof voiceEnabled === 'boolean') {
-      updates['voice.enabled'] = isStandby ? false : voiceEnabled;
     }
 
     if (Object.keys(updates).length === 0) {
@@ -587,9 +584,7 @@ router.post('/settings', adminAuth, async (req, res) => {
     }
 
     if (updates['display.standbyMode'] === true) {
-      updates['voice.enabled'] = false;
     } else if (updates['display.standbyMode'] === false) {
-      updates['voice.enabled'] = true;
     }
     
     const settings = await settingsService.updateMultiple(updates);
@@ -601,7 +596,6 @@ router.post('/settings', adminAuth, async (req, res) => {
     if (updates['display.standbyMode'] !== undefined) {
       const standbyMode = updates['display.standbyMode'];
       
-      // Broadcast standby state change to voice service
       websocketServer.broadcast({
         type: 'standby_change',
         standby: standbyMode,
@@ -653,9 +647,7 @@ router.put('/settings', adminAuth, async (req, res) => {
     }
 
     if (updates['display.standbyMode'] === true) {
-      updates['voice.enabled'] = false;
     } else if (updates['display.standbyMode'] === false) {
-      updates['voice.enabled'] = true;
     }
     
     const settings = await settingsService.updateMultiple(updates);
@@ -667,7 +659,6 @@ router.put('/settings', adminAuth, async (req, res) => {
     if (updates['display.standbyMode'] !== undefined) {
       const standbyMode = updates['display.standbyMode'];
       
-      // Broadcast standby state change to voice service
       websocketServer.broadcast({
         type: 'standby_change',
         standby: standbyMode,
@@ -1249,16 +1240,13 @@ router.post('/broadcast', apiKeyMiddleware, (req, res) => {
   try {
     const { type, page, command, listening } = req.body;
     
-    logger.info('Broadcasting voice command:', { type, page, command, listening });
-
-    if ((type === 'page_change' || type === 'voice_command') && page !== undefined) {
+    if (type === 'page_change') {
       websocketServer.broadcastPageChange(page, { source: 'internal_broadcast' });
       return res.json({ success: true, broadcasted: true });
     }
     
     // Broadcast to all connected WebSocket clients
     const payload = {
-      type: type || 'voice_command',
       timestamp: Date.now()
     };
     

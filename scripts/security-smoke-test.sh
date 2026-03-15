@@ -119,34 +119,6 @@ grep -q 'INVALID_OAUTH_STATE' "$GOOGLE_BODY_FILE" \
   || fail "Google Calendar authorize response did not contain INVALID_OAUTH_STATE"
 pass "Google Calendar authorize rejects invalid OAuth state"
 
-VOICE_CHECK_OUTPUT="$TMP_DIR/voice-check.txt"
-docker compose exec -T voice python3 - <<'PY' > "$VOICE_CHECK_OUTPUT"
-import json
-import os
-import requests
-import pyaudio
-
-p = pyaudio.PyAudio()
-try:
-    payload = {
-        "backend_health": requests.get("http://backend:3001/api/health", timeout=3).status_code,
-        "audio_device_count": p.get_device_count(),
-        "has_snd_device": os.path.exists("/dev/snd"),
-        "can_rw_default_control": os.access("/dev/snd/controlC0", os.R_OK | os.W_OK) if os.path.exists("/dev/snd/controlC0") else False,
-    }
-finally:
-    p.terminate()
-
-print(json.dumps(payload))
-
-if payload["backend_health"] != 200:
-    raise SystemExit(1)
-if not payload["has_snd_device"]:
-    raise SystemExit(1)
-if payload["audio_device_count"] <= 0:
-    raise SystemExit(1)
-PY
-pass "Voice container can reach the backend and sees audio devices"
 
 LOGOUT_STATUS="$(
   curl -sS \
@@ -158,7 +130,3 @@ LOGOUT_STATUS="$(
 )"
 [[ "$LOGOUT_STATUS" == "200" ]] || fail "Logout returned HTTP $LOGOUT_STATUS"
 pass "Logout succeeded"
-
-echo
-echo "Security smoke test output:"
-cat "$VOICE_CHECK_OUTPUT"

@@ -66,9 +66,6 @@ const DEFAULT_SETTINGS = {
   camera: {
     enabled: true
   },
-  voice: {
-    enabled: true
-  },
   current_scene: 'day',
   current_page: 'home'
 };

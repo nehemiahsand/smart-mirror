@@ -14,14 +14,13 @@ export default function Dashboard() {
   const [weatherData, setWeatherData] = useState(null);
   const [trafficData, setTrafficData] = useState(null);
   const [settings, setSettings] = useState(null);
-  const [privacy, setPrivacy] = useState({ cameraEnabled: true, voiceEnabled: true });
+  const [privacy, setPrivacy] = useState({ cameraEnabled: true });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
   const standbyActive = settings?.display?.standbyMode === true;
   const effectiveCameraEnabled = !standbyActive && privacy.cameraEnabled;
-  const effectiveVoiceEnabled = !standbyActive && privacy.voiceEnabled;
 
   useEffect(() => {
     fetchData();
@@ -44,7 +43,6 @@ export default function Dashboard() {
       setSettings(settingsData);
       setPrivacy({
         cameraEnabled: privacyStatus.cameraEnabled !== false,
-        voiceEnabled: privacyStatus.voiceEnabled !== false
       });
       setLoading(false);
     } catch (error) {
@@ -62,7 +60,6 @@ export default function Dashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           cameraEnabled: newPrivacy.cameraEnabled,
-          voiceEnabled: newPrivacy.voiceEnabled
         })
       });
       if (!res.ok) {
@@ -285,25 +282,6 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header">
             <span className="card-icon">🔒</span>
-            <h2>Privacy & Input</h2>
-          </div>
-          <div className="quick-actions">
-            <button
-              className={`action-btn ${effectiveVoiceEnabled ? '' : 'danger'}`}
-              disabled={busy || standbyActive}
-              onClick={() => updatePrivacy({ voiceEnabled: !privacy.voiceEnabled })}
-            >
-              <span>{effectiveVoiceEnabled ? '🎤' : '🚫'}</span>
-              {standbyActive
-                ? 'Voice Input Off in Standby'
-                : (effectiveVoiceEnabled ? 'Disable Voice Input' : 'Enable Voice Input')}
-            </button>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <span className="card-icon">⚡</span>
             <h2>Quick Actions</h2>
           </div>
           <div className="quick-actions">
