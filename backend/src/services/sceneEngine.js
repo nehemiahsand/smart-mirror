@@ -460,6 +460,21 @@ class SceneEngine {
       return this.refreshState({ source: 'esp32', reason: 'motion.idle', broadcast: true, persist: false });
     }
 
+    if (eventType === 'display.page.toggle') {
+      if (isStandby) {
+        logger.info('Ignoring page toggle while standby is active', {
+          deviceId: event.deviceId || 'unknown',
+        });
+        return this.refreshState({ source: 'esp32', reason: 'standby_ignored:display.page.toggle', broadcast: true, persist: false });
+      }
+
+      const websocketServer = require('../api/websocket');
+      const currentPage = settingsService.get('current_page') === 'spotify' ? 'spotify' : 'home';
+      const nextPage = currentPage === 'spotify' ? 'home' : 'spotify';
+      websocketServer.broadcastPageChange(nextPage, { source: 'esp32_toggle' });
+      return this.refreshState({ source: 'esp32', reason: `display.page.toggle:${nextPage}`, broadcast: true, persist: true });
+    }
+
     if (eventType === 'climate.reading') {
       return consoleService.handleEsp32Event({
         ...event,

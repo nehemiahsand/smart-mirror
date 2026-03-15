@@ -12,6 +12,7 @@ const ALLOWED_EVENT_TYPES = new Set([
   'device.event',
   'device.offline',
   'device.online',
+  'display.page.toggle',
   'motion.active',
   'motion.idle',
   'ui.action',

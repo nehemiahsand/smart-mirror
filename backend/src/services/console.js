@@ -300,50 +300,53 @@ class ConsoleService {
     const targetPageId = normalizePageId(pageId || this.state.activePageId);
     const timerSummary = this.buildTimerSummary();
     const focusSummary = this.buildFocusSummary();
+    const pageToggleTarget = getPresentedPageMeta(targetPageId === 'media' ? 'dynamic' : 'media');
 
     switch (targetPageId) {
       case 'weather':
         return {
-          button1: 'Prev Tab',
-          button2: 'Next Tab',
-          button3: 'Refresh',
-          button4: this.state.weatherTabId === 'alerts' ? 'Current' : 'Alerts',
-          dial: 'Pages',
+          button1: pageToggleTarget.name,
+          button2: 'Prev',
+          button3: 'Next',
+          button4: 'Refresh',
+          button5: this.state.weatherTabId === 'alerts' ? 'Current' : 'Alerts',
         };
       case 'media':
         return {
-          button1: 'Prev',
-          button2: 'Next',
-          button3: 'Play/Pause',
-          button4: 'Dynamic',
-          dial: 'Pages',
+          button1: pageToggleTarget.name,
+          button2: 'Prev',
+          button3: 'Play',
+          button4: 'Next',
+          button5: 'Home',
         };
       case 'timer-focus':
         return {
-          button1: 'Timer',
-          button2: 'Focus',
-          button3: this.state.timerFocusMode === 'timer'
+          button1: pageToggleTarget.name,
+          button2: 'Timer',
+          button3: 'Focus',
+          button4: this.state.timerFocusMode === 'timer'
             ? (timerSummary.running ? 'Pause' : (timerSummary.paused ? 'Resume' : 'Start'))
             : (focusSummary.running ? 'Pause' : (focusSummary.paused ? 'Resume' : 'Start')),
-          button4: 'Reset',
-          dial: 'Pages',
+          button5: 'Reset',
         };
       case 'dynamic':
       default:
         return {
-          button1: '--',
+          button1: pageToggleTarget.name,
           button2: '--',
           button3: '--',
           button4: '--',
-          dial: 'Pages',
+          button5: '--',
         };
     }
   }
 
   getState() {
     const canonicalPageId = normalizePageId(this.state.activePageId);
-    const presentedPage = getPresentedPageMeta(canonicalPageId);
     const manualPage = this.isManualPage(canonicalPageId);
+    const syncedMirrorPageId = normalizePageId(settingsService.get('current_page') || canonicalPageId);
+    const displayedCanonicalPageId = manualPage ? canonicalPageId : syncedMirrorPageId;
+    const presentedPage = getPresentedPageMeta(displayedCanonicalPageId);
     const presentedPages = this.getPresentedPages();
     const pageOrder = Object.keys(presentedPages);
 
@@ -351,14 +354,14 @@ class ConsoleService {
       ...this.state,
       activePageId: presentedPage.id,
       pageId: presentedPage.id,
-      canonicalPageId,
+      canonicalPageId: displayedCanonicalPageId,
       active: manualPage,
       interactiveActive: manualPage,
       pages: presentedPages,
       pageOrder,
       pageTitle: presentedPage.title,
       statusLabel: manualPage ? 'Manual page' : 'Automatic dynamic page',
-      softButtons: this.getSoftButtons(canonicalPageId),
+      softButtons: this.getSoftButtons(displayedCanonicalPageId),
       alarm: this.buildAlarmSummary(),
       timer: this.buildTimerSummary(),
       focus: this.buildFocusSummary(),

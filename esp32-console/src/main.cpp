@@ -10,21 +10,22 @@
 #include "config.h"
 
 namespace Pins {
-constexpr uint8_t BUTTON_PREV = 25;
-constexpr uint8_t BUTTON_NEXT = 26;
+constexpr uint8_t BUTTON_TOGGLE_PAGE = 25;
+constexpr uint8_t BUTTON_PREV = 26;
 constexpr uint8_t BUTTON_PRIMARY = 27;
-constexpr uint8_t BUTTON_BACK = 32;
-constexpr uint8_t POTENTIOMETER = 34;
+constexpr uint8_t BUTTON_NEXT = 32;
+constexpr uint8_t BUTTON_BACK = 34;
 constexpr uint8_t PIR_MOTION = 33;
 constexpr uint8_t OLED_SDA = 21;
 constexpr uint8_t OLED_SCL = 22;
 }  // namespace Pins
 
 enum class ButtonCommand : uint8_t {
-  Previous = 0,
-  Next = 1,
+  TogglePage = 0,
+  Previous = 1,
   Primary = 2,
-  Back = 3,
+  Next = 3,
+  Back = 4,
 };
 
 struct ButtonState {
@@ -40,15 +41,15 @@ struct ButtonState {
 struct MirrorState {
   bool backendReachable = false;
   bool interactiveActive = false;
-  String activePageId = "dynamic";
-  String pageTitle = "Smart Mirror";
+  String activePageId = "home";
+  String pageTitle = "Main Page";
   String statusLabel = "Waiting for backend";
   String lastAction = "Booting";
-  String button1 = "Prev";
-  String button2 = "Next";
-  String button3 = "OK";
-  String button4 = "Back";
-  String dial = "Adjust";
+  String button1 = "Spotify";
+  String button2 = "Prev";
+  String button3 = "Play";
+  String button4 = "Next";
+  String button5 = "Home";
 };
 
 namespace {
@@ -57,9 +58,10 @@ WiFiClient gWiFiClient;
 PubSubClient gMqttClient(gWiFiClient);
 
 ButtonState gButtons[] = {
+    {Pins::BUTTON_TOGGLE_PAGE, ButtonCommand::TogglePage, false, false, false, 0, 0},
     {Pins::BUTTON_PREV, ButtonCommand::Previous, false, false, false, 0, 0},
-    {Pins::BUTTON_NEXT, ButtonCommand::Next, false, false, false, 0, 0},
     {Pins::BUTTON_PRIMARY, ButtonCommand::Primary, false, false, false, 0, 0},
+    {Pins::BUTTON_NEXT, ButtonCommand::Next, false, false, false, 0, 0},
     {Pins::BUTTON_BACK, ButtonCommand::Back, false, false, false, 0, 0},
 };
 
@@ -77,19 +79,17 @@ unsigned long gLastMqttAttemptMs = 0;
 unsigned long gLastStatePollMs = 0;
 unsigned long gLastOledRenderMs = 0;
 unsigned long gLastMotionMs = 0;
-unsigned long gLastDialEmitMs = 0;
-
-int gLastDialReading = 0;
-int gLastDialBucket = 0;
 
 const char* buttonAction(ButtonCommand command) {
   switch (command) {
+    case ButtonCommand::TogglePage:
+      return "toggle_page";
     case ButtonCommand::Previous:
       return "previous";
-    case ButtonCommand::Next:
-      return "next";
     case ButtonCommand::Primary:
       return "primary";
+    case ButtonCommand::Next:
+      return "next";
     case ButtonCommand::Back:
       return "back";
     default:
@@ -99,14 +99,16 @@ const char* buttonAction(ButtonCommand command) {
 
 const char* buttonId(ButtonCommand command) {
   switch (command) {
-    case ButtonCommand::Previous:
+    case ButtonCommand::TogglePage:
       return "button1";
-    case ButtonCommand::Next:
+    case ButtonCommand::Previous:
       return "button2";
     case ButtonCommand::Primary:
       return "button3";
-    case ButtonCommand::Back:
+    case ButtonCommand::Next:
       return "button4";
+    case ButtonCommand::Back:
+      return "button5";
     default:
       return "button3";
   }
@@ -133,15 +135,15 @@ bool wifiConnected() { return WiFi.status() == WL_CONNECTED; }
 void resetMirrorState() {
   gMirrorState.backendReachable = false;
   gMirrorState.interactiveActive = false;
-  gMirrorState.activePageId = "dynamic";
-  gMirrorState.pageTitle = "Smart Mirror";
+  gMirrorState.activePageId = "home";
+  gMirrorState.pageTitle = "Main Page";
   gMirrorState.statusLabel = wifiConnected() ? "Waiting for backend" : "Waiting for WiFi";
   gMirrorState.lastAction = gLastEvent;
-  gMirrorState.button1 = "Prev";
-  gMirrorState.button2 = "Next";
-  gMirrorState.button3 = "OK";
-  gMirrorState.button4 = "Back";
-  gMirrorState.dial = "Adjust";
+  gMirrorState.button1 = "Spotify";
+  gMirrorState.button2 = "Prev";
+  gMirrorState.button3 = "Play";
+  gMirrorState.button4 = "Next";
+  gMirrorState.button5 = "Home";
 }
 
 bool publishStatus(bool online) {
@@ -180,19 +182,19 @@ bool publishJson(const char* type, JsonDocument& payload) {
 }
 
 bool publishAction(ButtonCommand command, bool hold) {
+  if (command == ButtonCommand::TogglePage) {
+    StaticJsonDocument<64> payload;
+    payload["pageId"] = gMirrorState.activePageId;
+    payload["hold"] = hold;
+    return publishJson("display.page.toggle", payload);
+  }
+
   StaticJsonDocument<192> payload;
   payload["pageId"] = gMirrorState.activePageId;
   payload["buttonId"] = buttonId(command);
   payload["action"] = buttonAction(command);
   payload["hold"] = hold;
   return publishJson("ui.action", payload);
-}
-
-bool publishAdjust(int delta) {
-  StaticJsonDocument<128> payload;
-  payload["pageId"] = gMirrorState.activePageId;
-  payload["delta"] = delta;
-  return publishJson("ui.adjust", payload);
 }
 
 bool publishMotion(const char* type) {
@@ -281,9 +283,8 @@ void pollConsoleState() {
   gMirrorState.backendReachable = true;
   gMirrorState.interactiveActive =
       document["interactiveActive"].as<bool>() || document["active"].as<bool>();
-  gMirrorState.activePageId = String(document["activePageId"] | "dynamic");
-  gMirrorState.pageTitle =
-      String(document["pageTitle"] | (gMirrorState.interactiveActive ? "Interactive" : "Smart Mirror"));
+  gMirrorState.activePageId = String(document["activePageId"] | "home");
+  gMirrorState.pageTitle = String(document["pageTitle"] | "Main Page");
   gMirrorState.statusLabel = String(document["statusLabel"] | "Ready");
   gMirrorState.lastAction = String(document["lastAction"] | gLastEvent);
 
@@ -293,7 +294,7 @@ void pollConsoleState() {
     gMirrorState.button2 = String(softButtons["button2"] | gMirrorState.button2);
     gMirrorState.button3 = String(softButtons["button3"] | gMirrorState.button3);
     gMirrorState.button4 = String(softButtons["button4"] | gMirrorState.button4);
-    gMirrorState.dial = String(softButtons["dial"] | gMirrorState.dial);
+    gMirrorState.button5 = String(softButtons["button5"] | gMirrorState.button5);
   }
 }
 
@@ -326,13 +327,13 @@ void renderDisplay() {
   gDisplay.print(clipLine(gMirrorState.lastAction));
 
   gDisplay.setCursor(0, 34);
-  gDisplay.print(clipLine(String("Dial: ") + gMirrorState.dial));
+  gDisplay.print(clipLine(String("1 ") + gMirrorState.button1));
 
   gDisplay.setCursor(0, 44);
-  gDisplay.print(clipLine(String("1 ") + gMirrorState.button1 + "  2 " + gMirrorState.button2));
+  gDisplay.print(clipLine(String("2 ") + gMirrorState.button2 + "  3 " + gMirrorState.button3));
 
   gDisplay.setCursor(0, 54);
-  gDisplay.print(clipLine(String("3 ") + gMirrorState.button3 + "  4 " + gMirrorState.button4));
+  gDisplay.print(clipLine(String("4 ") + gMirrorState.button4 + "  5 " + gMirrorState.button5));
 
   gDisplay.display();
 }
@@ -389,34 +390,14 @@ void pollMotion() {
   }
 }
 
-void pollDial() {
-  const unsigned long nowMs = millis();
-  const int reading = analogRead(Pins::POTENTIOMETER);
-  if (abs(reading - gLastDialReading) < Config::POT_MIN_DELTA) {
-    return;
-  }
-
-  const int bucket = reading / Config::POT_STEP_SIZE;
-  if (bucket == gLastDialBucket) {
-    gLastDialReading = reading;
-    return;
-  }
-
-  if ((nowMs - gLastDialEmitMs) < Config::DIAL_EMIT_COOLDOWN_MS) {
-    gLastDialReading = reading;
-    return;
-  }
-
-  gLastDialEmitMs = nowMs;
-  gLastDialReading = reading;
-  const int delta = (bucket > gLastDialBucket) ? 1 : -1;
-  gLastDialBucket = bucket;
-  publishAdjust(delta);
-}
-
 void initializeButtons() {
   for (ButtonState& button : gButtons) {
-    pinMode(button.pin, INPUT_PULLUP);
+    if (button.pin == Pins::BUTTON_BACK) {
+      // GPIO34 is input-only on ESP32 and needs an external pull-up/down resistor.
+      pinMode(button.pin, INPUT);
+    } else {
+      pinMode(button.pin, INPUT_PULLUP);
+    }
     const bool pressed = digitalRead(button.pin) == LOW;
     button.stablePressed = pressed;
     button.lastRawPressed = pressed;
@@ -449,10 +430,6 @@ void setup() {
   gStatusTopic = String(Config::MQTT_TOPIC_PREFIX) + "/" + Config::DEVICE_ID + "/status";
 
   pinMode(Pins::PIR_MOTION, INPUT);
-  analogReadResolution(12);
-  gLastDialReading = analogRead(Pins::POTENTIOMETER);
-  gLastDialBucket = gLastDialReading / Config::POT_STEP_SIZE;
-
   initializeButtons();
   initializeDisplay();
   resetMirrorState();
@@ -472,6 +449,5 @@ void loop() {
   pollConsoleState();
   pollButtons();
   pollMotion();
-  pollDial();
   renderDisplay();
 }
