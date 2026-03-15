@@ -14,7 +14,7 @@ constexpr uint8_t BUTTON_1 = 32;
 constexpr uint8_t BUTTON_2 = 26;
 constexpr uint8_t BUTTON_3 = 27;
 constexpr uint8_t BUTTON_4 = 25;
-constexpr uint8_t BUTTON_5 = 34;
+constexpr uint8_t BUTTON_5 = 23;
 constexpr uint8_t PIR_MOTION = 33;
 constexpr uint8_t OLED_SDA = 21;
 constexpr uint8_t OLED_SCL = 22;
@@ -477,12 +477,7 @@ void pollMotion() {
 
 void initializeButtons() {
   for (ButtonState& button : gButtons) {
-    if (button.pin == Pins::BUTTON_5) {
-      // GPIO34 is input-only on ESP32 and needs an external pull-up/down resistor.
-      pinMode(button.pin, INPUT);
-    } else {
-      pinMode(button.pin, INPUT_PULLUP);
-    }
+    pinMode(button.pin, INPUT_PULLUP);
     const bool pressed = digitalRead(button.pin) == LOW;
     button.stablePressed = pressed;
     button.lastRawPressed = pressed;
