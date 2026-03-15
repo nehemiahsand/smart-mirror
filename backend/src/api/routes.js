@@ -17,6 +17,7 @@ const cameraService = require('../services/camera');
 const trafficService = require('../services/traffic');
 const nbaService = require('../services/nba');
 const sportsService = require('../services/sports');
+const consoleService = require('../services/console');
 const websocketServer = require('./websocket');
 const layoutRoutes = require('./layout-routes');
 const apiKeyMiddleware = require('../middleware/apiKey');
@@ -186,6 +187,27 @@ router.get('/health', (req, res) => {
     uptime: process.uptime(),
     wsConnections: websocketServer.getClientCount()
   });
+});
+
+router.get('/console/state', (req, res) => {
+  try {
+    res.json(consoleService.getState());
+  } catch (error) {
+    logger.error('Failed to get console state', { error: error.message });
+    res.status(500).json({ error: 'Failed to get console state' });
+  }
+});
+
+router.get('/console/page/:pageId', (req, res) => {
+  try {
+    res.json(consoleService.getPageState(req.params.pageId));
+  } catch (error) {
+    logger.error('Failed to get console page state', {
+      error: error.message,
+      pageId: req.params.pageId,
+    });
+    res.status(500).json({ error: 'Failed to get console page state' });
+  }
 });
 
 // ===== Power Endpoints =====
