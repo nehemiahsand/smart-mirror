@@ -10,11 +10,11 @@
 #include "config.h"
 
 namespace Pins {
-constexpr uint8_t BUTTON_TOGGLE_PAGE = 25;
-constexpr uint8_t BUTTON_PREV = 26;
-constexpr uint8_t BUTTON_PRIMARY = 27;
-constexpr uint8_t BUTTON_NEXT = 32;
-constexpr uint8_t BUTTON_BACK = 34;
+constexpr uint8_t BUTTON_1 = 25;
+constexpr uint8_t BUTTON_2 = 26;
+constexpr uint8_t BUTTON_3 = 27;
+constexpr uint8_t BUTTON_4 = 32;
+constexpr uint8_t BUTTON_5 = 34;
 constexpr uint8_t PIR_MOTION = 33;
 constexpr uint8_t OLED_SDA = 21;
 constexpr uint8_t OLED_SCL = 22;
@@ -66,11 +66,11 @@ WiFiClient gWiFiClient;
 PubSubClient gMqttClient(gWiFiClient);
 
 ButtonState gButtons[] = {
-    {Pins::BUTTON_TOGGLE_PAGE, "button1", ButtonCommand::TogglePage, false, false, false, 0, 0},
-    {Pins::BUTTON_PREV, "button2", ButtonCommand::Primary, false, false, false, 0, 0},
-    {Pins::BUTTON_PRIMARY, "button3", ButtonCommand::Previous, false, false, false, 0, 0},
-    {Pins::BUTTON_NEXT, "button4", ButtonCommand::Next, false, false, false, 0, 0},
-    {Pins::BUTTON_BACK, "button5", ButtonCommand::Back, false, false, false, 0, 0},
+    {Pins::BUTTON_1, "button1", ButtonCommand::TogglePage, false, false, false, 0, 0},
+    {Pins::BUTTON_2, "button2", ButtonCommand::Primary, false, false, false, 0, 0},
+    {Pins::BUTTON_3, "button3", ButtonCommand::Previous, false, false, false, 0, 0},
+    {Pins::BUTTON_4, "button4", ButtonCommand::Next, false, false, false, 0, 0},
+    {Pins::BUTTON_5, "button5", ButtonCommand::Back, false, false, false, 0, 0},
 };
 
 MirrorState gMirrorState;
@@ -122,6 +122,32 @@ String backendUrl(const char* path) {
 }
 
 bool wifiConnected() { return WiFi.status() == WL_CONNECTED; }
+
+void buildConsoleStateFilter(JsonDocument& filter) {
+  filter["interactiveActive"] = true;
+  filter["active"] = true;
+  filter["standby"] = true;
+  filter["screenMode"] = true;
+  filter["activePageId"] = true;
+  filter["pageTitle"] = true;
+  filter["statusLabel"] = true;
+  filter["lastAction"] = true;
+
+  JsonObject softButtons = filter["softButtons"].to<JsonObject>();
+  softButtons["button1"] = true;
+  softButtons["button2"] = true;
+  softButtons["button3"] = true;
+  softButtons["button4"] = true;
+  softButtons["button5"] = true;
+
+  JsonObject overlay = filter["overlay"].to<JsonObject>();
+  overlay["title"] = true;
+  JsonArray overlayLines = overlay["lines"].to<JsonArray>();
+  overlayLines.add(true);
+  overlayLines.add(true);
+  overlayLines.add(true);
+  overlayLines.add(true);
+}
 
 void resetMirrorState() {
   gMirrorState.backendReachable = false;
@@ -270,8 +296,12 @@ void pollConsoleState() {
     return;
   }
 
-  StaticJsonDocument<2048> document;
-  const DeserializationError error = deserializeJson(document, http.getStream());
+  StaticJsonDocument<256> filter;
+  buildConsoleStateFilter(filter);
+
+  StaticJsonDocument<1024> document;
+  const DeserializationError error = deserializeJson(
+      document, http.getStream(), DeserializationOption::Filter(filter));
   http.end();
   if (error) {
     Serial.printf("[http] console state parse failed: %s\n", error.c_str());
@@ -442,7 +472,7 @@ void pollMotion() {
 
 void initializeButtons() {
   for (ButtonState& button : gButtons) {
-    if (button.pin == Pins::BUTTON_BACK) {
+    if (button.pin == Pins::BUTTON_5) {
       // GPIO34 is input-only on ESP32 and needs an external pull-up/down resistor.
       pinMode(button.pin, INPUT);
     } else {
