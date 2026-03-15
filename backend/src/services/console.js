@@ -179,6 +179,7 @@ let cachedPingMs = '0ms';
 
 function updateSystemStats() {
   const { exec } = require('child_process');
+  const net = require('net');
   
   exec("df -h / | tail -1 | awk '{print $5}'", (error, stdout) => {
     if (!error && stdout) {
@@ -186,13 +187,18 @@ function updateSystemStats() {
     }
   });
 
-  exec('ping -c 1 -W 1 8.8.8.8 | grep time= | sed -E "s/.*time=([0-9.]+) ms/\\\\1/"', (error, stdout) => {
-    if (!error && stdout) {
-      cachedPingMs = Math.round(parseFloat(stdout.trim())) + 'ms';
-    } else {
-      cachedPingMs = 'Err';
-    }
-  });
+  const start = Date.now();
+  const sock = new net.Socket();
+  sock.setTimeout(2000);
+  sock.on('connect', () => {
+    cachedPingMs = (Date.now() - start) + 'ms';
+    sock.destroy();
+  }).on('error', () => {
+    cachedPingMs = 'Err';
+  }).on('timeout', () => {
+    cachedPingMs = 'Err';
+    sock.destroy();
+  }).connect(53, '8.8.8.8');
 }
 setInterval(updateSystemStats, 10000);
 updateSystemStats();

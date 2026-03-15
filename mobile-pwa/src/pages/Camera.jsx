@@ -69,8 +69,7 @@ export default function Camera() {
     };
 
     const disableStream = () => {
-        setStreamUrl(''); // Break the image source connection cleanly
-        setStreamEnabled(false);
+        window.location.reload();
     };
 
     const formatTime = (ms) => {
