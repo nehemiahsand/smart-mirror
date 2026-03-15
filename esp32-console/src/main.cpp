@@ -124,27 +124,6 @@ String backendUrl(const char* path) {
 
 bool wifiConnected() { return WiFi.status() == WL_CONNECTED; }
 
-void buildConsoleStateFilter(JsonDocument& filter) {
-  filter["interactiveActive"] = true;
-  filter["active"] = true;
-  filter["standby"] = true;
-  filter["screenMode"] = true;
-  filter["activePageId"] = true;
-  filter["pageTitle"] = true;
-  filter["statusLabel"] = true;
-  filter["lastAction"] = true;
-  filter["statsLine1"] = true;
-  filter["statsLine2"] = true;
-  filter["statsLine3"] = true;
-
-  JsonObject softButtons = filter["softButtons"].to<JsonObject>();
-  softButtons["button1"] = true;
-  softButtons["button2"] = true;
-  softButtons["button3"] = true;
-  softButtons["button4"] = true;
-  softButtons["button5"] = true;
-}
-
 void resetMirrorState() {
   gMirrorState.backendReachable = false;
   gMirrorState.interactiveActive = false;
@@ -302,12 +281,8 @@ void pollConsoleState() {
     return;
   }
 
-  StaticJsonDocument<256> filter;
-  buildConsoleStateFilter(filter);
-
   StaticJsonDocument<1536> document;
-  const DeserializationError error = deserializeJson(
-      document, http.getStream(), DeserializationOption::Filter(filter));
+  const DeserializationError error = deserializeJson(document, http.getStream());
   http.end();
   if (error) {
     Serial.printf("[http] console state parse failed: %s\n", error.c_str());
