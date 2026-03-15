@@ -491,7 +491,8 @@ class ConsoleService {
     const standby = this.isStandbyActive();
     const cameraEnabled = !standby && settingsService.get('camera.enabled') !== false;
     const micEnabled = !standby && settingsService.get('voice.enabled') !== false;
-    const personDetected = cameraEnabled && cameraService.personDetected === true;
+    const sceneEngine = require('./sceneEngine');
+    const personDetected = sceneEngine.getState().motionActive === true;
     const cpuCount = os.cpus().length || 1;
     const [load1] = os.loadavg();
     const cpuPercent = Math.round((load1 / cpuCount) * 100);

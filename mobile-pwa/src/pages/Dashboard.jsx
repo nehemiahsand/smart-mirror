@@ -289,16 +289,6 @@ export default function Dashboard() {
           </div>
           <div className="quick-actions">
             <button
-              className={`action-btn ${effectiveCameraEnabled ? '' : 'danger'}`}
-              disabled={busy || standbyActive}
-              onClick={() => updatePrivacy({ cameraEnabled: !privacy.cameraEnabled })}
-            >
-              <span>{effectiveCameraEnabled ? '📷' : '🚫'}</span>
-              {standbyActive
-                ? 'Camera Input Off in Standby'
-                : (effectiveCameraEnabled ? 'Disable Camera Input' : 'Enable Camera Input')}
-            </button>
-            <button
               className={`action-btn ${effectiveVoiceEnabled ? '' : 'danger'}`}
               disabled={busy || standbyActive}
               onClick={() => updatePrivacy({ voiceEnabled: !privacy.voiceEnabled })}
