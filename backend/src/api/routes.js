@@ -22,8 +22,9 @@ const consoleService = require('../services/console');
 const websocketServer = require('./websocket');
 const layoutRoutes = require('./layout-routes');
 const apiKeyMiddleware = require('../middleware/apiKey');
+const adminOrApiKey = require('../middleware/adminOrApiKey');
 const cameraStreamAuth = require('../middleware/cameraStreamAuth');
-const { isSensitiveKey, redactSensitive } = require('../utils/redaction');
+const { isSensitiveKey, isSensitivePath, redactSensitive } = require('../utils/redaction');
 const { getLoginRateLimitStatus, recordFailedLoginAttempt, recordSuccessfulLogin } = require('../utils/loginRateLimit');
 const { ADMIN_SESSION_TTL_SECONDS, clearAdminSessionCookie, extractAdminToken, setAdminSessionCookie } = require('../utils/requestAuth');
 const { createToken, TOKEN_AUDIENCES } = require('../utils/auth');
@@ -136,8 +137,9 @@ router.post('/auth/stream-token', adminAuth, (req, res) => {
 router.get('/privacy/status', (req, res) => {
   try {
     const settings = settingsService.getAll();
-    const cameraEnabled = settings.camera?.enabled !== false;
-    const voiceEnabled = settings.voice?.enabled !== false;
+    const standbyActive = settings.display?.standbyMode === true;
+    const cameraEnabled = !standbyActive && settings.camera?.enabled !== false;
+    const voiceEnabled = !standbyActive && settings.voice?.enabled !== false;
     res.json({ cameraEnabled, voiceEnabled });
   } catch (error) {
     logger.error('Failed to get privacy status', { error: error.message });
@@ -474,7 +476,7 @@ router.post('/display/power', adminAuth, async (req, res) => {
 // ===== Settings Endpoints =====
 
 // Get all settings
-router.get('/settings', (req, res) => {
+router.get('/settings', adminOrApiKey, (req, res) => {
   try {
     const settings = settingsService.getAll();
     res.json(redactSensitive(settings));
@@ -485,16 +487,16 @@ router.get('/settings', (req, res) => {
 });
 
 // Get specific setting
-router.get('/settings/:key', (req, res) => {
+router.get('/settings/:key', adminOrApiKey, (req, res) => {
   try {
     const value = settingsService.get(req.params.key);
     if (value === undefined) {
       return res.status(404).json({ error: 'Setting not found' });
     }
-    if (isSensitiveKey(req.params.key)) {
+    if (isSensitiveKey(req.params.key) || isSensitivePath(req.params.key)) {
       return res.json({ key: req.params.key, value: value == null ? value : '[REDACTED]' });
     }
-    res.json({ key: req.params.key, value: redactSensitive(value, req.params.key) });
+    res.json({ key: req.params.key, value: redactSensitive(value, req.params.key, req.params.key) });
   } catch (error) {
     logger.error('Failed to get setting', { error: error.message });
     res.status(500).json({ error: 'Failed to retrieve setting' });

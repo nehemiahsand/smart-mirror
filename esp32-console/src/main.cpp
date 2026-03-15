@@ -48,6 +48,9 @@ struct MirrorState {
   String pageTitle = "Main Page";
   String statusLabel = "Waiting for backend";
   String lastAction = "Booting";
+  String statsLine1 = "";
+  String statsLine2 = "";
+  String statsLine3 = "";
   String button1 = "Spotify";
   String button2 = "Play/Pause";
   String button3 = "Prev";
@@ -127,6 +130,9 @@ void buildConsoleStateFilter(JsonDocument& filter) {
   filter["pageTitle"] = true;
   filter["statusLabel"] = true;
   filter["lastAction"] = true;
+  filter["statsLine1"] = true;
+  filter["statsLine2"] = true;
+  filter["statsLine3"] = true;
 
   JsonObject softButtons = filter["softButtons"].to<JsonObject>();
   softButtons["button1"] = true;
@@ -145,6 +151,9 @@ void resetMirrorState() {
   gMirrorState.pageTitle = "Main Page";
   gMirrorState.statusLabel = wifiConnected() ? "Waiting for backend" : "Waiting for WiFi";
   gMirrorState.lastAction = gLastEvent;
+  gMirrorState.statsLine1 = "";
+  gMirrorState.statsLine2 = "";
+  gMirrorState.statsLine3 = "";
   gMirrorState.button1 = "Spotify";
   gMirrorState.button2 = "Play/Pause";
   gMirrorState.button3 = "Prev";
@@ -299,6 +308,9 @@ void pollConsoleState() {
   gMirrorState.pageTitle = String(document["pageTitle"] | (gMirrorState.standby ? "Standby" : "Main Page"));
   gMirrorState.statusLabel = String(document["statusLabel"] | (gMirrorState.standby ? "Motion or 1 wakes" : "Ready"));
   gMirrorState.lastAction = String(document["lastAction"] | gLastEvent);
+  gMirrorState.statsLine1 = String(document["statsLine1"] | "");
+  gMirrorState.statsLine2 = String(document["statsLine2"] | "");
+  gMirrorState.statsLine3 = String(document["statsLine3"] | "");
 
   JsonObject softButtons = document["softButtons"].as<JsonObject>();
   if (!softButtons.isNull()) {
@@ -328,25 +340,43 @@ void drawLineIfPresent(int16_t y, const String& value, size_t maxLength = 20) {
   gDisplay.print(clipLine(value, maxLength));
 }
 
+void drawButtonLine(int16_t y, uint8_t buttonNumber, const String& label, size_t maxLength = 20) {
+  if (label.isEmpty()) {
+    return;
+  }
+
+  drawLineIfPresent(y, String(buttonNumber) + " " + label, maxLength);
+}
+
 void renderStandbyScreen() {
   renderHeader("Standby");
   drawLineIfPresent(18, gMirrorState.statusLabel);
-  drawLineIfPresent(42, String("1 ") + gMirrorState.button1);
+  drawButtonLine(42, 1, gMirrorState.button1);
+}
+
+void renderStatsScreen() {
+  renderHeader("Stats");
+  drawLineIfPresent(16, gMirrorState.statsLine1);
+  drawLineIfPresent(28, gMirrorState.statsLine2);
+  drawLineIfPresent(40, gMirrorState.statsLine3);
+  drawButtonLine(52, 5, gMirrorState.button5);
 }
 
 void renderPageScreen() {
   renderHeader(gMirrorState.pageTitle);
 
   if (gMirrorState.activePageId == "spotify") {
-    drawLineIfPresent(16, String("1 ") + gMirrorState.button1);
-    drawLineIfPresent(28, String("2 ") + gMirrorState.button2);
-    drawLineIfPresent(40, String("3 ") + gMirrorState.button3 + "  4 " + gMirrorState.button4);
-    drawLineIfPresent(52, String("5 ") + gMirrorState.button5);
+    drawButtonLine(16, 1, gMirrorState.button1);
+    drawButtonLine(28, 2, gMirrorState.button2);
+    if (!gMirrorState.button3.isEmpty() || !gMirrorState.button4.isEmpty()) {
+      drawLineIfPresent(40, String("3 ") + gMirrorState.button3 + "  4 " + gMirrorState.button4);
+    }
+    drawButtonLine(52, 5, gMirrorState.button5);
     return;
   }
 
-  drawLineIfPresent(22, String("1 ") + gMirrorState.button1);
-  drawLineIfPresent(44, String("5 ") + gMirrorState.button5);
+  drawButtonLine(22, 1, gMirrorState.button1);
+  drawButtonLine(44, 5, gMirrorState.button5);
 }
 
 void renderDisplay() {
@@ -366,6 +396,8 @@ void renderDisplay() {
 
   if (gMirrorState.screenMode == "standby" || gMirrorState.standby) {
     renderStandbyScreen();
+  } else if (gMirrorState.screenMode == "stats") {
+    renderStatsScreen();
   } else {
     renderPageScreen();
   }

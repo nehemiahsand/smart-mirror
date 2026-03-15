@@ -1,3 +1,4 @@
+const os = require('os');
 const climateService = require('./climate');
 const logger = require('../utils/logger');
 const settingsService = require('./settings');
@@ -62,6 +63,23 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
+function formatUptime(seconds) {
+  const totalSeconds = Math.max(0, Math.floor(seconds || 0));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+  if (days > 0) {
+    return `${days}d ${hours}h`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${minutes}m`;
+}
+
 function cycleIndex(currentIndex, length, delta) {
   return (currentIndex + delta + length) % length;
 }
@@ -124,6 +142,7 @@ class ConsoleService {
     this.tickInterval = null;
     this.state = {
       activePageId: 'dynamic',
+      overlayMode: null,
       expiresAt: null,
       lastInteractionAt: null,
       weatherTabId: 'current',
@@ -172,6 +191,10 @@ class ConsoleService {
 
   isStandbyActive() {
     return settingsService.get('display.standbyMode') === true;
+  }
+
+  isStatsOverlayActive() {
+    return this.state.overlayMode === 'stats';
   }
 
   getPages() {
@@ -311,6 +334,16 @@ class ConsoleService {
       };
     }
 
+    if (options.screenMode === 'stats') {
+      return {
+        button1: '',
+        button2: '',
+        button3: '',
+        button4: '',
+        button5: 'Close',
+      };
+    }
+
     const targetPageId = normalizePageId(pageId || this.state.activePageId);
     const timerSummary = this.buildTimerSummary();
     const focusSummary = this.buildFocusSummary();
@@ -331,7 +364,7 @@ class ConsoleService {
           button2: 'Play/Pause',
           button3: 'Prev',
           button4: 'Next',
-          button5: '',
+          button5: 'Stats',
         };
       case 'timer-focus':
         return {
@@ -350,9 +383,24 @@ class ConsoleService {
           button2: '',
           button3: '',
           button4: '',
-          button5: '',
+          button5: 'Stats',
         };
     }
+  }
+
+  buildStatsLines(presentedPage) {
+    const cpuCount = os.cpus().length || 1;
+    const [load1] = os.loadavg();
+    const cpuPercent = Math.round((load1 / cpuCount) * 100);
+    const totalMemMb = Math.round(os.totalmem() / 1024 / 1024);
+    const usedMemMb = Math.round((os.totalmem() - os.freemem()) / 1024 / 1024);
+    const memPercent = totalMemMb > 0 ? Math.round((usedMemMb / totalMemMb) * 100) : 0;
+
+    return {
+      line1: `Page ${presentedPage.title}`,
+      line2: `CPU ${cpuPercent}% RAM ${memPercent}%`,
+      line3: `Up ${formatUptime(os.uptime())}`,
+    };
   }
 
   getState() {
@@ -363,10 +411,14 @@ class ConsoleService {
     const presentedPages = this.getPresentedPages();
     const pageOrder = Object.keys(presentedPages);
     const standby = this.isStandbyActive();
-    const screenMode = standby ? 'standby' : 'page';
+    const statsOverlayActive = !standby && this.isStatsOverlayActive();
+    const screenMode = standby ? 'standby' : (statsOverlayActive ? 'stats' : 'page');
     const softButtons = this.getSoftButtons(displayedCanonicalPageId, {
       screenMode,
     });
+    const statsLines = statsOverlayActive
+      ? this.buildStatsLines(presentedPage)
+      : { line1: '', line2: '', line3: '' };
 
     return clone({
       ...this.state,
@@ -380,11 +432,14 @@ class ConsoleService {
       interactiveActive: !standby,
       pages: presentedPages,
       pageOrder,
-      pageTitle: standby ? 'Standby' : presentedPage.title,
+      pageTitle: standby ? 'Standby' : (statsOverlayActive ? 'Mirror Stats' : presentedPage.title),
       statusLabel: standby
         ? 'Motion or 1 wakes'
-        : (presentedPage.id === 'spotify' ? 'Spotify controls' : 'Mirror ready'),
+        : (statsOverlayActive ? `Viewing ${presentedPage.title}` : (presentedPage.id === 'spotify' ? 'Spotify controls' : 'Mirror ready')),
       softButtons,
+      statsLine1: statsLines.line1,
+      statsLine2: statsLines.line2,
+      statsLine3: statsLines.line3,
       alarm: this.buildAlarmSummary(),
       timer: this.buildTimerSummary(),
       focus: this.buildFocusSummary(),
@@ -418,6 +473,7 @@ class ConsoleService {
   }
 
   async openPage(pageId, source = 'api') {
+    this.state.overlayMode = null;
     const target = normalizePageTarget(pageId);
     const normalizedPageId = target.pageId;
     if (settingsService.get('console.enabled') === false) {
@@ -445,6 +501,7 @@ class ConsoleService {
   }
 
   async closeInteractive(source = 'api') {
+    this.state.overlayMode = null;
     this.state.activePageId = this.getDefaultPageId();
     this.state.expiresAt = null;
     this.state.lastAction = `close:${source}`;
@@ -455,6 +512,24 @@ class ConsoleService {
 
   async goHome(source = 'api') {
     return this.openPage('dynamic', source);
+  }
+
+  async openStatsOverlay(source = 'stats_open') {
+    this.state.overlayMode = 'stats';
+    this.touchInteraction(source);
+    this.broadcastState();
+    return this.getState();
+  }
+
+  async closeStatsOverlay(source = 'stats_close') {
+    if (!this.isStatsOverlayActive()) {
+      return this.getState();
+    }
+
+    this.state.overlayMode = null;
+    this.touchInteraction(source);
+    this.broadcastState();
+    return this.getState();
   }
 
   getNextPageId(delta = 1, currentPageId = this.state.activePageId) {
@@ -638,6 +713,10 @@ class ConsoleService {
   }
 
   async handleDynamicAction(action) {
+    if (['back', 'close'].includes(action)) {
+      return this.openStatsOverlay('dynamic:stats');
+    }
+
     this.touchInteraction(`dynamic:${action}`);
     this.broadcastState();
     return this.getState();
@@ -670,7 +749,9 @@ class ConsoleService {
       await spotifyService.next();
     } else if (['primary', 'toggle', 'confirm'].includes(action)) {
       await this.toggleMusicPlayback();
-    } else if (['back', 'home', 'close'].includes(action)) {
+    } else if (['back', 'close'].includes(action)) {
+      return this.openStatsOverlay('media:stats');
+    } else if (['home'].includes(action)) {
       return this.goHome('media_home');
     }
 
@@ -726,6 +807,16 @@ class ConsoleService {
     const normalizedAction = String(action || '').toLowerCase();
     const pageTarget = normalizePageTarget(payload.pageId || this.state.activePageId || this.getDefaultPageId());
     const pageId = pageTarget.pageId;
+
+    if (this.isStatsOverlayActive()) {
+      if (['back', 'close'].includes(normalizedAction)) {
+        return this.closeStatsOverlay('stats:close');
+      }
+
+      this.touchInteraction(`stats:${normalizedAction || 'noop'}`);
+      this.broadcastState();
+      return this.getState();
+    }
 
     if (normalizedAction === 'open' && payload.targetPageId) {
       return this.openPage(payload.targetPageId, payload.source || 'action_open');
@@ -917,6 +1008,9 @@ class ConsoleService {
   }
 
   async handleSettingsChanged(reason = 'settings_changed') {
+    if (this.isStandbyActive()) {
+      this.state.overlayMode = null;
+    }
     this.state.activePageId = normalizePageId(this.state.activePageId);
     if (!this.isPageEnabled(this.state.activePageId)) {
       this.state.activePageId = this.getDefaultPageId();

@@ -468,6 +468,13 @@ class SceneEngine {
         return this.applyStandbyMode(false, 'button:turn_on');
       }
 
+      if (typeof consoleService.isStatsOverlayActive === 'function' && consoleService.isStatsOverlayActive()) {
+        logger.info('Ignoring page toggle while stats overlay is active', {
+          deviceId: event.deviceId || 'unknown',
+        });
+        return this.refreshState({ source: 'esp32', reason: 'display.page.toggle:stats_ignored', broadcast: true, persist: false });
+      }
+
       const websocketServer = require('../api/websocket');
       const currentPage = settingsService.get('current_page') === 'spotify' ? 'spotify' : 'home';
       const nextPage = currentPage === 'spotify' ? 'home' : 'spotify';

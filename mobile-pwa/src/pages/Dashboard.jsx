@@ -14,6 +14,9 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
+  const standbyActive = settings?.display?.standbyMode === true;
+  const effectiveCameraEnabled = !standbyActive && privacy.cameraEnabled;
+  const effectiveVoiceEnabled = !standbyActive && privacy.voiceEnabled;
 
   useEffect(() => {
     fetchData();
@@ -277,20 +280,24 @@ export default function Dashboard() {
           </div>
           <div className="quick-actions">
             <button
-              className={`action-btn ${privacy.cameraEnabled ? '' : 'danger'}`}
-              disabled={busy}
+              className={`action-btn ${effectiveCameraEnabled ? '' : 'danger'}`}
+              disabled={busy || standbyActive}
               onClick={() => updatePrivacy({ cameraEnabled: !privacy.cameraEnabled })}
             >
-              <span>{privacy.cameraEnabled ? '📷' : '🚫'}</span>
-              {privacy.cameraEnabled ? 'Disable Camera Input' : 'Enable Camera Input'}
+              <span>{effectiveCameraEnabled ? '📷' : '🚫'}</span>
+              {standbyActive
+                ? 'Camera Input Off in Standby'
+                : (effectiveCameraEnabled ? 'Disable Camera Input' : 'Enable Camera Input')}
             </button>
             <button
-              className={`action-btn ${privacy.voiceEnabled ? '' : 'danger'}`}
-              disabled={busy}
+              className={`action-btn ${effectiveVoiceEnabled ? '' : 'danger'}`}
+              disabled={busy || standbyActive}
               onClick={() => updatePrivacy({ voiceEnabled: !privacy.voiceEnabled })}
             >
-              <span>{privacy.voiceEnabled ? '🎤' : '🚫'}</span>
-              {privacy.voiceEnabled ? 'Disable Voice Input' : 'Enable Voice Input'}
+              <span>{effectiveVoiceEnabled ? '🎤' : '🚫'}</span>
+              {standbyActive
+                ? 'Voice Input Off in Standby'
+                : (effectiveVoiceEnabled ? 'Disable Voice Input' : 'Enable Voice Input')}
             </button>
           </div>
         </div>

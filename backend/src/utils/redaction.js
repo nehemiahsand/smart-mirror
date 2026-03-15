@@ -1,12 +1,20 @@
 const SENSITIVE_KEY_PATTERNS = [/token/i, /secret/i, /password/i, /api.?key/i, /authorization/i];
+const SENSITIVE_PATHS = new Set([
+  'traffic.origin',
+  'traffic.destination'
+]);
 
 function isSensitiveKey(key) {
   return SENSITIVE_KEY_PATTERNS.some((pattern) => pattern.test(String(key)));
 }
 
-function redactSensitive(value, parentKey = '') {
+function isSensitivePath(path) {
+  return SENSITIVE_PATHS.has(String(path));
+}
+
+function redactSensitive(value, parentKey = '', currentPath = '') {
   if (Array.isArray(value)) {
-    return value.map((item) => redactSensitive(item, parentKey));
+    return value.map((item) => redactSensitive(item, parentKey, currentPath));
   }
 
   if (!value || typeof value !== 'object') {
@@ -15,10 +23,11 @@ function redactSensitive(value, parentKey = '') {
 
   const redacted = {};
   for (const [key, nestedValue] of Object.entries(value)) {
-    if (isSensitiveKey(key) || isSensitiveKey(parentKey)) {
+    const nextPath = currentPath ? `${currentPath}.${key}` : key;
+    if (isSensitiveKey(key) || isSensitiveKey(parentKey) || isSensitivePath(nextPath)) {
       redacted[key] = nestedValue == null ? nestedValue : '[REDACTED]';
     } else {
-      redacted[key] = redactSensitive(nestedValue, key);
+      redacted[key] = redactSensitive(nestedValue, key, nextPath);
     }
   }
 
@@ -27,5 +36,6 @@ function redactSensitive(value, parentKey = '') {
 
 module.exports = {
   isSensitiveKey,
+  isSensitivePath,
   redactSensitive,
 };
