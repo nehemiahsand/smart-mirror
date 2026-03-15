@@ -68,6 +68,11 @@ export default function Camera() {
         }
     };
 
+    const disableStream = () => {
+        setStreamUrl(''); // Break the image source connection cleanly
+        setStreamEnabled(false);
+    };
+
     const formatTime = (ms) => {
         if (!ms) return 'N/A';
         const minutes = Math.floor(ms / 60000);
@@ -173,7 +178,7 @@ export default function Camera() {
 
                         <button
                             className={`stream-button ${streamEnabled ? 'enabled' : 'disabled'}`}
-                            onClick={streamEnabled ? () => setStreamEnabled(false) : enableStream}
+                            onClick={streamEnabled ? disableStream : enableStream}
                         >
                             <span className="button-icon">
                                 {streamEnabled ? '⏹' : '▶'}

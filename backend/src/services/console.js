@@ -174,6 +174,29 @@ function getMirrorCycleTargetPageId(pageId) {
   return MIRROR_PAGE_ORDER[cycleIndex(safeIndex, MIRROR_PAGE_ORDER.length, 1)];
 }
 
+let cachedDiskUsage = '0%';
+let cachedPingMs = '0ms';
+
+function updateSystemStats() {
+  const { exec } = require('child_process');
+  
+  exec("df -h / | tail -1 | awk '{print $5}'", (error, stdout) => {
+    if (!error && stdout) {
+      cachedDiskUsage = stdout.trim();
+    }
+  });
+
+  exec('ping -c 1 -W 1 8.8.8.8 | grep time= | sed -E "s/.*time=([0-9.]+) ms/\\\\1/"', (error, stdout) => {
+    if (!error && stdout) {
+      cachedPingMs = Math.round(parseFloat(stdout.trim())) + 'ms';
+    } else {
+      cachedPingMs = 'Err';
+    }
+  });
+}
+setInterval(updateSystemStats, 10000);
+updateSystemStats();
+
 class ConsoleService {
   constructor() {
     this.initialized = false;
@@ -502,7 +525,7 @@ class ConsoleService {
     const cpuTempC = readCpuTempC();
 
     return {
-      line1: `Cam ${cameraEnabled ? 'On' : 'Off'} Mic ${micEnabled ? 'On' : 'Off'}`,
+      line1: `Disk ${cachedDiskUsage} Ping ${cachedPingMs}`,
       line2: `CPU ${cpuPercent}% RAM ${memPercent}%`,
       line3: cpuTempC == null
         ? `Up ${formatUptime(os.uptime())}`
