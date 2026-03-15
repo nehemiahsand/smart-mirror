@@ -1,7 +1,5 @@
 const climateService = require('./climate');
-const fs = require('fs');
 const logger = require('../utils/logger');
-const os = require('os');
 const settingsService = require('./settings');
 const spotifyService = require('./spotify');
 const weatherService = require('./weather');
@@ -17,11 +15,6 @@ const PAGE_ORDER = ['dynamic', 'weather', 'media', 'timer-focus'];
 const OLED_PAGE_ORDER = ['dynamic', 'media'];
 const WEATHER_TABS = ['current', 'hourly', 'daily', 'alerts'];
 const TIMER_FOCUS_MODES = ['timer', 'focus'];
-const THERMAL_SENSOR_PATHS = [
-  '/sys/class/thermal/thermal_zone0/temp',
-  '/sys/class/thermal/thermal_zone1/temp',
-];
-const STATS_CACHE_TTL_MS = 5000;
 
 const PAGE_ID_ALIASES = {
   home: 'dynamic',
@@ -80,51 +73,6 @@ function normalizeDelta(value) {
   return 1;
 }
 
-function formatUptimeShort(totalSeconds) {
-  const safeSeconds = Math.max(Number(totalSeconds) || 0, 0);
-  const days = Math.floor(safeSeconds / 86400);
-  const hours = Math.floor((safeSeconds % 86400) / 3600);
-  const minutes = Math.floor((safeSeconds % 3600) / 60);
-
-  if (days > 0) {
-    return `${days}d ${hours}h`;
-  }
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-}
-
-function readCpuTemperatureC() {
-  for (const sensorPath of THERMAL_SENSOR_PATHS) {
-    try {
-      const raw = fs.readFileSync(sensorPath, 'utf8').trim();
-      const value = Number.parseFloat(raw);
-      if (!Number.isFinite(value)) {
-        continue;
-      }
-
-      return value > 1000 ? Math.round(value / 1000) : Math.round(value);
-    } catch (_) {
-      continue;
-    }
-  }
-
-  return null;
-}
-
-function snapshotCpuTimes() {
-  const cpus = os.cpus() || [];
-  return cpus.reduce((accumulator, cpu) => {
-    const times = cpu?.times || {};
-    const total = Object.values(times).reduce((sum, value) => sum + value, 0);
-    return {
-      idle: accumulator.idle + (times.idle || 0),
-      total: accumulator.total + total,
-    };
-  }, { idle: 0, total: 0 });
-}
-
 function normalizePageTarget(pageId) {
   const normalized = String(pageId || '').trim().toLowerCase();
   const rawPageId = normalized || 'dynamic';
@@ -180,7 +128,6 @@ class ConsoleService {
       lastInteractionAt: null,
       weatherTabId: 'current',
       timerFocusMode: 'timer',
-      overlayId: null,
       lastAction: null,
       updatedAt: Date.now(),
     };
@@ -195,8 +142,6 @@ class ConsoleService {
       timerStatus: 'idle',
       timerEndsAt: null,
       timerRemainingMs: null,
-      systemStats: null,
-      cpuSnapshot: snapshotCpuTimes(),
     };
   }
 
@@ -227,10 +172,6 @@ class ConsoleService {
 
   isStandbyActive() {
     return settingsService.get('display.standbyMode') === true;
-  }
-
-  isStatsOverlayVisible() {
-    return this.state.overlayId === 'stats';
   }
 
   getPages() {
@@ -370,16 +311,6 @@ class ConsoleService {
       };
     }
 
-    if (options.overlayId === 'stats') {
-      return {
-        button1: '',
-        button2: '',
-        button3: '',
-        button4: '',
-        button5: 'Close',
-      };
-    }
-
     const targetPageId = normalizePageId(pageId || this.state.activePageId);
     const timerSummary = this.buildTimerSummary();
     const focusSummary = this.buildFocusSummary();
@@ -392,7 +323,7 @@ class ConsoleService {
           button2: 'Prev',
           button3: 'Next',
           button4: 'Refresh',
-          button5: 'Stats',
+          button5: '',
         };
       case 'media':
         return {
@@ -400,7 +331,7 @@ class ConsoleService {
           button2: 'Play/Pause',
           button3: 'Prev',
           button4: 'Next',
-          button5: 'Stats',
+          button5: '',
         };
       case 'timer-focus':
         return {
@@ -410,7 +341,7 @@ class ConsoleService {
           button4: this.state.timerFocusMode === 'timer'
             ? (timerSummary.running ? 'Pause' : (timerSummary.paused ? 'Resume' : 'Start'))
             : (focusSummary.running ? 'Pause' : (focusSummary.paused ? 'Resume' : 'Start')),
-          button5: 'Stats',
+          button5: 'Reset',
         };
       case 'dynamic':
       default:
@@ -419,77 +350,9 @@ class ConsoleService {
           button2: '',
           button3: '',
           button4: '',
-          button5: 'Stats',
+          button5: '',
         };
     }
-  }
-
-  getSystemStats() {
-    const now = Date.now();
-    if (this.runtime.systemStats && (now - this.runtime.systemStats.updatedAt) < STATS_CACHE_TTL_MS) {
-      return this.runtime.systemStats;
-    }
-
-    const currentSnapshot = snapshotCpuTimes();
-    const previousSnapshot = this.runtime.cpuSnapshot;
-    let cpuPercent = this.runtime.systemStats?.cpuPercent ?? null;
-    if (
-      previousSnapshot &&
-      currentSnapshot.total > previousSnapshot.total &&
-      currentSnapshot.idle >= previousSnapshot.idle
-    ) {
-      const totalDelta = currentSnapshot.total - previousSnapshot.total;
-      const idleDelta = currentSnapshot.idle - previousSnapshot.idle;
-      cpuPercent = Math.round(((totalDelta - idleDelta) / totalDelta) * 100);
-    }
-
-    this.runtime.cpuSnapshot = currentSnapshot;
-
-    const totalMemMb = Math.round(os.totalmem() / (1024 * 1024));
-    const freeMemMb = Math.round(os.freemem() / (1024 * 1024));
-    const usedMemMb = Math.max(totalMemMb - freeMemMb, 0);
-    const ramPercent = totalMemMb > 0 ? Math.round((usedMemMb / totalMemMb) * 100) : 0;
-    const cpuTempC = readCpuTemperatureC();
-    const loadAvg1m = Number(os.loadavg()[0] || 0).toFixed(2);
-
-    this.runtime.systemStats = {
-      updatedAt: now,
-      cpuPercent,
-      cpuTempC,
-      ramPercent,
-      usedMemMb,
-      totalMemMb,
-      uptimeSeconds: Math.floor(os.uptime()),
-      loadAvg1m,
-      cpuCount: (os.cpus() || []).length,
-    };
-
-    return this.runtime.systemStats;
-  }
-
-  buildStatsOverlay(currentPageTitle) {
-    const stats = this.getSystemStats();
-    const cpuSummary = stats.cpuTempC != null
-      ? `CPU ${stats.cpuPercent ?? '--'}% ${stats.cpuTempC}C`
-      : `CPU ${stats.cpuPercent ?? '--'}%`;
-    const lines = [
-      cpuSummary,
-      `RAM ${stats.ramPercent}% ${stats.usedMemMb}/${stats.totalMemMb}M`,
-      `Up ${formatUptimeShort(stats.uptimeSeconds)}`,
-      `Load ${stats.loadAvg1m} C${stats.cpuCount}`,
-    ];
-
-    return {
-      id: 'stats',
-      title: 'Mirror Stats',
-      sourcePageTitle: currentPageTitle,
-      line1: lines[0],
-      line2: lines[1],
-      line3: lines[2],
-      line4: lines[3],
-      lines,
-      stats,
-    };
   }
 
   getState() {
@@ -500,11 +363,9 @@ class ConsoleService {
     const presentedPages = this.getPresentedPages();
     const pageOrder = Object.keys(presentedPages);
     const standby = this.isStandbyActive();
-    const overlay = standby || !this.isStatsOverlayVisible() ? null : this.buildStatsOverlay(presentedPage.title);
-    const screenMode = standby ? 'standby' : (overlay ? 'stats' : 'page');
+    const screenMode = standby ? 'standby' : 'page';
     const softButtons = this.getSoftButtons(displayedCanonicalPageId, {
       screenMode,
-      overlayId: overlay?.id || null,
     });
 
     return clone({
@@ -519,12 +380,11 @@ class ConsoleService {
       interactiveActive: !standby,
       pages: presentedPages,
       pageOrder,
-      pageTitle: standby ? 'Standby' : (overlay?.title || presentedPage.title),
+      pageTitle: standby ? 'Standby' : presentedPage.title,
       statusLabel: standby
         ? 'Motion or 1 wakes'
-        : (overlay ? `Back to ${presentedPage.title}` : (presentedPage.id === 'spotify' ? 'Spotify controls' : 'Mirror ready')),
+        : (presentedPage.id === 'spotify' ? 'Spotify controls' : 'Mirror ready'),
       softButtons,
-      overlay,
       alarm: this.buildAlarmSummary(),
       timer: this.buildTimerSummary(),
       focus: this.buildFocusSummary(),
@@ -587,7 +447,6 @@ class ConsoleService {
   async closeInteractive(source = 'api') {
     this.state.activePageId = this.getDefaultPageId();
     this.state.expiresAt = null;
-    this.state.overlayId = null;
     this.state.lastAction = `close:${source}`;
     this.state.updatedAt = Date.now();
     this.broadcastState();
@@ -596,26 +455,6 @@ class ConsoleService {
 
   async goHome(source = 'api') {
     return this.openPage('dynamic', source);
-  }
-
-  async toggleStatsOverlay(source = 'api') {
-    if (this.isStandbyActive()) {
-      return this.getState();
-    }
-
-    this.state.overlayId = this.isStatsOverlayVisible() ? null : 'stats';
-    this.touchInteraction(this.state.overlayId ? `overlay:stats:open:${source}` : `overlay:stats:close:${source}`);
-    this.broadcastState();
-    return this.getState();
-  }
-
-  handleStandbyActivated(source = 'system') {
-    if (this.state.overlayId) {
-      this.state.overlayId = null;
-      this.state.lastAction = `overlay:stats:hidden:${source}`;
-      this.state.updatedAt = Date.now();
-      this.broadcastState();
-    }
   }
 
   getNextPageId(delta = 1, currentPageId = this.state.activePageId) {
@@ -798,7 +637,9 @@ class ConsoleService {
     this.runtime.focusRemainingMs = null;
   }
 
-  async handleDynamicAction() {
+  async handleDynamicAction(action) {
+    this.touchInteraction(`dynamic:${action}`);
+    this.broadcastState();
     return this.getState();
   }
 
@@ -886,14 +727,6 @@ class ConsoleService {
     const pageTarget = normalizePageTarget(payload.pageId || this.state.activePageId || this.getDefaultPageId());
     const pageId = pageTarget.pageId;
 
-    if (payload.buttonId === 'button5') {
-      return this.toggleStatsOverlay(payload.source || 'button5');
-    }
-
-    if (this.isStatsOverlayVisible()) {
-      return this.getState();
-    }
-
     if (normalizedAction === 'open' && payload.targetPageId) {
       return this.openPage(payload.targetPageId, payload.source || 'action_open');
     }
@@ -947,7 +780,6 @@ class ConsoleService {
         return this.openPage(payload.pageId || payload.page || this.getDefaultPageId(), event.source || 'esp32');
       case 'ui.action':
         return this.handleAction(payload.action || payload.command || 'primary', {
-          buttonId: payload.buttonId || payload.button || payload.id,
           pageId: payload.pageId,
           targetPageId: payload.targetPageId,
           source: event.source || 'esp32',
@@ -1086,9 +918,6 @@ class ConsoleService {
 
   async handleSettingsChanged(reason = 'settings_changed') {
     this.state.activePageId = normalizePageId(this.state.activePageId);
-    if (this.isStandbyActive()) {
-      this.state.overlayId = null;
-    }
     if (!this.isPageEnabled(this.state.activePageId)) {
       this.state.activePageId = this.getDefaultPageId();
       this.state.expiresAt = null;

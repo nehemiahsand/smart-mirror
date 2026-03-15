@@ -52,12 +52,7 @@ struct MirrorState {
   String button2 = "Play/Pause";
   String button3 = "Prev";
   String button4 = "Next";
-  String button5 = "Stats";
-  String overlayTitle = "Mirror Stats";
-  String overlayLine1 = "";
-  String overlayLine2 = "";
-  String overlayLine3 = "";
-  String overlayLine4 = "";
+  String button5 = "";
 };
 
 namespace {
@@ -139,13 +134,6 @@ void buildConsoleStateFilter(JsonDocument& filter) {
   softButtons["button3"] = true;
   softButtons["button4"] = true;
   softButtons["button5"] = true;
-
-  JsonObject overlay = filter["overlay"].to<JsonObject>();
-  overlay["title"] = true;
-  overlay["line1"] = true;
-  overlay["line2"] = true;
-  overlay["line3"] = true;
-  overlay["line4"] = true;
 }
 
 void resetMirrorState() {
@@ -161,12 +149,7 @@ void resetMirrorState() {
   gMirrorState.button2 = "Play/Pause";
   gMirrorState.button3 = "Prev";
   gMirrorState.button4 = "Next";
-  gMirrorState.button5 = "Stats";
-  gMirrorState.overlayTitle = "Mirror Stats";
-  gMirrorState.overlayLine1 = "";
-  gMirrorState.overlayLine2 = "";
-  gMirrorState.overlayLine3 = "";
-  gMirrorState.overlayLine4 = "";
+  gMirrorState.button5 = "";
 }
 
 bool publishStatus(bool online) {
@@ -325,21 +308,6 @@ void pollConsoleState() {
     gMirrorState.button4 = String(softButtons["button4"] | gMirrorState.button4);
     gMirrorState.button5 = String(softButtons["button5"] | gMirrorState.button5);
   }
-
-  JsonObject overlay = document["overlay"].as<JsonObject>();
-  if (!overlay.isNull()) {
-    gMirrorState.overlayTitle = String(overlay["title"] | "Mirror Stats");
-    gMirrorState.overlayLine1 = String(overlay["line1"] | "");
-    gMirrorState.overlayLine2 = String(overlay["line2"] | "");
-    gMirrorState.overlayLine3 = String(overlay["line3"] | "");
-    gMirrorState.overlayLine4 = String(overlay["line4"] | "");
-  } else {
-    gMirrorState.overlayTitle = "Mirror Stats";
-    gMirrorState.overlayLine1 = "";
-    gMirrorState.overlayLine2 = "";
-    gMirrorState.overlayLine3 = "";
-    gMirrorState.overlayLine4 = "";
-  }
 }
 
 void renderHeader(const String& title) {
@@ -381,15 +349,6 @@ void renderPageScreen() {
   drawLineIfPresent(44, String("5 ") + gMirrorState.button5);
 }
 
-void renderStatsScreen() {
-  renderHeader(gMirrorState.overlayTitle);
-  drawLineIfPresent(14, gMirrorState.overlayLine1);
-  drawLineIfPresent(24, gMirrorState.overlayLine2);
-  drawLineIfPresent(34, gMirrorState.overlayLine3);
-  drawLineIfPresent(44, gMirrorState.overlayLine4);
-  drawLineIfPresent(54, String("5 ") + gMirrorState.button5);
-}
-
 void renderDisplay() {
   if (!gDisplayReady) {
     return;
@@ -407,8 +366,6 @@ void renderDisplay() {
 
   if (gMirrorState.screenMode == "standby" || gMirrorState.standby) {
     renderStandbyScreen();
-  } else if (gMirrorState.screenMode == "stats") {
-    renderStatsScreen();
   } else {
     renderPageScreen();
   }

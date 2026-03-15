@@ -311,10 +311,6 @@ class SceneEngine {
       'voice.enabled': !standbyMode,
     });
 
-    if (standbyMode) {
-      consoleService.handleStandbyActivated(reason);
-    }
-
     websocketServer.broadcastSettingsUpdate(updatedSettings);
     websocketServer.broadcast({
       type: 'standby_change',
@@ -465,15 +461,6 @@ class SceneEngine {
     }
 
     if (eventType === 'display.page.toggle') {
-      const consoleState = consoleService.getState();
-      if (consoleState.screenMode === 'stats') {
-        logger.info('Closing stats overlay via page toggle button', {
-          deviceId: event.deviceId || 'unknown',
-        });
-        await consoleService.toggleStatsOverlay('button1_close');
-        return this.refreshState({ source: 'esp32', reason: 'overlay_closed:display.page.toggle', broadcast: true, persist: false });
-      }
-
       if (isStandby) {
         logger.info('Waking display from standby via page toggle button', {
           deviceId: event.deviceId || 'unknown',
