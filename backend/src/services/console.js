@@ -5,13 +5,14 @@ const spotifyService = require('./spotify');
 const weatherService = require('./weather');
 
 const DEFAULT_PAGES = {
-  dynamic: { id: 'dynamic', name: 'Dynamic', title: 'Dynamic', enabled: true },
+  dynamic: { id: 'dynamic', name: 'Main Page', title: 'Main Page', enabled: true },
   weather: { id: 'weather', name: 'Weather', title: 'Weather', enabled: true },
-  media: { id: 'media', name: 'Media', title: 'Media', enabled: true },
+  media: { id: 'media', name: 'Spotify', title: 'Spotify', enabled: true },
   'timer-focus': { id: 'timer-focus', name: 'Timer / Focus', title: 'Timer / Focus', enabled: true },
 };
 
 const PAGE_ORDER = ['dynamic', 'weather', 'media', 'timer-focus'];
+const OLED_PAGE_ORDER = ['dynamic', 'media'];
 const WEATHER_TABS = ['current', 'hourly', 'daily', 'alerts'];
 const TIMER_FOCUS_MODES = ['timer', 'focus'];
 
@@ -89,6 +90,32 @@ function normalizePageTarget(pageId) {
 
 function normalizePageId(pageId) {
   return normalizePageTarget(pageId).pageId;
+}
+
+function getPresentedPageId(pageId) {
+  const normalizedPageId = normalizePageId(pageId);
+  if (normalizedPageId === 'dynamic') {
+    return 'home';
+  }
+  if (normalizedPageId === 'media') {
+    return 'spotify';
+  }
+  return normalizedPageId;
+}
+
+function getPresentedPageMeta(pageId) {
+  const normalizedPageId = normalizePageId(pageId);
+  if (normalizedPageId === 'dynamic') {
+    return { id: 'home', name: 'Main Page', title: 'Main Page' };
+  }
+  if (normalizedPageId === 'media') {
+    return { id: 'spotify', name: 'Spotify', title: 'Spotify' };
+  }
+  return {
+    id: normalizedPageId,
+    name: normalizedPageId,
+    title: normalizedPageId,
+  };
 }
 
 class ConsoleService {
@@ -171,7 +198,26 @@ class ConsoleService {
 
   getEnabledPageOrder() {
     const pages = this.getPages();
-    return PAGE_ORDER.filter((pageId) => pages[pageId]?.enabled !== false);
+    return OLED_PAGE_ORDER.filter((pageId) => pages[pageId]?.enabled !== false);
+  }
+
+  getPresentedPages() {
+    const pages = this.getPages();
+    return Object.fromEntries(
+      this.getEnabledPageOrder().map((pageId) => {
+        const page = pages[pageId];
+        const presentedPage = getPresentedPageMeta(pageId);
+        return [
+          presentedPage.id,
+          {
+            ...page,
+            id: presentedPage.id,
+            name: presentedPage.name,
+            title: presentedPage.title,
+          },
+        ];
+      })
+    );
   }
 
   getInactivityTimeoutMs() {
@@ -295,20 +341,24 @@ class ConsoleService {
   }
 
   getState() {
-    const pageId = normalizePageId(this.state.activePageId);
-    const manualPage = this.isManualPage(pageId);
+    const canonicalPageId = normalizePageId(this.state.activePageId);
+    const presentedPage = getPresentedPageMeta(canonicalPageId);
+    const manualPage = this.isManualPage(canonicalPageId);
+    const presentedPages = this.getPresentedPages();
+    const pageOrder = Object.keys(presentedPages);
 
     return clone({
       ...this.state,
-      activePageId: pageId,
-      pageId,
+      activePageId: presentedPage.id,
+      pageId: presentedPage.id,
+      canonicalPageId,
       active: manualPage,
       interactiveActive: manualPage,
-      pages: this.getPages(),
-      pageOrder: PAGE_ORDER,
-      pageTitle: this.getPages()[pageId]?.title || this.getPages()[pageId]?.name || pageId,
+      pages: presentedPages,
+      pageOrder,
+      pageTitle: presentedPage.title,
       statusLabel: manualPage ? 'Manual page' : 'Automatic dynamic page',
-      softButtons: this.getSoftButtons(pageId),
+      softButtons: this.getSoftButtons(canonicalPageId),
       alarm: this.buildAlarmSummary(),
       timer: this.buildTimerSummary(),
       focus: this.buildFocusSummary(),
@@ -734,8 +784,9 @@ class ConsoleService {
     ]);
 
     return {
-      pageId: 'dynamic',
-      title: this.getPages().dynamic?.title || 'Dynamic',
+      pageId: 'home',
+      canonicalPageId: 'dynamic',
+      title: this.getPages().dynamic?.title || 'Main Page',
       status: 'automatic',
       summary: 'Scene-driven mirror view',
       climate: climate && !climate.error ? climate : null,
@@ -767,8 +818,9 @@ class ConsoleService {
     const album = item?.album || {};
 
     return {
-      pageId: 'media',
-      title: this.getPages().media?.title || 'Media',
+      pageId: 'spotify',
+      canonicalPageId: 'media',
+      title: this.getPages().media?.title || 'Spotify',
       trackName: item?.name || null,
       artistName: Array.isArray(item?.artists) ? item.artists.map((artist) => artist.name).join(', ') : null,
       albumName: album?.name || null,
