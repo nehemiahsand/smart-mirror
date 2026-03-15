@@ -352,6 +352,7 @@ void renderStandbyScreen() {
   renderHeader("Standby");
   drawLineIfPresent(18, gMirrorState.statusLabel);
   drawButtonLine(42, 1, gMirrorState.button1);
+  drawButtonLine(54, 5, gMirrorState.button5);
 }
 
 void renderStatsScreen() {
@@ -394,10 +395,10 @@ void renderDisplay() {
   gDisplay.setTextSize(1);
   gDisplay.setTextColor(SSD1306_WHITE);
 
-  if (gMirrorState.screenMode == "standby" || gMirrorState.standby) {
-    renderStandbyScreen();
-  } else if (gMirrorState.screenMode == "stats") {
+  if (gMirrorState.screenMode == "stats") {
     renderStatsScreen();
+  } else if (gMirrorState.screenMode == "standby" || gMirrorState.standby) {
+    renderStandbyScreen();
   } else {
     renderPageScreen();
   }

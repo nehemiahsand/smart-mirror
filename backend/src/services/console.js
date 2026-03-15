@@ -330,7 +330,7 @@ class ConsoleService {
         button2: '',
         button3: '',
         button4: '',
-        button5: '',
+        button5: 'Stats',
       };
     }
 
@@ -411,8 +411,8 @@ class ConsoleService {
     const presentedPages = this.getPresentedPages();
     const pageOrder = Object.keys(presentedPages);
     const standby = this.isStandbyActive();
-    const statsOverlayActive = !standby && this.isStatsOverlayActive();
-    const screenMode = standby ? 'standby' : (statsOverlayActive ? 'stats' : 'page');
+    const statsOverlayActive = this.isStatsOverlayActive();
+    const screenMode = statsOverlayActive ? 'stats' : (standby ? 'standby' : 'page');
     const softButtons = this.getSoftButtons(displayedCanonicalPageId, {
       screenMode,
     });

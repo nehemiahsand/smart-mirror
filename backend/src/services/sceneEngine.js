@@ -489,6 +489,18 @@ class SceneEngine {
       });
     }
 
+    if (
+      isStandby &&
+      eventType === 'ui.action' &&
+      (payload.buttonId === 'button5' || payload.button === 'button5' || payload.id === 'button5') &&
+      ['back', 'close'].includes(String(payload.action || payload.command || '').toLowerCase())
+    ) {
+      return consoleService.handleEsp32Event({
+        ...event,
+        source: event.source || 'esp32',
+      });
+    }
+
     if (isStandby) {
       logger.info('Ignoring interactive ESP32 input while standby is active', {
         eventType,
