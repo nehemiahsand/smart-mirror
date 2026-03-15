@@ -374,7 +374,8 @@ void renderStatsScreen() {
 void renderPageScreen() {
   renderHeader(gMirrorState.pageTitle);
   const bool showExtendedControls =
-      gMirrorState.activePageId == "spotify" || gMirrorState.activePageId == "fun";
+      gMirrorState.activePageId == "spotify" || gMirrorState.activePageId == "fun" ||
+      gMirrorState.activePageId == "home";
 
   if (isCompactScreen()) {
     if (showExtendedControls) {
