@@ -14,7 +14,7 @@ const weatherService = require('../services/weather');
 const dht22Service = require('../sensors/dht22');
 const { redactSensitive } = require('../utils/redaction');
 
-const ALLOWED_SYNC_PAGES = new Set(['home', 'spotify']);
+const ALLOWED_SYNC_PAGES = new Set(['home', 'fun', 'spotify']);
 
 class WebSocketServer {
   constructor() {

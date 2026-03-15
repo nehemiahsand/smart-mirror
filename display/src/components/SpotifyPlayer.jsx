@@ -5,7 +5,7 @@ import { apiFetch } from '../apiClient';
 
 const API_BASE = '/api/spotify';
 
-export default function SpotifyPlayer({ onGoHome }) {
+export default function SpotifyPlayer() {
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);

@@ -10,6 +10,11 @@ function getDefaultWsUrl() {
 }
 
 const BASE_WS_URL = import.meta.env.VITE_WS_URL || getDefaultWsUrl();
+const ALLOWED_PAGES = new Set(['home', 'fun', 'spotify']);
+
+function normalizePage(page) {
+  return ALLOWED_PAGES.has(page) ? page : 'home';
+}
 
 export const useWebSocket = (onPageChange, onListeningChange) => {
   const [isConnected, setIsConnected] = useState(false);
@@ -31,7 +36,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
         setIsConnected(true);
         
         // Broadcast current page to sync voice service
-        const currentPage = localStorage.getItem('currentPage') || 'home';
+        const currentPage = normalizePage(localStorage.getItem('currentPage'));
         ws.send(JSON.stringify({
           type: 'sync_page',
           page: currentPage
@@ -80,7 +85,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
               // Handle voice-triggered page changes
               if (data.page && onPageChange) {
                 console.log('🎤 Voice command: changing page to', data.page);
-                onPageChange(data.page);
+                onPageChange(normalizePage(data.page));
               }
               break;
             case 'jarvis_listening':
@@ -169,7 +174,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({
         type: 'sync_page',
-        page
+        page: normalizePage(page)
       }));
     }
   }, []);

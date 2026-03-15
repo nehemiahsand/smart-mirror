@@ -8,6 +8,7 @@ const logger = require('../utils/logger');
 const settingsService = require('../services/settings');
 const weatherService = require('../services/weather');
 const photosService = require('../services/photos');
+const funContentService = require('../services/funContent');
 const wifiService = require('../services/wifi');
 const dht22Service = require('../sensors/dht22');
 const googleCalendarService = require('../services/googleCalendar');
@@ -190,6 +191,41 @@ router.get('/health', (req, res) => {
     uptime: process.uptime(),
     wsConnections: websocketServer.getClientCount()
   });
+});
+
+router.get('/fun/current', async (req, res) => {
+  try {
+    const { item } = await funContentService.getCurrentItem();
+    res.json(item);
+  } catch (error) {
+    logger.error('Failed to get fun content', { error: error.message });
+    res.status(500).json({ error: 'Failed to get fun content' });
+  }
+});
+
+router.get('/fun/current/image', async (req, res) => {
+  try {
+    const imagePath = await funContentService.getCurrentImagePath();
+    if (!imagePath) {
+      return res.status(404).json({ error: 'Fun image unavailable' });
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=300');
+    return res.sendFile(imagePath);
+  } catch (error) {
+    logger.error('Failed to get fun image', { error: error.message });
+    return res.status(500).json({ error: 'Failed to get fun image' });
+  }
+});
+
+router.post('/fun/refresh', adminAuth, async (req, res) => {
+  try {
+    const { item } = await funContentService.getCurrentItem({ forceRefresh: true });
+    res.json({ success: !item.unavailable, item });
+  } catch (error) {
+    logger.error('Failed to refresh fun content', { error: error.message });
+    res.status(500).json({ error: 'Failed to refresh fun content' });
+  }
 });
 
 router.get('/console/state', (req, res) => {

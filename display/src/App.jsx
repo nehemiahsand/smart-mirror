@@ -3,32 +3,35 @@ import './App.css';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useLayoutEngine } from './hooks/useLayoutEngine';
 import TimeDateWidget from './widgets/TimeDate';
-import WeatherTempWidget from './widgets/WeatherTemp';
 import WeatherTrafficWidget from './widgets/WeatherTraffic';
 import GoogleCalendarWidget from './widgets/GoogleCalendar';
 import PhotosWidget from './widgets/Photos';
-import TrafficWidget from './widgets/Traffic';
 import SportsScores from './widgets/SportsScores';
 import MessageOverlay from './components/MessageOverlay';
 import StatusIndicator from './components/StatusIndicator';
-import LayoutContainer from './components/LayoutContainer';
+import PageIndicator from './components/PageIndicator';
 import StandbyMode from './components/StandbyMode';
 import SpotifyPlayer from './components/SpotifyPlayer';
-import { apiFetch } from './apiClient';
+import FunPage from './components/FunPage';
+
+const DISPLAY_PAGES = ['home', 'fun', 'spotify'];
+const DEFAULT_PAGE = 'home';
+
+function normalizePage(page) {
+    return DISPLAY_PAGES.includes(page) ? page : DEFAULT_PAGE;
+}
 
 function App() {
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [currentPage, setCurrentPage] = useState(() => {
-        // Restore page state from localStorage
-        return localStorage.getItem('currentPage') || 'home';
-    });
+    const [currentPage, setCurrentPage] = useState(() => normalizePage(localStorage.getItem('currentPage')));
     const [isJarvisListening, setIsJarvisListening] = useState(false);
 
     // WebSocket with page change handler
     const handlePageChange = useCallback((page) => {
-        console.log('Page change requested:', page);
-        setCurrentPage(page);
-        localStorage.setItem('currentPage', page);
+        const normalizedPage = normalizePage(page);
+        console.log('Page change requested:', normalizedPage);
+        setCurrentPage(normalizedPage);
+        localStorage.setItem('currentPage', normalizedPage);
     }, []);
 
     const handleListeningChange = useCallback((listening) => {
@@ -53,7 +56,6 @@ function App() {
 
     // Initialize layout engine
     const {
-        getWidgetStyle,
         isWidgetEnabled,
         isAnimating
     } = useLayoutEngine(settings);
@@ -134,38 +136,6 @@ function App() {
         }
     };
 
-    // Save layout to Raspberry Pi via POST /api/settings
-    const handleSaveLayout = async (layoutData) => {
-        try {
-            const response = await apiFetch('/api/settings', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(layoutData)
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to save layout');
-            }
-
-            const result = await response.json();
-            console.log('Layout saved successfully:', result);
-
-            // Changes will be broadcast via WebSocket automatically
-            return result;
-        } catch (error) {
-            console.error('Error saving layout:', error);
-            throw error;
-        }
-    };
-
-    // Determine which widgets to show based on settings
-    const showWidget = (widgetName) => {
-        if (!settings?.widgets) return true; // Show all by default
-        return settings.widgets[widgetName] !== false;
-    };
-
     // Get widget order from settings or use default
     const getWidgetOrder = (widgetId) => {
         if (!settings?.widgetOrder || !Array.isArray(settings.widgetOrder)) {
@@ -188,24 +158,21 @@ function App() {
         return <StandbyMode />;
     }
 
-    // Page navigation
-    const goToHome = () => setCurrentPage('home');
-    const goToSpotify = () => setCurrentPage('spotify');
-
-    // Page indicator component
-    const PageIndicator = () => (
-        <div className="page-indicator">
-            <div className={`page-dot ${currentPage === 'home' ? 'active' : ''}`} />
-            <div className={`page-dot ${currentPage === 'spotify' ? 'active' : ''}`} />
-        </div>
-    );
-
     // Render Spotify page
     if (currentPage === 'spotify') {
         return (
             <>
-                <SpotifyPlayer onGoHome={goToHome} />
-                <PageIndicator />
+                <SpotifyPlayer />
+                <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
+            </>
+        );
+    }
+
+    if (currentPage === 'fun') {
+        return (
+            <>
+                <FunPage />
+                <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
             </>
         );
     }
@@ -267,7 +234,7 @@ function App() {
             <StatusIndicator isConnected={isConnected} />
 
             {/* Page Indicator */}
-            <PageIndicator />
+            <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
         </div>
     );
 }

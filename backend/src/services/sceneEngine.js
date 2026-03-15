@@ -2,6 +2,8 @@ const logger = require('../utils/logger');
 const consoleService = require('./console');
 const settingsService = require('./settings');
 
+const DISPLAY_PAGE_ORDER = ['home', 'fun', 'spotify'];
+
 function parseClockValue(value) {
   if (typeof value !== 'string' || !value.includes(':')) {
     return null;
@@ -377,7 +379,7 @@ class SceneEngine {
   }
 
   async handlePageRequest(page, context = {}) {
-    if (page === 'spotify') {
+    if (page === 'spotify' || page === 'fun') {
       return this.getState();
     }
     if (page === 'home') {
@@ -476,8 +478,10 @@ class SceneEngine {
       }
 
       const websocketServer = require('../api/websocket');
-      const currentPage = settingsService.get('current_page') === 'spotify' ? 'spotify' : 'home';
-      const nextPage = currentPage === 'spotify' ? 'home' : 'spotify';
+      const storedPage = String(settingsService.get('current_page') || 'home');
+      const currentPage = DISPLAY_PAGE_ORDER.includes(storedPage) ? storedPage : 'home';
+      const currentIndex = DISPLAY_PAGE_ORDER.indexOf(currentPage);
+      const nextPage = DISPLAY_PAGE_ORDER[(currentIndex + 1) % DISPLAY_PAGE_ORDER.length];
       websocketServer.broadcastPageChange(nextPage, { source: 'esp32_toggle' });
       return this.refreshState({ source: 'esp32', reason: `display.page.toggle:${nextPage}`, broadcast: true, persist: true });
     }

@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const cameraService = require('./camera');
 const climateService = require('./climate');
+const funContentService = require('./funContent');
 const logger = require('../utils/logger');
 const settingsService = require('./settings');
 const spotifyService = require('./spotify');
@@ -9,13 +10,15 @@ const weatherService = require('./weather');
 
 const DEFAULT_PAGES = {
   dynamic: { id: 'dynamic', name: 'Main Page', title: 'Main Page', enabled: true },
+  fun: { id: 'fun', name: 'Fun', title: 'Fun', enabled: true },
   weather: { id: 'weather', name: 'Weather', title: 'Weather', enabled: true },
   media: { id: 'media', name: 'Spotify', title: 'Spotify', enabled: true },
   'timer-focus': { id: 'timer-focus', name: 'Timer / Focus', title: 'Timer / Focus', enabled: true },
 };
 
-const PAGE_ORDER = ['dynamic', 'weather', 'media', 'timer-focus'];
-const OLED_PAGE_ORDER = ['dynamic', 'media'];
+const PAGE_ORDER = ['dynamic', 'fun', 'weather', 'media', 'timer-focus'];
+const OLED_PAGE_ORDER = ['dynamic', 'fun', 'media'];
+const MIRROR_PAGE_ORDER = ['dynamic', 'fun', 'media'];
 const WEATHER_TABS = ['current', 'hourly', 'daily', 'alerts'];
 const TIMER_FOCUS_MODES = ['timer', 'focus'];
 
@@ -23,6 +26,10 @@ const PAGE_ID_ALIASES = {
   home: 'dynamic',
   main: 'dynamic',
   apps: 'dynamic',
+  fun: 'fun',
+  comic: 'fun',
+  comics: 'fun',
+  daily: 'fun',
   spotify: 'media',
   music: 'media',
   alarm: 'timer-focus',
@@ -130,6 +137,9 @@ function getPresentedPageId(pageId) {
   if (normalizedPageId === 'dynamic') {
     return 'home';
   }
+  if (normalizedPageId === 'fun') {
+    return 'fun';
+  }
   if (normalizedPageId === 'media') {
     return 'spotify';
   }
@@ -141,6 +151,9 @@ function getPresentedPageMeta(pageId) {
   if (normalizedPageId === 'dynamic') {
     return { id: 'home', name: 'Main Page', title: 'Main Page' };
   }
+  if (normalizedPageId === 'fun') {
+    return { id: 'fun', name: 'Fun', title: 'Fun' };
+  }
   if (normalizedPageId === 'media') {
     return { id: 'spotify', name: 'Spotify', title: 'Spotify' };
   }
@@ -149,6 +162,13 @@ function getPresentedPageMeta(pageId) {
     name: normalizedPageId,
     title: normalizedPageId,
   };
+}
+
+function getMirrorCycleTargetPageId(pageId) {
+  const normalizedPageId = normalizePageId(pageId);
+  const currentIndex = MIRROR_PAGE_ORDER.indexOf(normalizedPageId);
+  const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+  return MIRROR_PAGE_ORDER[cycleIndex(safeIndex, MIRROR_PAGE_ORDER.length, 1)];
 }
 
 class ConsoleService {
@@ -216,6 +236,7 @@ class ConsoleService {
     const configuredPages = settingsService.get('interactivePages') || {};
     const pageOverrides = {
       dynamic: configuredPages.dynamic || configuredPages.home || configuredPages.main || {},
+      fun: configuredPages.fun || configuredPages.daily || {},
       weather: configuredPages.weather || {},
       media: configuredPages.media || configuredPages.music || configuredPages.spotify || {},
       'timer-focus': configuredPages['timer-focus'] || configuredPages.timer || configuredPages.focus || configuredPages.alarm || {},
@@ -362,7 +383,7 @@ class ConsoleService {
     const targetPageId = normalizePageId(pageId || this.state.activePageId);
     const timerSummary = this.buildTimerSummary();
     const focusSummary = this.buildFocusSummary();
-    const pageToggleTarget = getPresentedPageMeta(targetPageId === 'media' ? 'dynamic' : 'media');
+    const pageToggleTarget = getPresentedPageMeta(getMirrorCycleTargetPageId(targetPageId));
 
     switch (targetPageId) {
       case 'weather':
@@ -372,6 +393,14 @@ class ConsoleService {
           button3: 'Next',
           button4: 'Refresh',
           button5: '',
+        };
+      case 'fun':
+        return {
+          button1: pageToggleTarget.name,
+          button2: '',
+          button3: '',
+          button4: '',
+          button5: 'Stats',
         };
       case 'media':
         return {
@@ -429,7 +458,7 @@ class ConsoleService {
   getState() {
     const canonicalPageId = normalizePageId(this.state.activePageId);
     const syncedMirrorPageId = normalizePageId(settingsService.get('current_page') || canonicalPageId);
-    const displayedCanonicalPageId = syncedMirrorPageId === 'media' ? 'media' : 'dynamic';
+    const displayedCanonicalPageId = MIRROR_PAGE_ORDER.includes(syncedMirrorPageId) ? syncedMirrorPageId : 'dynamic';
     const presentedPage = getPresentedPageMeta(displayedCanonicalPageId);
     const presentedPages = this.getPresentedPages();
     const pageOrder = Object.keys(presentedPages);
@@ -458,7 +487,11 @@ class ConsoleService {
       pageTitle: standby ? 'Standby' : (statsOverlayActive ? 'Mirror Stats' : presentedPage.title),
       statusLabel: standby
         ? 'Motion or 1 wakes'
-        : (statsOverlayActive ? `Viewing ${presentedPage.title}` : (presentedPage.id === 'spotify' ? 'Spotify controls' : 'Mirror ready')),
+        : (statsOverlayActive
+          ? `Viewing ${presentedPage.title}`
+          : (presentedPage.id === 'spotify'
+            ? 'Spotify controls'
+            : (presentedPage.id === 'fun' ? 'Fun page ready' : 'Mirror ready'))),
       softButtons,
       statsLine1: statsLines.line1,
       statsLine2: statsLines.line2,
@@ -767,6 +800,17 @@ class ConsoleService {
     return this.getState();
   }
 
+  async handleFunAction(action) {
+    if (['back', 'close'].includes(action)) {
+      return this.openStatsOverlay('fun:stats');
+    }
+
+    this.touchInteraction(`fun:${action}`);
+    this.broadcastState();
+    await this.broadcastPageData('fun');
+    return this.getState();
+  }
+
   async handleWeatherAction(action) {
     const currentIndex = WEATHER_TABS.indexOf(this.state.weatherTabId);
     if (action === 'previous') {
@@ -878,6 +922,8 @@ class ConsoleService {
     }
 
     switch (pageId) {
+      case 'fun':
+        return this.handleFunAction(normalizedAction);
       case 'weather':
         return this.handleWeatherAction(normalizedAction);
       case 'media':
@@ -954,6 +1000,19 @@ class ConsoleService {
       climate: climate && !climate.error ? climate : null,
       weather: weather && !weather.error ? weather : null,
       softButtons: this.getSoftButtons('dynamic'),
+    };
+  }
+
+  async getFunPageData() {
+    const { item } = await funContentService.getCurrentItem();
+
+    return {
+      pageId: 'fun',
+      canonicalPageId: 'fun',
+      title: this.getPages().fun?.title || 'Fun',
+      item,
+      summary: item.unavailable ? 'No fun content available' : (item.title || 'Fun content ready'),
+      softButtons: this.getSoftButtons('fun'),
     };
   }
 
@@ -1040,6 +1099,8 @@ class ConsoleService {
     }
 
     switch (normalizedPageId) {
+      case 'fun':
+        return this.getFunPageData();
       case 'weather':
         return this.getWeatherPageData();
       case 'media':

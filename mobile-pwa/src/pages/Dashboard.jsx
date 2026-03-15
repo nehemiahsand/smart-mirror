@@ -5,6 +5,11 @@ import AlertModal from '../components/AlertModal';
 import { apiFetch } from '../apiClient';
 
 export default function Dashboard() {
+  const pageLabels = {
+    home: 'Home',
+    fun: 'Fun',
+    spotify: 'Spotify',
+  };
   const [sensorData, setSensorData] = useState(null);
   const [weatherData, setWeatherData] = useState(null);
   const [trafficData, setTrafficData] = useState(null);
@@ -174,7 +179,7 @@ export default function Dashboard() {
         const json = await res.json().catch(() => ({}));
         throw new Error(json.error || 'Failed to change page');
       }
-      setAlertModal({ type: 'success', message: `Display switched to ${page === 'spotify' ? 'Spotify' : 'Home'} page` });
+      setAlertModal({ type: 'success', message: `Display switched to ${pageLabels[page] || page} page` });
     } catch (e) {
       console.error('Page change failed:', e);
       setAlertModal({ type: 'error', message: `Failed to change page: ${e.message}` });
@@ -264,6 +269,10 @@ export default function Dashboard() {
             <button className="action-btn" disabled={busy} onClick={() => changePage('home')}>
               <span>🏠</span>
               Home Page
+            </button>
+            <button className="action-btn" disabled={busy} onClick={() => changePage('fun')}>
+              <span>🎉</span>
+              Fun Page
             </button>
             <button className="action-btn" disabled={busy} onClick={() => changePage('spotify')}>
               <span>🎵</span>

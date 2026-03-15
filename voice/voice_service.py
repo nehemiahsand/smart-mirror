@@ -37,6 +37,7 @@ CHUNK_SIZE = 4000
 # Voice commands mapping
 COMMANDS = {
     # Navigation
+    'fun': ['fun', 'comic', 'comics', 'calvin and hobbes', 'show comic', 'open comic', 'show fun', 'open fun'],
     'spotify': ['spotify', 'music', 'music player', 'player', 'open spotify', 'go to spotify', 'show spotify', 'show music'],
     'home': ['home', 'main page', 'go home', 'main', 'homepage', 'back home', 'return home', 'go back home', 'exit', 'close', 'back', 'go back'],
     
@@ -235,22 +236,52 @@ class VoiceRecognitionService:
         except Exception as e:
             logger.error(f"Error sending Spotify command: {e}")
             return False
+
+    def matches_keyword(self, text_lower, keyword):
+        """Match single words safely and phrases by substring."""
+        if len(keyword.split()) == 1:
+            return (
+                f" {keyword} " in f" {text_lower} "
+                or text_lower.startswith(keyword + " ")
+                or text_lower.endswith(" " + keyword)
+                or text_lower == keyword
+            )
+        return keyword in text_lower
+
+    def matches_any(self, text_lower, command_name):
+        """Check if text matches any keyword in a command group."""
+        return any(self.matches_keyword(text_lower, keyword) for keyword in COMMANDS[command_name])
     
     def process_command(self, text):
         """Process voice command based on current page"""
         text_lower = text.lower().strip()
         logger.info(f"🔊 Heard: '{text}' (Page: {self.current_page})")
         
-        # HOME PAGE: Only listen for "spotify" to navigate
+        # HOME PAGE: Listen for page navigation
         if self.current_page == 'home':
-            if any(keyword in text_lower for keyword in COMMANDS['spotify']):
+            if self.matches_any(text_lower, 'fun'):
+                logger.info("🎉 Navigating to Fun page")
+                self.send_page_command('fun')
+                return True
+            if self.matches_any(text_lower, 'spotify'):
                 logger.info("📱 Navigating to Spotify page")
                 self.send_page_command('spotify')
                 return True
-            else:
-                logger.debug(f"❌ No match on home page. Say 'Spotify' to navigate.")
-        
-        # SPOTIFY PAGE: Listen for playback controls and "home"
+            logger.debug("❌ No match on home page. Say 'Fun' or 'Spotify' to navigate.")
+
+        # FUN PAGE: Listen for navigation only
+        elif self.current_page == 'fun':
+            if self.matches_any(text_lower, 'home'):
+                logger.info("🏠 Navigating to home page")
+                self.send_page_command('home')
+                return True
+            if self.matches_any(text_lower, 'spotify'):
+                logger.info("🎵 Navigating to Spotify page")
+                self.send_page_command('spotify')
+                return True
+            logger.debug("❌ No match on Fun page. Say 'Home' or 'Spotify'.")
+
+        # SPOTIFY PAGE: Listen for playback controls and navigation
         elif self.current_page == 'spotify':
             # Check for playback commands FIRST (higher priority)
             for action, keywords in COMMANDS.items():
@@ -261,23 +292,16 @@ class VoiceRecognitionService:
                             logger.info(f"🎵 Executing Spotify command: {action} (matched: '{keyword}' in '{text}')")
                             self.send_spotify_command(action)
                             return True
-            
-            # Check for home navigation (lower priority)
-            # Use word boundaries for home commands to avoid "back" matching "playback"
-            for keyword in COMMANDS['home']:
-                # For single words, use word boundary check
-                if len(keyword.split()) == 1:
-                    if f" {keyword} " in f" {text_lower} " or text_lower.startswith(keyword + " ") or text_lower.endswith(" " + keyword) or text_lower == keyword:
-                        logger.info(f"🏠 Navigating to home page (matched: '{keyword}')")
-                        self.send_page_command('home')
-                        return True
-                else:
-                    # For phrases, simple substring match
-                    if keyword in text_lower:
-                        logger.info(f"🏠 Navigating to home page (matched: '{keyword}')")
-                        self.send_page_command('home')
-                        return True
-            
+
+            if self.matches_any(text_lower, 'fun'):
+                logger.info("🎉 Navigating to Fun page")
+                self.send_page_command('fun')
+                return True
+            if self.matches_any(text_lower, 'home'):
+                logger.info("🏠 Navigating to home page")
+                self.send_page_command('home')
+                return True
+
             logger.info(f"❌ No match on Spotify page for: '{text}'")
         
         return False
@@ -286,8 +310,9 @@ class VoiceRecognitionService:
         """Main listening loop - continuous command recognition using Vosk"""
         logger.info("🎤 Voice assistant started (100% OFFLINE - Vosk)")
         logger.info("🔒 Your voice never leaves this device!")
-        logger.info("📋 Home page: Say 'Spotify' to navigate")
-        logger.info("📋 Spotify page: Say 'Home', 'Play', 'Pause', 'Next', 'Previous'")
+        logger.info("📋 Home page: Say 'Fun' or 'Spotify' to navigate")
+        logger.info("📋 Fun page: Say 'Home' or 'Spotify'")
+        logger.info("📋 Spotify page: Say 'Home', 'Fun', 'Play', 'Pause', 'Next', 'Previous'")
         
         while True:
             try:
