@@ -5,17 +5,17 @@
 namespace Config {
 constexpr char DEVICE_ID[] = "mirror-entry-1";
 
-constexpr char WIFI_SSID[] = "YOUR_WIFI_SSID";
-constexpr char WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";
+constexpr char WIFI_SSID[] = "Sanders_45";
+constexpr char WIFI_PASSWORD[] = "plantpot4";
 
-constexpr char MQTT_HOST[] = "192.168.1.100";
+constexpr char MQTT_HOST[] = "192.168.7.175";
 constexpr uint16_t MQTT_PORT = 1883;
 constexpr char MQTT_USERNAME[] = "";
 constexpr char MQTT_PASSWORD[] = "";
 constexpr bool MQTT_USE_AUTH = false;
 constexpr char MQTT_TOPIC_PREFIX[] = "smartmirror/esp32";
 
-constexpr char BACKEND_BASE_URL[] = "http://192.168.1.100";
+constexpr char BACKEND_BASE_URL[] = "http://192.168.7.175";
 
 constexpr unsigned long WIFI_RECONNECT_INTERVAL_MS = 10000UL;
 constexpr unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000UL;
