@@ -10,6 +10,17 @@ const adminAuth = require('../middleware/adminAuth');
 const adminOrApiKey = require('../middleware/adminOrApiKey');
 const { consumeOAuthState, issueOAuthState } = require('../utils/oauthState');
 
+function isSpotifyAuthError(error) {
+    return error?.message === 'Not authenticated with Spotify' || error?.message === 'No refresh token available';
+}
+
+function sendSpotifyAuthNeeded(res) {
+    return res.status(401).json({
+        error: 'AUTH_NEEDED',
+        details: 'Spotify authentication is required'
+    });
+}
+
 // Get Spotify authentication URL
 router.get('/auth-url', adminAuth, (req, res) => {
     try {
@@ -52,6 +63,7 @@ router.get('/callback', async (req, res) => {
 // Get authentication status
 router.get('/status', (req, res) => {
     res.json({
+        configured: !!spotifyService.clientId && !!spotifyService.clientSecret,
         authenticated: spotifyService.isAuthenticated(),
         hasToken: !!spotifyService.accessToken
     });
@@ -69,6 +81,9 @@ router.get('/player', async (req, res) => {
         const playback = await spotifyService.getCurrentPlayback();
         res.json(playback || { is_playing: false });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error getting playback state:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to get playback state',
@@ -83,6 +98,9 @@ router.get('/currently-playing', async (req, res) => {
         const track = await spotifyService.getCurrentlyPlaying();
         res.json(track || {});
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error getting currently playing:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to get currently playing track',
@@ -97,6 +115,9 @@ router.put('/play', adminOrApiKey, async (req, res) => {
         await spotifyService.play(req.body.device_id, req.body.context_uri);
         res.json({ success: true });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error playing:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to play',
@@ -111,6 +132,9 @@ router.put('/play-liked', adminOrApiKey, async (req, res) => {
         await spotifyService.playLikedSongs();
         res.json({ success: true });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error playing liked songs:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to play liked songs',
@@ -125,6 +149,9 @@ router.put('/pause', adminOrApiKey, async (req, res) => {
         await spotifyService.pause();
         res.json({ success: true });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error pausing:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to pause',
@@ -139,6 +166,9 @@ router.post('/next', adminOrApiKey, async (req, res) => {
         await spotifyService.next();
         res.json({ success: true });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error skipping to next:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to skip to next track',
@@ -153,6 +183,9 @@ router.post('/previous', adminOrApiKey, async (req, res) => {
         await spotifyService.previous();
         res.json({ success: true });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error going to previous:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to go to previous track',
@@ -171,6 +204,9 @@ router.put('/volume', adminOrApiKey, async (req, res) => {
         await spotifyService.setVolume(volume);
         res.json({ success: true });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error setting volume:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to set volume',
@@ -189,6 +225,9 @@ router.put('/seek', adminOrApiKey, async (req, res) => {
         await spotifyService.seek(position);
         res.json({ success: true });
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error seeking:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to seek',
@@ -203,6 +242,9 @@ router.get('/devices', async (req, res) => {
         const devices = await spotifyService.getDevices();
         res.json(devices);
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error getting devices:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to get devices',
@@ -217,6 +259,9 @@ router.get('/playlist/:id', async (req, res) => {
         const playlist = await spotifyService.getPlaylist(req.params.id);
         res.json(playlist);
     } catch (error) {
+        if (isSpotifyAuthError(error)) {
+            return sendSpotifyAuthNeeded(res);
+        }
         logger.error('Error getting playlist:', error);
         res.status(error.response?.status || 500).json({ 
             error: 'Failed to get playlist',

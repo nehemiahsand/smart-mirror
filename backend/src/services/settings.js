@@ -24,23 +24,81 @@ const DEFAULT_SETTINGS = {
   weather: {
     city: 'Birmingham,US',
     units: 'imperial',
-    updateInterval: 600000 // 10 minutes
+    updateInterval: 600000
+  },
+  traffic: {
+    enabled: false,
+    origin: '',
+    destination: '',
+    googleMapsApiKey: '',
+    tomtomApiKey: ''
   },
   widgets: {
     clock: true,
     weather: true,
     calendar: false,
-    news: false
+    news: false,
+    traffic: true
   },
   network: {
     ssid: null,
     connected: false
-  }
+  },
+  spotify: {
+    accessToken: null,
+    refreshToken: null,
+    tokenExpiry: null
+  },
+  camera: {
+    enabled: true
+  },
+  voice: {
+    enabled: true
+  },
+  current_scene: 'day',
+  current_page: 'home'
 };
+
+function cloneDefaultSettings() {
+  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+}
+
+function mergeSettings(base, override) {
+  if (Array.isArray(base)) {
+    return Array.isArray(override) ? [...override] : [...base];
+  }
+
+  if (!base || typeof base !== 'object') {
+    return override === undefined ? base : override;
+  }
+
+  const result = { ...base };
+  const source = override && typeof override === 'object' ? override : {};
+
+  for (const [key, value] of Object.entries(source)) {
+    if (value === undefined) {
+      continue;
+    }
+
+    const baseValue = base[key];
+    if (Array.isArray(value)) {
+      result[key] = [...value];
+    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+      result[key] = mergeSettings(
+        baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue) ? baseValue : {},
+        value
+      );
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
 
 class SettingsService {
   constructor() {
-    this.settings = { ...DEFAULT_SETTINGS };
+    this.settings = cloneDefaultSettings();
     this.initialized = false;
   }
 
@@ -53,17 +111,14 @@ class SettingsService {
       try {
         const data = await fs.readFile(SETTINGS_FILE, 'utf8');
         const loadedSettings = JSON.parse(data);
-        // Deep merge to preserve all settings including spotify
-        this.settings = {
-          ...DEFAULT_SETTINGS,
-          ...loadedSettings,
-          // Ensure nested objects are properly merged
-          display: { ...DEFAULT_SETTINGS.display, ...loadedSettings.display },
-          weather: { ...DEFAULT_SETTINGS.weather, ...loadedSettings.weather },
-          widgets: { ...DEFAULT_SETTINGS.widgets, ...loadedSettings.widgets },
-          network: { ...DEFAULT_SETTINGS.network, ...loadedSettings.network }
-        };
+        this.settings = mergeSettings(cloneDefaultSettings(), loadedSettings);
         logger.info('Settings loaded successfully');
+
+        const normalizedSettings = JSON.stringify(this.settings);
+        if (normalizedSettings !== JSON.stringify(loadedSettings)) {
+          await this.save();
+          logger.info('Settings file migrated to current schema');
+        }
       } catch (error) {
         // File doesn't exist, create with defaults
         await this.save();
@@ -152,7 +207,7 @@ class SettingsService {
   }
 
   async reset() {
-    this.settings = { ...DEFAULT_SETTINGS };
+    this.settings = cloneDefaultSettings();
     await this.save();
     logger.info('Settings reset to defaults');
     

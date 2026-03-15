@@ -1225,22 +1225,31 @@ router.post('/broadcast', apiKeyMiddleware, (req, res) => {
 router.get('/traffic/commute', async (req, res) => {
   try {
     const settings = settingsService.getAll();
+    const trafficSettings = settings.traffic || {};
     
-    if (!settings.traffic || !settings.traffic.enabled) {
+    if (!trafficSettings.enabled) {
       return res.status(400).json({ error: 'Traffic widget not configured' });
     }
 
-    const { origin, destination, tomtomApiKey } = settings.traffic;
+    const origin = trafficSettings.origin || process.env.TRAFFIC_ORIGIN || '';
+    const destination = trafficSettings.destination || process.env.TRAFFIC_DESTINATION || '';
+    const tomtomApiKey = trafficSettings.tomtomApiKey || process.env.TOMTOM_API_KEY || '';
+    const googleMapsApiKey = trafficSettings.googleMapsApiKey || process.env.GOOGLE_MAPS_API_KEY || '';
     
     if (!origin || !destination) {
       return res.status(400).json({ error: 'Origin and destination must be configured in settings' });
     }
 
-    if (!tomtomApiKey) {
-      return res.status(400).json({ error: 'TomTom API key not configured' });
+    if (!tomtomApiKey && !googleMapsApiKey) {
+      return res.status(400).json({ error: 'Traffic API key not configured' });
     }
 
-    const data = await trafficService.getCommuteData(origin, destination, tomtomApiKey);
+    const data = await trafficService.getCommuteData({
+      origin,
+      destination,
+      tomtomApiKey,
+      googleMapsApiKey
+    });
     res.json(data);
   } catch (error) {
     logger.error('Failed to get traffic data', { error: error.message });
