@@ -228,12 +228,13 @@
   border: 2px solid rgba(255, 255, 255, 0.1);
   background: #000;
   display: block;
-  object-fit: contain;
+  object-fit: cover;
+  box-sizing: border-box;
 }
 
 @media (min-width: 641px) {
   .video-stream, .video-feed {
-    max-width: 800px;
+    width: 100%;
   }
 }
 
@@ -266,7 +267,7 @@
   border-radius: 8px;
   border: 1px solid rgba(16, 185, 129, 0.3);
   width: 100%;
-  max-width: 800px;
+  box-sizing: border-box;
 }
 
 @media (max-width: 640px) {
