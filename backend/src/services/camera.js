@@ -191,10 +191,13 @@ class CameraService {
   async getStatus() {
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
+      const sceneEngine = require("./sceneEngine");
+      const standbyEnabled = require("./settings").get('presence.standbyOnIdle') !== false;
+
       return {
         available: this.isAvailable,
         enabled: response.data.enabled !== false,
-        person_detected: require("./sceneEngine").getState().motionActive || false,
+        person_detected: sceneEngine.getState().motionActive || false,
         total_detections: response.data.total_detections,
         fps: response.data.fps,
         stream_viewers: response.data.stream_viewers || 0,
@@ -202,14 +205,16 @@ class CameraService {
         stream_fps_limit: response.data.stream_fps_limit || null,
         stream_jpeg_quality: response.data.stream_jpeg_quality || null,
         capture_resolution: response.data.capture_resolution || null,
-        auto_standby_enabled: this.autoStandbyEnabled,
+        auto_standby_enabled: standbyEnabled,
         dark_standby_enabled: this.darkStandbyEnabled,
         is_dark: response.data.is_dark,
         brightness: response.data.brightness,
-        last_detection: this.lastDetectionTime,
-        time_until_standby: this.lastDetectionTime 
-          ? Math.max(0, NO_PERSON_TIMEOUT - (Date.now() - this.lastDetectionTime))
-          : null,
+        last_detection: sceneEngine.lastMotionAt || this.lastDetectionTime,
+        time_until_standby: sceneEngine.motionActive 
+          ? sceneEngine.getIdleTimeoutMs() 
+          : (sceneEngine.lastMotionAt && standbyEnabled)
+            ? Math.max(0, sceneEngine.getIdleTimeoutMs() - (Date.now() - sceneEngine.lastMotionAt))
+            : null,
         standby_start_time: this.standbyStartTime,
         time_until_shutdown: null // Auto-shutdown disabled
       };

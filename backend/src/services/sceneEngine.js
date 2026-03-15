@@ -463,6 +463,7 @@ class SceneEngine {
 
     if (eventType === 'motion.idle') {
       this.motionActive = false;
+      this.lastMotionAt = Date.now(); // Reset the standby countdown explicitly when motion ends
       return this.refreshState({ source: 'esp32', reason: 'motion.idle', broadcast: true, persist: false });
     }
 
@@ -565,6 +566,7 @@ class SceneEngine {
       presenceEnabled &&
       standbyOnIdle &&
       this.lastMotionAt &&
+      !this.motionActive &&
       !isCurrentlyStandby &&
       (Date.now() - this.lastMotionAt) >= idleTimeoutMs
     ) {
