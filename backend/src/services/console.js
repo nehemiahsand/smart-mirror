@@ -451,6 +451,26 @@ class ConsoleService {
     });
   }
 
+  getEsp32State() {
+    const state = this.getState();
+
+    return {
+      interactiveActive: state.interactiveActive,
+      active: state.active,
+      standby: state.standby,
+      screenMode: state.screenMode,
+      activePageId: state.activePageId,
+      pageTitle: state.pageTitle,
+      statusLabel: state.statusLabel,
+      lastAction: state.lastAction,
+      statsLine1: state.statsLine1,
+      statsLine2: state.statsLine2,
+      statsLine3: state.statsLine3,
+      softButtons: state.softButtons,
+      updatedAt: state.updatedAt,
+    };
+  }
+
   touchInteraction(action = 'interaction') {
     const now = Date.now();
     this.state.lastInteractionAt = now;

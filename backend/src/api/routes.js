@@ -194,7 +194,9 @@ router.get('/health', (req, res) => {
 
 router.get('/console/state', (req, res) => {
   try {
-    res.json(consoleService.getState());
+    const isEsp32Client = req.query.device === 'esp32'
+      || String(req.get('user-agent') || '').includes('ESP32HTTPClient');
+    res.json(isEsp32Client ? consoleService.getEsp32State() : consoleService.getState());
   } catch (error) {
     logger.error('Failed to get console state', { error: error.message });
     res.status(500).json({ error: 'Failed to get console state' });

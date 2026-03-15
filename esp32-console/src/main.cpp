@@ -72,6 +72,7 @@ ButtonState gButtons[] = {
 };
 
 MirrorState gMirrorState;
+bool gHasConsoleState = false;
 
 String gEventTopic;
 String gStatusTopic;
@@ -159,6 +160,18 @@ void resetMirrorState() {
   gMirrorState.button3 = "Prev";
   gMirrorState.button4 = "Next";
   gMirrorState.button5 = "";
+}
+
+void markBackendUnavailable() {
+  if (!gHasConsoleState) {
+    resetMirrorState();
+    return;
+  }
+
+  gMirrorState.backendReachable = false;
+  gMirrorState.interactiveActive = false;
+  gMirrorState.statusLabel = wifiConnected() ? "Waiting for backend" : "Waiting for WiFi";
+  gMirrorState.lastAction = gLastEvent;
 }
 
 bool publishStatus(bool online) {
@@ -279,27 +292,28 @@ void pollConsoleState() {
   gLastStatePollMs = nowMs;
 
   HTTPClient http;
-  http.begin(backendUrl("/api/console/state"));
+  http.begin(backendUrl("/api/console/state?device=esp32"));
   const int statusCode = http.GET();
   if (statusCode != HTTP_CODE_OK) {
     http.end();
-    resetMirrorState();
+    markBackendUnavailable();
     return;
   }
 
   StaticJsonDocument<256> filter;
   buildConsoleStateFilter(filter);
 
-  StaticJsonDocument<1024> document;
+  StaticJsonDocument<1536> document;
   const DeserializationError error = deserializeJson(
       document, http.getStream(), DeserializationOption::Filter(filter));
   http.end();
   if (error) {
     Serial.printf("[http] console state parse failed: %s\n", error.c_str());
-    resetMirrorState();
+    markBackendUnavailable();
     return;
   }
 
+  gHasConsoleState = true;
   gMirrorState.backendReachable = true;
   gMirrorState.interactiveActive = document["interactiveActive"].as<bool>() || document["active"].as<bool>();
   gMirrorState.standby = document["standby"].as<bool>();
