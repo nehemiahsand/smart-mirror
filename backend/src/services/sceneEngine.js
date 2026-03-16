@@ -89,7 +89,7 @@ class SceneEngine {
       this.tick().catch((error) => {
         logger.error('Scene engine tick failed', { error: error.message });
       });
-    }, 30000);
+    }, 2000);
     logger.info('Scene engine initialized');
   }
 
@@ -573,7 +573,7 @@ class SceneEngine {
       return;
     }
 
-    await this.refreshState({ source: 'tick', reason: 'timer', broadcast: true, persist: false });
+    await this.refreshState({ source: 'tick', reason: 'timer', broadcast: false, persist: false });
   }
 
   async handleSettingsChanged(reason = 'settings_changed') {

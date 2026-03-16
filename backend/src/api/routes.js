@@ -495,8 +495,11 @@ router.post('/camera/auto-standby', adminAuth, async (req, res) => {
     if (typeof enabled !== 'boolean') {
       return res.status(400).json({ error: 'enabled must be a boolean' });
     }
-    cameraService.setAutoStandby(enabled);
-    res.json({ success: true, auto_standby_enabled: enabled });
+    await cameraService.setAutoStandby(enabled);
+    res.json({
+      success: true,
+      auto_standby_enabled: settingsService.get('presence.standbyOnIdle') !== false,
+    });
   } catch (error) {
     logger.error('Failed to set auto-standby', { error: error.message });
     res.status(500).json({ error: 'Failed to set auto-standby' });

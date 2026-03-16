@@ -6,27 +6,21 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
 const settingsService = require('./settings');
-const displayService = require('./display');
 
 const CAMERA_URL = process.env.CAMERA_URL || 'http://localhost:5556';
-const POLL_INTERVAL = 5000; // Check every 5 seconds (matches AI detection interval)
-const NO_PERSON_TIMEOUT = 30 * 60 * 1000; // 30 minutes in milliseconds
+const POLL_INTERVAL = 5000;
 
 class CameraService {
   constructor() {
     this.isAvailable = false;
     this.personDetected = false;
-    this.lastDetectionTime = null;
     this.checkInterval = null;
-    this.autoStandbyEnabled = false;
-    this.lastStandbyState = null;
     this.shutdownTimer = null;
     this.standbyStartTime = null;
     this.isDark = false;
     this.brightness = 100;
-    this.darkStandbyEnabled = true; // Enable standby when room goes dark
+    this.darkStandbyEnabled = false;
     this.cameraEnabled = true;
-    this.cameraWarmupUntil = 0;
   }
 
   async initialize() {
@@ -83,7 +77,7 @@ class CameraService {
       clearInterval(this.checkInterval);
     }
 
-    logger.info('Starting person detection monitoring...');
+    logger.info('Starting camera status monitoring...');
     this.checkInterval = setInterval(() => this.checkPersonDetection(), POLL_INTERVAL);
     
     // Initial check
@@ -104,56 +98,11 @@ class CameraService {
     }
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
-      const { person_detected, total_detections, fps, is_dark, brightness } = response.data;
+      const { person_detected, is_dark, brightness } = response.data;
 
-      const previousState = this.personDetected;
-      const previousDarkState = this.isDark;
       this.personDetected = person_detected;
       this.isDark = is_dark;
       this.brightness = brightness;
-
-      // After camera is re-enabled, allow a short warmup period to avoid
-      // false dark/no-person standby transitions while exposure stabilizes.
-      if (Date.now() < this.cameraWarmupUntil) {
-        if (person_detected) {
-          this.lastDetectionTime = Date.now();
-        }
-        return;
-      }
-
-      // Check for dark room - enter standby immediately when lights go off
-      if (this.darkStandbyEnabled && is_dark && !previousDarkState) {
-        logger.info(`Room went dark (brightness: ${brightness}) - entering standby`);
-        await this.enterStandby();
-        return; // Don't process person detection when dark
-      }
-
-      // Skip person detection logic if room is dark
-      if (is_dark) {
-        return;
-      }
-
-      if (person_detected) {
-        this.lastDetectionTime = Date.now();
-        
-        if (!previousState) {
-          logger.info('Person detected by AI while awake');
-        }
-      } else {
-        // No person detected - check if we should enter standby
-        if (this.autoStandbyEnabled && this.lastDetectionTime) {
-          const timeSinceLastPerson = Date.now() - this.lastDetectionTime;
-          
-          if (timeSinceLastPerson >= NO_PERSON_TIMEOUT) {
-            logger.info(`No person detected for ${NO_PERSON_TIMEOUT / 60000} minutes - entering standby`);
-            await this.enterStandby();
-            this.lastDetectionTime = null; // Reset
-          }
-        } else if (!this.autoStandbyEnabled) {
-          // Auto-standby disabled - clear the timer
-          this.lastDetectionTime = null;
-        }
-      }
     } catch (error) {
       if (error.code === 'ECONNREFUSED') {
         logger.warn('Camera service connection refused - may be starting up');
@@ -192,7 +141,8 @@ class CameraService {
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
       const sceneEngine = require("./sceneEngine");
-      const standbyEnabled = require("./settings").get('presence.standbyOnIdle') !== false;
+      const presenceEnabled = require("./settings").get('presence.enabled') !== false;
+      const standbyEnabled = presenceEnabled && require("./settings").get('presence.standbyOnIdle') !== false;
 
       return {
         available: this.isAvailable,
@@ -209,7 +159,7 @@ class CameraService {
         dark_standby_enabled: this.darkStandbyEnabled,
         is_dark: response.data.is_dark,
         brightness: response.data.brightness,
-        last_detection: sceneEngine.lastMotionAt || this.lastDetectionTime,
+        last_detection: sceneEngine.lastMotionAt || null,
         time_until_standby: sceneEngine.motionActive 
           ? sceneEngine.getIdleTimeoutMs() 
           : (sceneEngine.lastMotionAt && standbyEnabled)
@@ -247,14 +197,8 @@ class CameraService {
 
   async setCameraEnabled(enabled) {
     this.cameraEnabled = enabled;
-    if (enabled) {
-      this.cameraWarmupUntil = Date.now() + 20000;
-      this.lastDetectionTime = Date.now();
-      this.personDetected = false;
-      this.isDark = false;
-    } else {
-      this.cameraWarmupUntil = 0;
-    }
+    this.personDetected = false;
+    this.isDark = false;
     const path = enabled ? '/control/enable' : '/control/disable';
     try {
       await axios.post(`${CAMERA_URL}${path}`, {}, { timeout: 3000 });
@@ -264,26 +208,12 @@ class CameraService {
     }
   }
 
-  setAutoStandby(enabled) {
-    this.autoStandbyEnabled = enabled;
-    
-    if (!enabled) {
-      // Disabling auto-standby - reset the countdown timers
-      this.lastDetectionTime = null;
-      if (this.shutdownTimer) {
-        clearTimeout(this.shutdownTimer);
-        this.shutdownTimer = null;
-        this.standbyStartTime = null;
-        logger.info('Cleared auto-shutdown timer');
-      }
-    } else {
-      // Re-enabling auto-standby - reset state and check current person status
-      this.lastDetectionTime = null;
-      this.personDetected = false;
-      // Trigger immediate check to update state
-      this.checkPersonDetection();
-    }
-    
+  async setAutoStandby(enabled) {
+    await settingsService.update('presence.standbyOnIdle', enabled);
+
+    const sceneEngine = require('./sceneEngine');
+    await sceneEngine.handleSettingsChanged('camera:auto_standby_toggle');
+
     logger.info(`Auto-standby ${enabled ? 'enabled' : 'disabled'}`);
   }
 }

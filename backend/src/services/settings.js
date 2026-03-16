@@ -66,6 +66,11 @@ const DEFAULT_SETTINGS = {
   camera: {
     enabled: true
   },
+  presence: {
+    enabled: true,
+    standbyOnIdle: true,
+    idleTimeoutSeconds: 1800
+  },
   current_scene: 'day',
   current_page: 'home'
 };
