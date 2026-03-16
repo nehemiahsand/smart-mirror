@@ -106,7 +106,7 @@ export default function Camera() {
                     <div className="camera-status">
                         <div className="info-box" style={{ marginBottom: "15px" }}>
                             <p>
-                                💡 Your mirror uses a hardware PIR motion sensor connected directly 
+                                💡 Your mirror uses a hardware PIR motion sensor connected directly
                                 to the ESP32 to detect presence instead of heavy AI logic.
                             </p>
                         </div>
@@ -142,7 +142,7 @@ export default function Camera() {
                     <div className="auto-standby-control">
                         <div className="info-box">
                             <p>
-                                When enabled, the mirror will automatically enter standby mode after 
+                                When enabled, the mirror will automatically enter standby mode after
                                 no movement is reported from the ESP32 motion sensor.
                             </p>
                         </div>
@@ -167,43 +167,43 @@ export default function Camera() {
                     <h2>Live Stream Proxy Feed</h2>
                 </div>
 
-                    <div className="camera-feed">
-                        <div className="info-box">
-                            <p>
-                                💡 Video streaming natively proxies an MJPEG stream without AI processing.
-                                Enable to preview your camera orientation.
-                            </p>
-                        </div>
-
-                        <button
-                            className={`stream-button ${streamEnabled ? 'enabled' : 'disabled'}`}
-                            onClick={streamEnabled ? disableStream : enableStream}
-                        >
-                            <span className="button-icon">
-                                {streamEnabled ? '⏹' : '▶'}
-                            </span>
-                            {streamEnabled ? 'Stop Video Stream' : `Start Video Stream (${streamDetails})`}
-                        </button>
-
-                        {streamEnabled && (
-                            <div className="feed-container">
-                                <img
-                                    src={streamUrl}
-                                    alt="Live Camera Feed"
-                                    className="video-feed"
-                                    onError={(e) => {
-                                        console.error('Stream load error');
-                                        e.target.parentNode.innerHTML = '<div class="feed-error">Failed to load stream.<br/>Check container connection.</div>';
-                                    }}
-                                />
-                                <div className="feed-status">
-                                    <span className="live-indicator">🔴 LIVE</span>
-                                    <span>MJPEG Proxy Feed</span>
-                                </div>
-                            </div>
-                        )}
+                <div className="camera-feed">
+                    <div className="info-box">
+                        <p>
+                            💡 Video streaming natively proxies an MJPEG stream without AI processing.
+                            Enable to preview your camera orientation.
+                        </p>
                     </div>
+
+                    <button
+                        className={`stream-button ${streamEnabled ? 'enabled' : 'disabled'}`}
+                        onClick={streamEnabled ? disableStream : enableStream}
+                    >
+                        <span className="button-icon">
+                            {streamEnabled ? '⏹' : '▶'}
+                        </span>
+                        {streamEnabled ? 'Stop Video Stream' : `Start Video Stream (${streamDetails})`}
+                    </button>
+
+                    {streamEnabled && (
+                        <div className="feed-container">
+                            <img
+                                src={streamUrl}
+                                alt="Live Camera Feed"
+                                className="video-feed"
+                                onError={(e) => {
+                                    console.error('Stream load error');
+                                    e.target.parentNode.innerHTML = '<div class="feed-error">Failed to load stream.<br/>Check container connection.</div>';
+                                }}
+                            />
+                            <div className="feed-status">
+                                <span className="live-indicator">🔴 LIVE</span>
+                                <span>MJPEG Proxy Feed</span>
+                            </div>
+                        </div>
+                    )}
                 </div>
+            </div>
         </div>
     );
 }

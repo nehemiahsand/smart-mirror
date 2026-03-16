@@ -69,7 +69,7 @@ const DEFAULT_SETTINGS = {
   presence: {
     enabled: true,
     standbyOnIdle: true,
-    idleTimeoutSeconds: 1800
+    idleTimeoutSeconds: 300
   },
   current_scene: 'day',
   current_page: 'home'
