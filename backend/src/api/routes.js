@@ -253,7 +253,14 @@ router.get('/console/state', (req, res) => {
 
 router.get('/console/page/:pageId', async (req, res) => {
   try {
-    res.json(await consoleService.getPageData(req.params.pageId));
+    const options = {};
+    if (req.query.targetDate) {
+      const parsed = Number(req.query.targetDate);
+      if (Number.isFinite(parsed)) {
+        options.targetDate = new Date(parsed);
+      }
+    }
+    res.json(await consoleService.getPageData(req.params.pageId, options));
   } catch (error) {
     logger.error('Failed to get console page state', {
       error: error.message,

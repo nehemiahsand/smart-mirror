@@ -1117,13 +1117,13 @@ class ConsoleService {
     };
   }
 
-  async getFunPageData() {
+  async getFunPageData(options = {}) {
     const selectedDateKey = this.getFunDateKey();
     const { item } = await funContentService.getItemByDate(selectedDateKey);
     const clockFormat = settingsService.get('display.clockFormat') === '12h' ? '12h' : '24h';
     const widgets = await Promise.all([
       Promise.resolve(moonPhaseService.getCurrentWidget()),
-      bibleVerseClockService.getCurrentWidget({ clockFormat }),
+      bibleVerseClockService.getCurrentWidget({ clockFormat, targetDate: options.targetDate }),
     ]);
 
     return {
@@ -1215,7 +1215,7 @@ class ConsoleService {
     };
   }
 
-  async getPageData(pageId = this.state.activePageId) {
+  async getPageData(pageId = this.state.activePageId, options = {}) {
     const target = normalizePageTarget(pageId);
     const normalizedPageId = target.pageId;
 
@@ -1225,7 +1225,7 @@ class ConsoleService {
 
     switch (normalizedPageId) {
       case 'fun':
-        return this.getFunPageData();
+        return this.getFunPageData(options);
       case 'weather':
         return this.getWeatherPageData();
       case 'media':

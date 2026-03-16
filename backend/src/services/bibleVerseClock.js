@@ -257,7 +257,8 @@ class BibleVerseClockService {
   async getCurrentWidget(options = {}) {
     const timeZone = options.timeZone || DEFAULT_TIMEZONE;
     const clockFormat = normalizeClockFormat(options.clockFormat);
-    const parts = getDateParts(new Date(), timeZone);
+    const targetDate = options.targetDate ? new Date(options.targetDate) : new Date();
+    const parts = getDateParts(targetDate, timeZone);
     const referenceHour = getReferenceHour(parts.hour24, clockFormat);
     const timeLabel = formatClockLabel(parts, clockFormat);
     const minute = parts.minute;

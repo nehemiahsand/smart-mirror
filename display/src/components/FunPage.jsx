@@ -101,7 +101,6 @@ function FunContent({ item, loading }) {
         return (
             <div className="fun-comic-frame">
                 <div className="fun-comic-header">
-                    <span className="fun-item-pill">Daily Fun</span>
                     <span className="fun-item-title">{item.title}</span>
                 </div>
 
@@ -136,8 +135,55 @@ export default function FunPage({ pageData }) {
 
     useEffect(() => {
         let mounted = true;
+        let prefetchTimeoutId;
+        let swapTimeoutId;
+        let pendingData = null;
 
-        const fetchFunContent = async () => {
+        const doSwap = () => {
+            if (!mounted) return;
+            if (pendingData) {
+                setItem(pendingData.item || null);
+                setWidgets(pendingData.widgets || {});
+                pendingData = null;
+            }
+            schedulePrefetch();
+        };
+
+        const doPrefetch = async () => {
+            try {
+                // Target 10 seconds into the future to ensure we request the next minute's data
+                const targetDateMs = Date.now() + 10000;
+                const response = await apiFetch(`/api/console/page/fun?targetDate=${targetDateMs}`);
+                const data = await response.json();
+                
+                if (mounted) {
+                    pendingData = data;
+                }
+            } catch (error) {
+                console.error('Failed to pre-fetch fun content:', error);
+            } finally {
+                if (mounted) {
+                    // Schedule the swap exactly at the top of the minute
+                    const now = new Date();
+                    const msUntilNextMinute = 60000 - (now.getSeconds() * 1000 + now.getMilliseconds());
+                    // Add a tiny 10ms buffer to align perfectly with the UI clock rollout
+                    swapTimeoutId = setTimeout(doSwap, msUntilNextMinute + 10);
+                }
+            }
+        };
+
+        const schedulePrefetch = () => {
+            const now = new Date();
+            const ms = now.getSeconds() * 1000 + now.getMilliseconds();
+            // Aim to prefetch 5 seconds before the minute ends
+            let delay = 55000 - ms;
+            if (delay < 0) {
+                delay = 0; // If we're already past 55s, prefetch immediately
+            }
+            prefetchTimeoutId = setTimeout(doPrefetch, delay);
+        };
+
+        const fetchInitial = async () => {
             try {
                 const response = await apiFetch('/api/console/page/fun');
                 const data = await response.json();
@@ -157,16 +203,17 @@ export default function FunPage({ pageData }) {
             } finally {
                 if (mounted) {
                     setLoading(false);
+                    schedulePrefetch();
                 }
             }
         };
 
-        fetchFunContent();
-        const interval = setInterval(fetchFunContent, 60 * 1000);
+        fetchInitial();
 
         return () => {
             mounted = false;
-            clearInterval(interval);
+            if (prefetchTimeoutId) clearTimeout(prefetchTimeoutId);
+            if (swapTimeoutId) clearTimeout(swapTimeoutId);
         };
     }, []);
 
@@ -193,10 +240,8 @@ export default function FunPage({ pageData }) {
                     <TimeDateWidget />
                 </div>
                 <div className="fun-content-section">
-                    <div className="fun-widget-row">
-                        <MoonWidget widget={widgets.left} />
-                        <BibleClockWidget widget={widgets.right} />
-                    </div>
+                    <MoonWidget widget={widgets.left} />
+                    <BibleClockWidget widget={widgets.right} />
                     <div className="fun-comic-section">
                         <FunContent item={item} loading={loading} />
                     </div>
