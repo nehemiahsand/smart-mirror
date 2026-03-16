@@ -209,7 +209,7 @@ export default function FunPage({ pageData, settings }) {
                 const targetDateMs = Date.now() + 10000;
                 const response = await apiFetch(`/api/console/page/fun?targetDate=${targetDateMs}`);
                 const data = await response.json();
-                
+
                 if (mounted) {
                     pendingData = data;
                 }
@@ -305,16 +305,16 @@ export default function FunPage({ pageData, settings }) {
                 <div className="fun-time-section" style={{ order: getOrder('timedate') }}>
                     <TimeDateWidget />
                 </div>
-                
+
                 <div className="fun-widget-row" style={{ order: getOrder('sunmoon') }}>
                     <SunWidget widget={widgets.sun} />
                     <MoonWidget widget={widgets.moon || widgets.left} />
                 </div>
-                
+
                 <div style={{ order: getOrder('bibleclock'), width: '100%', maxWidth: '1320px' }}>
                     <BibleClockWidget widget={widgets.right} />
                 </div>
-                
+
                 <div className="fun-comic-section" style={{ order: getOrder('comics') }}>
                     <FunContent items={items} loading={loading} />
                 </div>
