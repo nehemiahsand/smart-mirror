@@ -377,6 +377,12 @@ class WebSocketServer {
           return;
         }
         this.broadcastPageChange(data.page, { source: 'display_sync' });
+        consoleService.openPage(data.page, 'display_sync').catch((error) => {
+          logger.error('Failed to sync console page from display', {
+            error: error.message,
+            page: data.page,
+          });
+        });
         break;
 
       default:

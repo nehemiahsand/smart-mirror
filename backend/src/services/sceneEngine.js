@@ -482,10 +482,13 @@ class SceneEngine {
       }
 
       const websocketServer = require('../api/websocket');
-      const storedPage = String(settingsService.get('current_page') || 'home');
-      const currentPage = DISPLAY_PAGE_ORDER.includes(storedPage) ? storedPage : 'home';
+      const consoleState = consoleService.getState();
+      const displayedPage = String(consoleState.pageId || settingsService.get('current_page') || 'home');
+      const currentPage = DISPLAY_PAGE_ORDER.includes(displayedPage) ? displayedPage : 'home';
       const currentIndex = DISPLAY_PAGE_ORDER.indexOf(currentPage);
       const nextPage = DISPLAY_PAGE_ORDER[(currentIndex + 1) % DISPLAY_PAGE_ORDER.length];
+
+      await consoleService.openPage(nextPage, 'esp32_toggle');
       websocketServer.broadcastPageChange(nextPage, { source: 'esp32_toggle' });
       return this.refreshState({ source: 'esp32', reason: `display.page.toggle:${nextPage}`, broadcast: true, persist: true });
     }
