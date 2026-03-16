@@ -1132,6 +1132,13 @@ class ConsoleService {
       // Calculate exactly one year ago
       const lastYearDate = new Date(selectedDate);
       lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
+      
+      // If exactly one year ago falls on a Sunday, it will break the Mon-Sat stacking layout.
+      // Shift it back one day to Saturday so we still get a normal comic strip.
+      if (lastYearDate.getDay() === 0) {
+        lastYearDate.setDate(lastYearDate.getDate() - 1);
+      }
+
       const pad = (n) => String(n).padStart(2, '0');
       const lastYearDateKey = `${lastYearDate.getFullYear()}-${pad(lastYearDate.getMonth() + 1)}-${pad(lastYearDate.getDate())}`;
 

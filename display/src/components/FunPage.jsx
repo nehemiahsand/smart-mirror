@@ -4,6 +4,42 @@ import TimeDateWidget from '../widgets/TimeDate';
 import { apiFetch, getApiUrl } from '../apiClient';
 import './FunPage.css';
 
+function SunWidget({ widget }) {
+    if (!widget) {
+        return (
+            <div className="fun-panel">
+                <div className="fun-panel-title">Sun</div>
+                <div className="fun-widget-empty">Sun data unavailable</div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="fun-panel fun-panel-sun">
+            <div className="fun-panel-title">Sun</div>
+            <div className="fun-moon-widget">
+                <div className="fun-moon-emoji" aria-hidden="true">{widget.emoji || '☀️'}</div>
+                <div className="fun-moon-copy">
+                    <div className="fun-moon-phase">{widget.statusName || 'Daylight'}</div>
+                    <div className="fun-moon-meta">Sunrise: {widget.sunriseTime || '--'}</div>
+                    <div className="fun-moon-meta">Sunset: {widget.sunsetTime || '--'}</div>
+                    <div className="fun-moon-meta">{widget.daylightDuration || '--'} hours of daylight</div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+SunWidget.propTypes = {
+    widget: PropTypes.shape({
+        emoji: PropTypes.string,
+        statusName: PropTypes.string,
+        sunriseTime: PropTypes.string,
+        sunsetTime: PropTypes.string,
+        daylightDuration: PropTypes.string
+    })
+};
+
 function MoonWidget({ widget }) {
     if (!widget) {
         return (
@@ -248,7 +284,10 @@ export default function FunPage({ pageData }) {
                     <TimeDateWidget />
                 </div>
                 <div className="fun-content-section">
-                    <MoonWidget widget={widgets.left} />
+                    <div className="fun-widget-row">
+                        <SunWidget widget={widgets.sun} />
+                        <MoonWidget widget={widgets.moon || widgets.left} />
+                    </div>
                     <BibleClockWidget widget={widgets.right} />
                     <div className="fun-comic-section">
                         <FunContent items={items} loading={loading} />
