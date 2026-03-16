@@ -170,7 +170,7 @@ function FunContent({ items, loading }) {
     );
 }
 
-export default function FunPage({ pageData }) {
+export default function FunPage({ pageData, settings }) {
     const [items, setItems] = useState(null);
     const [widgets, setWidgets] = useState({});
     const [loading, setLoading] = useState(true);
@@ -277,21 +277,34 @@ export default function FunPage({ pageData }) {
         setLoading(false);
     }, [pageData]);
 
+    const getOrder = (widgetId) => {
+        if (!settings?.funWidgetOrder || !Array.isArray(settings.funWidgetOrder)) {
+            const defaults = ['timedate', 'sunmoon', 'bibleclock', 'comics'];
+            const idx = defaults.indexOf(widgetId);
+            return idx === -1 ? 99 : idx;
+        }
+        const index = settings.funWidgetOrder.indexOf(widgetId);
+        return index === -1 ? 99 : index;
+    };
+
     return (
         <div className="mirror fun-page">
-            <div className="fun-page-content">
-                <div className="fun-time-section">
+            <div className="fun-page-content" style={{ display: 'flex', flexDirection: 'column' }}>
+                <div className="fun-time-section" style={{ order: getOrder('timedate') }}>
                     <TimeDateWidget />
                 </div>
-                <div className="fun-content-section">
-                    <div className="fun-widget-row">
-                        <SunWidget widget={widgets.sun} />
-                        <MoonWidget widget={widgets.moon || widgets.left} />
-                    </div>
+                
+                <div className="fun-widget-row" style={{ order: getOrder('sunmoon') }}>
+                    <SunWidget widget={widgets.sun} />
+                    <MoonWidget widget={widgets.moon || widgets.left} />
+                </div>
+                
+                <div style={{ order: getOrder('bibleclock'), width: '100%', maxWidth: '1320px' }}>
                     <BibleClockWidget widget={widgets.right} />
-                    <div className="fun-comic-section">
-                        <FunContent items={items} loading={loading} />
-                    </div>
+                </div>
+                
+                <div className="fun-comic-section" style={{ order: getOrder('comics') }}>
+                    <FunContent items={items} loading={loading} />
                 </div>
             </div>
         </div>

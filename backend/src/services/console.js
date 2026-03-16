@@ -1151,6 +1151,41 @@ class ConsoleService {
     }
 
     const clockFormat = settingsService.get('display.clockFormat') === '12h' ? '12h' : '24h';
+    const settings = settingsService.getAll();
+    const weather = await weatherService.getCurrentWeather(settings.weather.city, settings.weather.units).catch(() => null);
+    
+    let sunWidget = null;
+    if (weather && weather.sunrise && weather.sunset) {
+      const formatSunTime = (ts) => {
+        const d = new Date(ts * 1000);
+        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+      };
+      
+      const nowTs = Math.floor(Date.now() / 1000);
+      let statusName = 'Daylight';
+      let emoji = '☀️';
+      if (nowTs < weather.sunrise) {
+        statusName = 'Before Sunrise';
+        emoji = '🌅';
+      } else if (nowTs > weather.sunset) {
+        statusName = 'After Sunset';
+        emoji = '🌇';
+      }
+      
+      const diffHours = (weather.sunset - weather.sunrise) / 3600;
+      
+      sunWidget = {
+        type: 'sun',
+        title: 'Sun',
+        status: 'ready',
+        emoji: emoji,
+        statusName: statusName,
+        sunriseTime: formatSunTime(weather.sunrise),
+        sunsetTime: formatSunTime(weather.sunset),
+        daylightDuration: diffHours > 0 ? diffHours.toFixed(1) : '--'
+      };
+    }
+
     const widgets = await Promise.all([
       Promise.resolve(moonPhaseService.getCurrentWidget()),
       bibleVerseClockService.getCurrentWidget({ clockFormat, targetDate: options.targetDate }),
@@ -1161,7 +1196,9 @@ class ConsoleService {
       canonicalPageId: 'fun',
       title: this.getPages().fun?.title || 'Fun',
       widgets: {
-        left: widgets[0],
+        sun: sunWidget,
+        moon: widgets[0],
+        left: widgets[0], // fallback for old UI
         right: widgets[1],
       },
       item: items[0],

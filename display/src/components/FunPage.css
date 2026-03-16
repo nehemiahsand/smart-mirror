@@ -213,12 +213,6 @@
     opacity: 0.7;
 }
 
-@media (max-width: 768px) {
-    .fun-page-content {
-        padding: 60px 16px 170px;
-        gap: 1.5rem;
-    }
-
 .fun-widget-row {
     width: 100%;
     max-width: 1320px;
@@ -226,9 +220,18 @@
     flex-direction: row;
     gap: 1.5rem;
 }
+
 .fun-widget-row .fun-panel {
     flex: 1 1 0;
 }
+
+@media (max-width: 768px) {
+    .fun-page-content {
+        padding: 60px 16px 170px;
+        gap: 1.5rem;
+    }
+
+    .fun-widget-row {
         flex-direction: column;
     }
 

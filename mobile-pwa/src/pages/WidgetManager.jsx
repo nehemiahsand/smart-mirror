@@ -3,15 +3,29 @@ import './WidgetManager.css';
 import AlertModal from '../components/AlertModal';
 import { apiFetch } from '../apiClient';
 
-const WIDGETS = [
-  { id: 'timedate', name: 'Time & Date', icon: '🕐' },
-  { id: 'weathertemp', name: 'Weather & Temperature & Traffic', icon: '🌤️' },
-  { id: 'googlecalendar', name: 'Calendar & Sports', icon: '📅' },
-  { id: 'photos', name: 'Photos Slideshow', icon: '📸' },
+const PAGES = [
+  { id: 'home', name: 'Home Page' },
+  { id: 'fun', name: 'Fun Page' }
 ];
 
+const WIDGETS_BY_PAGE = {
+  home: [
+    { id: 'timedate', name: 'Time & Date', icon: '🕐' },
+    { id: 'weathertemp', name: 'Weather, Temp & Traffic', icon: '🌤️' },
+    { id: 'googlecalendar', name: 'Calendar & Sports', icon: '📅' },
+    { id: 'photos', name: 'Photos Slideshow', icon: '📸' },
+  ],
+  fun: [
+    { id: 'timedate', name: 'Time & Date', icon: '🕐' },
+    { id: 'sunmoon', name: 'Sun/Moon Phase', icon: '🌞' },
+    { id: 'bibleclock', name: 'Bible Clock', icon: '📖' },
+    { id: 'comics', name: 'Comics', icon: '🤡' },
+  ]
+};
+
 export default function WidgetManager() {
-  const [widgets, setWidgets] = useState([]);
+  const [activePage, setActivePage] = useState('home');
+  const [pageWidgets, setPageWidgets] = useState({ home: [], fun: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [alertModal, setAlertModal] = useState(null);
@@ -25,21 +39,27 @@ export default function WidgetManager() {
       const response = await apiFetch('/api/settings');
       const settings = await response.json();
 
-      const widgetOrder = settings.widgetOrder || [];
+      const homeOrder = settings.widgetOrder || [];
+      const funOrder = settings.funWidgetOrder || [];
 
-      const list = [...WIDGETS];
+      const buildList = (pageId, savedOrder) => {
+        const list = [...WIDGETS_BY_PAGE[pageId]];
+        if (savedOrder.length > 0) {
+          list.sort((a, b) => {
+            const indexA = savedOrder.indexOf(a.id);
+            const indexB = savedOrder.indexOf(b.id);
+            if (indexA === -1) return 1;
+            if (indexB === -1) return -1;
+            return indexA - indexB;
+          });
+        }
+        return list;
+      };
 
-      if (widgetOrder.length > 0) {
-        list.sort((a, b) => {
-          const indexA = widgetOrder.indexOf(a.id);
-          const indexB = widgetOrder.indexOf(b.id);
-          if (indexA === -1) return 1;
-          if (indexB === -1) return -1;
-          return indexA - indexB;
-        });
-      }
-
-      setWidgets(list);
+      setPageWidgets({
+        home: buildList('home', homeOrder),
+        fun: buildList('fun', funOrder)
+      });
       setLoading(false);
     } catch (error) {
       console.error('Failed to load widgets:', error);
@@ -48,19 +68,20 @@ export default function WidgetManager() {
   };
 
   const moveWidget = (index, direction) => {
+    const list = [...pageWidgets[activePage]];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= widgets.length) return;
+    if (newIndex < 0 || newIndex >= list.length) return;
 
-    const newList = [...widgets];
-    [newList[index], newList[newIndex]] = [newList[newIndex], newList[index]];
-    setWidgets(newList);
+    [list[index], list[newIndex]] = [list[newIndex], list[index]];
+    setPageWidgets(prev => ({ ...prev, [activePage]: list }));
   };
 
   const saveChanges = async () => {
     setSaving(true);
     try {
       const updatedSettings = {
-        widgetOrder: widgets.map(w => w.id),
+        widgetOrder: pageWidgets.home.map(w => w.id),
+        funWidgetOrder: pageWidgets.fun.map(w => w.id)
       };
 
       await apiFetch('/api/settings', {
@@ -68,6 +89,8 @@ export default function WidgetManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updatedSettings)
       });
+      setAlertModal({ type: 'success', message: 'Widget order saved' });
+      setTimeout(() => setAlertModal(null), 2000);
     } catch (error) {
       console.error('Failed to save:', error);
       setAlertModal({ type: 'error', message: 'Failed to save order' });
@@ -87,20 +110,42 @@ export default function WidgetManager() {
     );
   }
 
+  const currentWidgets = pageWidgets[activePage];
+
   return (
     <div className="page">
       <div className="page-header">
         <h1>Widgets</h1>
       </div>
+      
+      <div className="page-tabs" style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+        {PAGES.map(p => (
+          <button 
+            key={p.id}
+            onClick={() => setActivePage(p.id)}
+            style={{ 
+              flex: 1, 
+              padding: '10px', 
+              background: activePage === p.id ? 'var(--primary-color, #007bff)' : '#333',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontWeight: activePage === p.id ? 'bold' : 'normal'
+            }}
+          >
+            {p.name}
+          </button>
+        ))}
+      </div>
 
       <div className="card">
         <div className="card-header">
           <span className="card-icon">📊</span>
-          <h2>Widget Order</h2>
+          <h2>{PAGES.find(p => p.id === activePage)?.name} Order</h2>
         </div>
 
         <div className="widgets-list">
-          {widgets.map((widget, index) => (
+          {currentWidgets.map((widget, index) => (
             <div key={widget.id} className="widget-item">
               <div className="widget-left">
                 <div className="order-controls">
@@ -114,7 +159,7 @@ export default function WidgetManager() {
                   <button
                     className="order-btn"
                     onClick={() => moveWidget(index, 'down')}
-                    disabled={index === widgets.length - 1}
+                    disabled={index === currentWidgets.length - 1}
                   >
                     ↓
                   </button>

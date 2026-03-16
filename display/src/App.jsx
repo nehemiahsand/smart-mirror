@@ -172,7 +172,7 @@ function App() {
     if (currentPage === 'fun') {
         return (
             <>
-                <FunPage pageData={consolePageData.fun} />
+                <FunPage pageData={consolePageData.fun} settings={settings} />
                 <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
             </>
         );
