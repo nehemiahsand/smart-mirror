@@ -47,7 +47,6 @@ function BibleClockWidget({ widget }) {
         <div className="fun-panel fun-panel-verse">
             <div className="fun-panel-header">
                 <div className="fun-panel-title">Bible Clock</div>
-                <div className="fun-verse-time">{widget?.timeLabel || '--:--'}</div>
             </div>
 
             <div className="fun-verse-reference">{widget?.message || 'Bible clock unavailable'}</div>
@@ -79,7 +78,7 @@ BibleClockWidget.propTypes = {
     })
 };
 
-function FunContent({ item, loading }) {
+function FunContent({ items, loading }) {
     if (loading) {
         return (
             <div className="fun-comic-frame fun-empty-state">
@@ -88,34 +87,41 @@ function FunContent({ item, loading }) {
         );
     }
 
-    if (!item || item.unavailable) {
+    if (!items || items.length === 0 || items[0].unavailable) {
         return (
             <div className="fun-comic-frame fun-empty-state">
                 <div className="fun-empty-title">Fun content unavailable</div>
-                <div className="fun-empty-message">{item?.message || 'Try again later.'}</div>
+                <div className="fun-empty-message">{items?.[0]?.message || 'Try again later.'}</div>
             </div>
         );
     }
 
-    if (item.itemType === 'comic') {
+    const firstItem = items[0];
+    if (firstItem.itemType === 'comic') {
+        const dates = items.map(i => i.date || 'Today').join(' & ');
+        const anyStale = items.some(i => i.stale);
+
         return (
             <div className="fun-comic-frame">
                 <div className="fun-comic-header">
-                    <span className="fun-item-title">{item.title}</span>
+                    <span className="fun-item-title">{firstItem.title}</span>
                 </div>
 
-                <div className="fun-comic-body">
-                    <img
-                        src={`${getApiUrl()}${item.imageUrl}`}
-                        alt={item.title || 'Fun content'}
-                        className="fun-comic-image"
-                        loading="eager"
-                    />
+                <div className="fun-comic-body stack-images">
+                    {items.map(item => (
+                        <img
+                            key={item.date}
+                            src={`${getApiUrl()}${item.imageUrl}`}
+                            alt={item.title || 'Fun content'}
+                            className="fun-comic-image"
+                            loading="eager"
+                        />
+                    ))}
                 </div>
 
                 <div className="fun-comic-footer">
-                    <span>{item.date || 'Today'}</span>
-                    {item.stale && <span className="fun-stale-pill">Cached</span>}
+                    <span>{dates}</span>
+                    {anyStale && <span className="fun-stale-pill">Cached</span>}
                 </div>
             </div>
         );
@@ -129,7 +135,7 @@ function FunContent({ item, loading }) {
 }
 
 export default function FunPage({ pageData }) {
-    const [item, setItem] = useState(null);
+    const [items, setItems] = useState(null);
     const [widgets, setWidgets] = useState({});
     const [loading, setLoading] = useState(true);
 
@@ -142,7 +148,7 @@ export default function FunPage({ pageData }) {
         const doSwap = () => {
             if (!mounted) return;
             if (pendingData) {
-                setItem(pendingData.item || null);
+                setItems(pendingData.items || (pendingData.item ? [pendingData.item] : null));
                 setWidgets(pendingData.widgets || {});
                 pendingData = null;
             }
@@ -188,16 +194,16 @@ export default function FunPage({ pageData }) {
                 const response = await apiFetch('/api/console/page/fun');
                 const data = await response.json();
                 if (mounted) {
-                    setItem(data.item || null);
+                    setItems(data.items || (data.item ? [data.item] : null));
                     setWidgets(data.widgets || {});
                 }
             } catch (error) {
                 console.error('Failed to fetch fun content:', error);
                 if (mounted) {
-                    setItem({
+                    setItems([{
                         unavailable: true,
                         message: 'Unable to load fun content right now.',
-                    });
+                    }]);
                     setWidgets({});
                 }
             } finally {
@@ -222,8 +228,10 @@ export default function FunPage({ pageData }) {
             return;
         }
 
-        if (pageData.item) {
-            setItem(pageData.item);
+        if (pageData.items) {
+            setItems(pageData.items);
+        } else if (pageData.item) {
+            setItems([pageData.item]);
         }
 
         if (pageData.widgets) {
@@ -243,7 +251,7 @@ export default function FunPage({ pageData }) {
                     <MoonWidget widget={widgets.left} />
                     <BibleClockWidget widget={widgets.right} />
                     <div className="fun-comic-section">
-                        <FunContent item={item} loading={loading} />
+                        <FunContent items={items} loading={loading} />
                     </div>
                 </div>
             </div>

@@ -541,8 +541,7 @@ class ConsoleService {
 
   getState() {
     const canonicalPageId = normalizePageId(this.state.activePageId);
-    const syncedMirrorPageId = normalizePageId(settingsService.get('current_page') || canonicalPageId);
-    const displayedCanonicalPageId = MIRROR_PAGE_ORDER.includes(syncedMirrorPageId) ? syncedMirrorPageId : 'dynamic';
+    const displayedCanonicalPageId = canonicalPageId;
     const presentedPage = getPresentedPageMeta(displayedCanonicalPageId);
     const presentedPages = this.getPresentedPages();
     const pageOrder = Object.keys(presentedPages);
@@ -1119,7 +1118,30 @@ class ConsoleService {
 
   async getFunPageData(options = {}) {
     const selectedDateKey = this.getFunDateKey();
-    const { item } = await funContentService.getItemByDate(selectedDateKey);
+    let selectedDate = new Date();
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(selectedDateKey || ''));
+    if (match) {
+      selectedDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+    }
+    const dayOfWeek = selectedDate.getDay();
+
+    const { item: mainItem } = await funContentService.getItemByDate(selectedDateKey);
+    let items = [mainItem];
+
+    if (dayOfWeek !== 0 && mainItem && !mainItem.unavailable) {
+      const delta = dayOfWeek === 1 ? 1 : -1;
+      const secondDateKey = funContentService.shiftDateKey(selectedDateKey, delta);
+      const { item: secondItem } = await funContentService.getItemByDate(secondDateKey);
+      
+      if (secondItem && !secondItem.unavailable) {
+        if (delta === 1) {
+          items.push(secondItem);
+        } else {
+          items.unshift(secondItem);
+        }
+      }
+    }
+
     const clockFormat = settingsService.get('display.clockFormat') === '12h' ? '12h' : '24h';
     const widgets = await Promise.all([
       Promise.resolve(moonPhaseService.getCurrentWidget()),
@@ -1134,9 +1156,10 @@ class ConsoleService {
         left: widgets[0],
         right: widgets[1],
       },
-      item,
+      item: items[0],
+      items: items,
       selectedDateKey,
-      summary: item.unavailable ? 'No fun content available' : (item.title || 'Fun content ready'),
+      summary: mainItem.unavailable ? 'No fun content available' : (mainItem.title || 'Fun content ready'),
       softButtons: this.getSoftButtons('fun'),
     };
   }
