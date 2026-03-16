@@ -78,6 +78,18 @@ MoonWidget.propTypes = {
 
 function BibleClockWidget({ widget }) {
     const status = widget?.status || 'error';
+    const message = widget?.message || 'Bible clock unavailable';
+
+    const renderReference = (text) => {
+        const parts = text.split(/(\d+:\d+)/);
+        return parts.map((part, i) =>
+            /(\d+:\d+)/.test(part) ? (
+                <strong key={i} className="fun-reference-numbers">{part}</strong>
+            ) : (
+                part
+            )
+        );
+    };
 
     return (
         <div className="fun-panel fun-panel-verse">
@@ -85,7 +97,7 @@ function BibleClockWidget({ widget }) {
                 <div className="fun-panel-title">Bible Clock</div>
             </div>
 
-            <div className="fun-verse-reference">{widget?.message || 'Bible clock unavailable'}</div>
+            <div className="fun-verse-reference">{renderReference(message)}</div>
 
             {status === 'ready' && (
                 <div className="fun-verse-text">“{widget.verseText}”</div>

@@ -112,15 +112,20 @@
 }
 
 .fun-verse-reference {
-    margin-top: 0.3rem;
-    font-size: 1.3rem;
-    font-weight: 500;
+    margin-top: 0.5rem;
+    font-size: 2.5rem;
+    font-weight: 400;
     line-height: 1.35;
 }
 
+.fun-reference-numbers {
+    font-weight: 500;
+    letter-spacing: -0.02em;
+}
+
 .fun-verse-text {
-    margin-top: 0.85rem;
-    font-size: 1.02rem;
+    margin-top: 1.5rem;
+    font-size: 1.5rem;
     line-height: 1.6;
     opacity: 0.9;
 }
@@ -246,6 +251,14 @@
 
     .fun-moon-phase {
         font-size: 1.5rem;
+    }
+
+    .fun-verse-reference {
+        font-size: 2rem;
+    }
+
+    .fun-verse-text {
+        font-size: 1.25rem;
     }
 
     .fun-empty-title {
