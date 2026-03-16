@@ -1129,16 +1129,17 @@ class ConsoleService {
     let items = [mainItem];
 
     if (dayOfWeek !== 0 && mainItem && !mainItem.unavailable) {
-      const delta = dayOfWeek === 1 ? 1 : -1;
-      const secondDateKey = funContentService.shiftDateKey(selectedDateKey, delta);
-      const { item: secondItem } = await funContentService.getItemByDate(secondDateKey);
+      // Calculate exactly one year ago
+      const lastYearDate = new Date(selectedDate);
+      lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
+      const pad = (n) => String(n).padStart(2, '0');
+      const lastYearDateKey = `${lastYearDate.getFullYear()}-${pad(lastYearDate.getMonth() + 1)}-${pad(lastYearDate.getDate())}`;
+
+      const { item: topItem } = await funContentService.getItemByDate(lastYearDateKey);
       
-      if (secondItem && !secondItem.unavailable) {
-        if (delta === 1) {
-          items.push(secondItem);
-        } else {
-          items.unshift(secondItem);
-        }
+      if (topItem && !topItem.unavailable) {
+        // Unshift puts it at the beginning of the array, so it renders ON TOP in the flex column layout
+        items.unshift(topItem);
       }
     }
 
