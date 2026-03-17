@@ -216,9 +216,9 @@ def capture_loop():
     logger.info("Starting lightweight native MJPEG camera loop (%sx%s @ %sfps)", streamer.capture_width, streamer.capture_height, streamer.capture_fps)
     while True:
         try:
-            if not streamer.enabled or streamer.stream_viewers == 0:
+            if streamer.stream_viewers == 0:
                 if streamer.capture_active:
-                    logger.info("Camera disabled or 0 viewers - stopping capture to save power")
+                    logger.info("0 viewers - stopping capture to save power")
                     streamer.stop_capture()
                 time.sleep(0.5)
                 continue
