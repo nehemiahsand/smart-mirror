@@ -101,6 +101,15 @@ Runtime settings are stored in backend/data/settings.json.
 Start:
 
 ```bash
+git clone https://github.com/[your-repo]/smart-mirror.git
+cd smart-mirror
+```
+
+## Start, Check, and Verify
+
+Start the core services manually:
+
+```bash
 docker compose up -d --build
 ```
 
@@ -108,6 +117,20 @@ Status:
 
 ```bash
 docker compose ps
+```
+
+### Auto-Deployment (CD) Setup
+
+You can configure the mirror to automatically download and deploy updates pushed to the `main` branch.
+
+```bash
+# Link the auto-updater systemd files
+sudo ln -s /home/smartmirror/Downloads/smart-mirror/deploy/systemd/smart-mirror-updater.service /etc/systemd/system/
+sudo ln -s /home/smartmirror/Downloads/smart-mirror/deploy/systemd/smart-mirror-updater.timer /etc/systemd/system/
+
+# Enable and start the timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now smart-mirror-updater.timer
 ```
 
 Useful checks:

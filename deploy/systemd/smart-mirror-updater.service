@@ -1,0 +1,12 @@
+[Unit]
+Description=Smart Mirror Continuous Deployment (CD) Updater
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/home/smartmirror/Downloads/smart-mirror
+ExecStart=/home/smartmirror/Downloads/smart-mirror/scripts/auto-update.sh
+StandardOutput=journal
+StandardError=journal

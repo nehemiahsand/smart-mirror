@@ -34,6 +34,13 @@ The backend is the source of truth for page state, standby state, console soft b
 - HDMI display
 - ESP32 with five buttons, PIR sensor, and SSD1306 OLED
 
+## Local Development & CI/CD Pipeline
+
+The project is structured to support true "Local Development" on non-Raspberry Pi hardware alongside a complete Git-Ops workflow:
+1. **Hardware Abstraction:** The backend services (like `dht22.js` and `camera.js`) gracefully mock sensor and camera returns when running under `NODE_ENV=development`. This prevents fatal crashes when coding on a personal computer (Mac/PC).
+2. **Continuous Integration (CI):** A GitHub Actions workflow (`.github/workflows/ci.yml`) automatically performs Node.js dependency audits and Jest unit tests (`backend/__tests__`) upon every push to the `main` branch.
+3. **Continuous Deployment (CD):** The Raspberry Pi utilizes a systemd `.timer` (`deploy/systemd/smart-mirror-updater.timer`) to poll the remote repository for changes. If a new passing version lands in `main`, the mirror automatically triggers `git pull` and `docker compose up -d --build`.
+
 ## Active UX Surfaces
 
 ### Mirror Display
