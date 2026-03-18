@@ -72,8 +72,6 @@ The script currently verifies:
 - login rate limiting
 - Spotify invalid OAuth state rejection
 - Google Calendar invalid OAuth state rejection
-- voice container connectivity to backend
-- audio device visibility in the voice container
 
 ## Manual Mirror Checks
 
@@ -86,7 +84,7 @@ The script currently verifies:
 
 ### Standby and Privacy
 
-- entering standby reports `cameraEnabled: false` and `voiceEnabled: false` from `/api/privacy/status`
+- entering standby reports `cameraEnabled: false` from `/api/privacy/status`
 - PIR motion wakes the mirror from standby
 - camera alone does not wake standby
 - camera can still drive standby later once the mirror is awake
@@ -135,126 +133,14 @@ cd esp32-console
 
 #### Test Case: Play Command Recognition
 **Description:** Verify "play" command triggers Spotify play  
-**Preconditions:** Microphone connected, voice service running  
+**Preconditions:** Spotify authenticated and available  
 **Test Steps:**
 1. Navigate to Spotify page
-2. Say "play" clearly into microphone
-3. Verify voice service logs show recognized text
-4. Verify PUT request sent to `/api/spotify/play`
-5. Verify music starts playing
+2. Trigger playback using PWA controls
+3. Verify PUT request sent to `/api/spotify/play`
+4. Verify music starts playing
 
-**Expected Result:** Voice command triggers playback  
-**Status:** ✅ PASS (after phonetic variations added)
-
-#### Test Case: Pause Command Recognition
-**Description:** Verify "pause" command stops playback  
-**Test Steps:**
-1. Start music playback
-2. Say "pause" clearly
-3. Verify PUT request to `/api/spotify/pause`
-4. Verify music stops
-
-**Expected Result:** Voice command pauses music  
-**Status:** ✅ PASS
-
-#### Test Case: Next Track Command
-**Description:** Verify "next" command skips to next song  
-**Test Steps:**
-1. Start playback
-2. Say "next"
-3. Verify POST request to `/api/spotify/next`
-4. Verify track changes
-
-**Expected Result:** Song skips forward  
-**Status:** ✅ PASS
-
-#### Test Case: Previous Track Command
-**Description:** Verify "previous" command goes to previous song  
-**Test Steps:**
-1. Start playback on second song
-2. Say "previous"
-3. Verify POST request to `/api/spotify/previous`
-4. Verify track changes back
-
-**Expected Result:** Song goes to previous track  
-**Status:** ✅ PASS
-
-#### Test Case: Home Navigation Command
-**Description:** Verify "home" command navigates to home page  
-**Preconditions:** Currently on Spotify page  
-**Test Steps:**
-1. Say "home" or "go home"
-2. Verify voice service sends page change command
-3. Verify display navigates to home page
-
-**Expected Result:** Page changes to home  
-**Status:** ✅ PASS
-
-#### Test Case: Word Boundary Bug Prevention
-**Description:** Verify "back" in "playback" doesn't trigger home navigation  
-**Test Steps:**
-1. On Spotify page, start playback
-2. Say "start playback" or "resume playback"
-3. Verify voice service does NOT navigate to home
-4. Verify music starts playing instead
-
-**Expected Result:** "playback" correctly triggers play, not navigation  
-**Status:** ✅ PASS (Fixed - word boundary logic added)
-
-### 2.2 Page-Aware Processing Tests
-
-#### Test Case: Page Context - Spotify Page
-**Description:** Verify playback commands only work on Spotify page  
-**Test Steps:**
-1. Navigate to home page
-2. Say "play"
-3. Verify command is ignored or triggers navigation
-4. Navigate to Spotify page
-5. Say "play"
-6. Verify playback starts
-
-**Expected Result:** Commands context-aware based on current page  
-**Status:** ✅ PASS
-
-#### Test Case: WebSocket Sync
-**Description:** Verify voice service syncs with display page changes  
-**Test Steps:**
-1. Start voice service
-2. Change page on display
-3. Verify voice service receives `page_change` event
-4. Verify voice service updates internal page state
-5. Test page-specific command works
-
-**Expected Result:** Voice service always knows current page  
-**Status:** ✅ PASS
-
-### 2.3 Error Handling Tests
-
-#### Test Case: Microphone Disconnection
-**Description:** Verify graceful handling when mic disconnected  
-**Test Steps:**
-1. Start voice service
-2. Unplug USB microphone
-3. Verify service logs error
-4. Verify service attempts reconnection
-5. Replug microphone
-6. Verify service resumes listening
-
-**Expected Result:** Service recovers from microphone loss  
-**Status:** ✅ PASS
-
-#### Test Case: Network Loss During Command
-**Description:** Verify handling when backend unreachable  
-**Test Steps:**
-1. Stop backend container
-2. Say voice command
-3. Verify voice service logs connection error
-4. Verify service doesn't crash
-5. Restart backend
-6. Say command again
-7. Verify command works
-
-**Expected Result:** Service resilient to temporary network issues  
+**Expected Result:** Playback starts successfully  
 **Status:** ✅ PASS
 
 ## 3. Sensor Service Tests
@@ -605,23 +491,6 @@ cd esp32-console
 
 ## 7. Integration Tests
 
-### 7.1 End-to-End Voice Control
-
-#### Test Case: Voice to Display Flow
-**Description:** Complete flow from voice command to display update  
-**Test Steps:**
-1. Start all services
-2. Navigate to Spotify page on display
-3. Say "play" into microphone
-4. Verify voice service recognizes command
-5. Verify PUT request to backend
-6. Verify Spotify API called
-7. Verify WebSocket broadcast
-8. Verify display shows playing state
-
-**Expected Result:** Complete voice control pipeline working  
-**Status:** ✅ PASS
-
 ### 7.2 Multi-Client Synchronization
 
 #### Test Case: PWA and Display Sync
@@ -698,8 +567,7 @@ cd esp32-console
 1. Restart backend container
 2. Verify display reconnects WebSocket
 3. Verify data continues to flow
-4. Restart voice service
-5. Verify voice commands resume working
+4. Verify PWA still loads and can fetch `/api/health`
 
 **Expected Result:** Automatic recovery from restarts  
 **Status:** ✅ PASS
@@ -709,14 +577,13 @@ cd esp32-console
 | Category | Total Tests | Passed | Failed | Pass Rate |
 |----------|-------------|--------|--------|-----------|
 | Backend API | 16 | 16 | 0 | 100% |
-| Voice Service | 12 | 12 | 0 | 100% |
 | Sensor Service | 3 | 3 | 0 | 100% |
 | Camera Service | 4 | 4 | 0 | 100% |
 | Display Frontend | 14 | 14 | 0 | 100% |
 | PWA Frontend | 11 | 11 | 0 | 100% |
-| Integration | 3 | 3 | 0 | 100% |
+| Integration | 2 | 2 | 0 | 100% |
 | Performance | 4 | 4 | 0 | 100% |
-| **TOTAL** | **67** | **67** | **0** | **100%** |
+| **TOTAL** | **54** | **54** | **0** | **100%** |
 
 ---
 

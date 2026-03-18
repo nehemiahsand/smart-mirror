@@ -258,7 +258,7 @@ async function start() {
     await powerService.initialize();
     logger.info('Power service', { available: powerService.isAvailable() });
 
-    // Initialize Camera service with AI person detection
+    // Initialize camera integration (streaming sidecar + enable/disable)
     await cameraService.initialize();
     logger.info('Camera service initialized');
 

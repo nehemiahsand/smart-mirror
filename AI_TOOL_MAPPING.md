@@ -11,8 +11,7 @@ This repository was built through AI-assisted development with human hardware as
 | Backend | Node.js, Express, `ws`, `axios`, `mqtt` | API hub, auth, WebSocket, ESP32 scene/console logic |
 | Display | React + Vite | Mirror UI on port `3000` |
 | PWA | React + Vite | Built into backend image and served from backend root |
-| Voice | Python, Vosk, PyAudio, WebSocket | Offline speech recognition and page-aware commands |
-| Camera | Python, Flask, ffmpeg, OpenCV, MediaPipe | MJPEG capture, brightness checks, person detection |
+| Camera | Python, Flask, ffmpeg | MJPEG capture/streaming and camera enable/disable |
 | Sensor | Python, Flask, Adafruit/Blinka stack | DHT22 sidecar on Pi GPIO |
 | ESP32 | Arduino, PubSubClient, ArduinoJson, SSD1306 | OLED/button console, MQTT input, HTTP state polling |
 | Messaging | Mosquitto | Authenticated broker for ESP32 events |
@@ -66,7 +65,7 @@ This project demonstrates **100% AI-generated code** with **human direction and 
 - Identify bugs for AI to fix
 - Build the physical hardware
 
-The result is a fully functional smart mirror with 6 containerized services, voice control, sensor integration, and mobile PWA - entirely coded by AI under human guidance.
+The result is a fully functional smart mirror with containerized services, sensor integration, and a mobile PWA - entirely coded by AI under human guidance.
 
 ---
 

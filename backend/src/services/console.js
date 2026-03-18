@@ -14,14 +14,13 @@ const weatherService = require('./weather');
 const DEFAULT_PAGES = {
   dynamic: { id: 'dynamic', name: 'Main Page', title: 'Main Page', enabled: true },
   fun: { id: 'fun', name: 'Fun', title: 'Fun', enabled: true },
-  weather: { id: 'weather', name: 'Weather', title: 'Weather', enabled: true },
   media: { id: 'media', name: 'Spotify', title: 'Spotify', enabled: true },
-  'timer-focus': { id: 'timer-focus', name: 'Timer / Focus', title: 'Timer / Focus', enabled: true },
 };
 
-const PAGE_ORDER = ['dynamic', 'fun', 'weather', 'media', 'timer-focus'];
+const PAGE_ORDER = ['dynamic', 'fun', 'media'];
 const OLED_PAGE_ORDER = ['dynamic', 'fun', 'media'];
 const MIRROR_PAGE_ORDER = ['dynamic', 'fun', 'media'];
+// Legacy interactive pages still have handlers below, but are no longer presented by default.
 const WEATHER_TABS = ['current', 'hourly', 'daily', 'alerts'];
 const TIMER_FOCUS_MODES = ['timer', 'focus'];
 
@@ -35,9 +34,6 @@ const PAGE_ID_ALIASES = {
   daily: 'fun',
   spotify: 'media',
   music: 'media',
-  alarm: 'timer-focus',
-  focus: 'timer-focus',
-  timer: 'timer-focus',
 };
 
 function clone(value) {
@@ -270,9 +266,7 @@ class ConsoleService {
     const pageOverrides = {
       dynamic: configuredPages.dynamic || configuredPages.home || configuredPages.main || {},
       fun: configuredPages.fun || configuredPages.daily || {},
-      weather: configuredPages.weather || {},
       media: configuredPages.media || configuredPages.music || configuredPages.spotify || {},
-      'timer-focus': configuredPages['timer-focus'] || configuredPages.timer || configuredPages.focus || configuredPages.alarm || {},
     };
 
     return Object.fromEntries(
@@ -520,7 +514,7 @@ class ConsoleService {
     const standby = this.isStandbyActive();
     const cameraEnabled = !standby && settingsService.get('camera.enabled') !== false;
     const sceneEngine = require('./sceneEngine');
-    const personDetected = sceneEngine.getState().motionActive === true;
+    const motionDetected = sceneEngine.getState().motionActive === true;
     const cpuCount = os.cpus().length || 1;
     const [load1] = os.loadavg();
     const cpuPercent = Math.round((load1 / cpuCount) * 100);
@@ -535,7 +529,7 @@ class ConsoleService {
       line3: cpuTempC == null
         ? `Up ${formatUptime(os.uptime())}`
         : `Up ${formatUptime(os.uptime())} T ${cpuTempC}C`,
-      line4: `Person ${personDetected ? 'Yes' : 'No'}`,
+      line4: `Motion ${motionDetected ? 'Yes' : 'No'}`,
     };
   }
 

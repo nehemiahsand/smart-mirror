@@ -142,21 +142,21 @@ export default function Camera() {
                         <div className="info-box" style={{ marginBottom: "15px" }}>
                             <p>
                                 💡 Your mirror uses a hardware PIR motion sensor connected directly
-                                to the ESP32 to detect presence instead of heavy AI logic.
+                                to the ESP32 to detect motion/presence instead of heavy camera AI.
                             </p>
                         </div>
                         <div className="status-grid">
                             <div className="status-item">
-                                <span className="status-label">Person Detected</span>
-                                <span className={`status-value ${cameraStatus.person_detected ? 'active' : 'inactive'}`}>
-                                    {cameraStatus.person_detected ? '✅ YES' : '❌ NO'}
+                                <span className="status-label">Motion Detected</span>
+                                <span className={`status-value ${cameraStatus.motion_detected ? 'active' : 'inactive'}`}>
+                                    {cameraStatus.motion_detected ? '✅ YES' : '❌ NO'}
                                 </span>
                             </div>
 
                             <div className="status-item">
                                 <span className="status-label">Time Until Standby</span>
                                 <span className="status-value">
-                                    {cameraStatus.person_detected
+                                    {cameraStatus.motion_detected
                                         ? 'Paused while present'
                                         : formatTime(cameraStatus.time_until_standby)}
                                 </span>

@@ -1,6 +1,7 @@
 /**
  * Camera Service
- * Manages AI-based person detection and auto-standby logic
+ * Integrates with the lightweight camera sidecar (MJPEG streaming + enable/disable).
+ * Presence/motion comes from the ESP32 (see sceneEngine), not from camera-side AI.
  */
 
 const axios = require('axios');
@@ -13,7 +14,6 @@ const POLL_INTERVAL = 5000;
 class CameraService {
   constructor() {
     this.isAvailable = false;
-    this.personDetected = false;
     this.checkInterval = null;
     this.shutdownTimer = null;
     this.standbyStartTime = null;
@@ -78,36 +78,35 @@ class CameraService {
     }
 
     logger.info('Starting camera status monitoring...');
-    this.checkInterval = setInterval(() => this.checkPersonDetection(), POLL_INTERVAL);
+    this.checkInterval = setInterval(() => this.pollCameraStatus(), POLL_INTERVAL);
     
     // Initial check
-    this.checkPersonDetection();
+    this.pollCameraStatus();
   }
 
   stopMonitoring() {
     if (this.checkInterval) {
       clearInterval(this.checkInterval);
       this.checkInterval = null;
-      logger.info('Stopped person detection monitoring');
+      logger.info('Stopped camera status monitoring');
     }
   }
 
-  async checkPersonDetection() {
+  async pollCameraStatus() {
     if (!this.cameraEnabled) {
       return;
     }
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
-      const { person_detected, is_dark, brightness } = response.data;
+      const { is_dark, brightness } = response.data;
 
-      this.personDetected = person_detected;
       this.isDark = is_dark;
       this.brightness = brightness;
     } catch (error) {
       if (error.code === 'ECONNREFUSED') {
         logger.warn('Camera service connection refused - may be starting up');
       } else {
-        logger.error('Error checking person detection:', error.message);
+        logger.error('Error polling camera status:', error.message);
       }
     }
   }
@@ -147,7 +146,7 @@ class CameraService {
       return {
         available: this.isAvailable,
         enabled: response.data.enabled !== false,
-        person_detected: sceneEngine.getState().motionActive || false,
+        motion_detected: sceneEngine.getState().motionActive || false,
         total_detections: response.data.total_detections,
         fps: response.data.fps,
         stream_viewers: response.data.stream_viewers || 0,
@@ -181,8 +180,8 @@ class CameraService {
   }
 
   startShutdownTimer() {
-    // Auto-shutdown timer functionality removed
-    // Standby mode will remain indefinitely until person is detected
+    // Auto-shutdown timer functionality removed.
+    // Standby remains active until woken via motion/button flows.
   }
 
   cancelShutdownTimer() {
@@ -197,7 +196,6 @@ class CameraService {
 
   async setCameraEnabled(enabled) {
     this.cameraEnabled = enabled;
-    this.personDetected = false;
     this.isDark = false;
     const path = enabled ? '/control/enable' : '/control/disable';
     try {

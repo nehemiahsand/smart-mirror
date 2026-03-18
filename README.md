@@ -1,17 +1,16 @@
 # Smart Mirror
 
-Smart mirror system for Raspberry Pi with a dedicated display UI, an admin/mobile PWA, offline voice control, camera-driven standby, and an ESP32 OLED/button console.
+Smart mirror system for Raspberry Pi with a dedicated display UI, an admin/mobile PWA, camera-driven standby, and an ESP32 OLED/button console.
 
 ## Current Stack
 
-The current Docker Compose stack runs six services:
+The current Docker Compose stack runs five services:
 
 - `mosquitto`: authenticated internal MQTT broker for the ESP32 console
 - `sensor`: DHT22 sidecar on GPIO
-- `camera`: ffmpeg + MediaPipe based detection service
+- `camera`: lightweight MJPEG streaming sidecar (no AI recognition)
 - `backend`: Node/Express API, WebSocket hub, settings, auth, ESP32 scene/console logic, and the built PWA
 - `display`: React/Vite mirror display on port `3000`
-- `voice`: offline Vosk-based voice control service
 
 The backend is exposed on host port `80` and serves both:
 
@@ -22,8 +21,7 @@ The backend is exposed on host port `80` and serves both:
 
 - Mirror display with two synced pages: `home` and `spotify`
 - Mobile/admin PWA served by the backend
-- Offline voice control with page-aware Spotify/navigation commands
-- Camera-controlled person detection and dark-room standby
+- Camera streaming + camera on/off control
 - PIR-first wake path through the ESP32 console
 - ESP32 OLED/button console with MQTT input and HTTP state polling
 - Weather, traffic, sports, photos, Google Calendar, Spotify, and sensor data
@@ -131,8 +129,7 @@ Standby behavior:
 - The backend image builds the PWA bundle into `backend/public`
 - There is no separate PWA container in the current compose file
 - The display app is still a separate container on port `3000`
-- The voice service is offline/local via Vosk, not cloud speech recognition
-- The camera service uses MediaPipe pose landmarks and MJPEG capture, not the older Haar-cascade flow
+- The camera service is a lightweight MJPEG streamer; it does not run AI recognition
 
 ## Verification Commands
 
@@ -155,12 +152,7 @@ curl http://localhost/api/console/state?device=esp32
                                      └──────────┘
 ┌─────────────┐                           ↑
 │     PWA     │ ←─── HTTP/WebSocket ──────┤
-│  (Port 3002)│                           │
-└─────────────┘                           │
-                                          │
-┌─────────────┐                           │
-│    Voice    │ ←─── WebSocket ───────────┤
-│   Service   │                           │
+│  (served at /)│                         │
 └─────────────┘                           │
                                           │
 ┌─────────────┐      ┌─────────────┐     │
@@ -284,23 +276,6 @@ Modify `display/src/App.css` for dark/light theme customization.
 ---
 
 ## 🐛 Troubleshooting
-
-### Voice Commands Not Working
-
-**Check voice service logs:**
-```bash
-docker logs smart-mirror-voice -f
-```
-
-**Common issues:**
-- Microphone not detected → Check USB connection
-- Commands not recognized → Speak clearly, avoid background noise
-- Page sync issues → WebSocket might be disconnected, restart voice service
-
-**Restart voice service:**
-```bash
-docker compose restart voice
-```
 
 ### Widgets Not Displaying
 
@@ -524,10 +499,6 @@ smart-mirror/
 │   ├── src/
 │   │   ├── pages/          # PWA pages
 │   │   └── components/     # Shared components
-│   └── Dockerfile
-├── voice/                   # Python voice recognition
-│   ├── voice_service.py
-│   ├── requirements.txt
 │   └── Dockerfile
 ├── sensor/                  # DHT22 sensor service
 │   ├── dht22_server.py

@@ -36,7 +36,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
         console.log('WebSocket connected');
         setIsConnected(true);
         
-        // Broadcast current page to sync voice service
+        // Broadcast current page so other clients can sync state.
         const currentPage = normalizePage(localStorage.getItem('currentPage'));
         ws.send(JSON.stringify({
           type: 'sync_page',
@@ -91,9 +91,9 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
               break;
             case 'page_change':
             case 'voice_command':
-              // Handle voice-triggered page changes
+              // Handle externally-triggered page changes
               if (data.page && onPageChange) {
-                console.log('🎤 Voice command: changing page to', data.page);
+                console.log('External command: changing page to', data.page);
                 onPageChange(normalizePage(data.page));
               }
               break;

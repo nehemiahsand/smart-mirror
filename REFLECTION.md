@@ -1,6 +1,6 @@
 ## Utility Assessment
 
-AI assistance was valuable for getting a broad, integrated codebase working quickly across backend, frontend, Python sidecars, Docker, and ESP32 firmware. The current repo shows that speed clearly: one project now spans a secured backend, a display app, a served PWA, camera and sensor sidecars, offline voice control, and an MQTT-driven ESP32 console.
+AI assistance was valuable for getting a broad, integrated codebase working quickly across backend, frontend, Python sidecars, Docker, and ESP32 firmware. The current repo shows that speed clearly: one project now spans a secured backend, a display app, a served PWA, camera and sensor sidecars, and an MQTT-driven ESP32 console.
 
 The main downside was consistency. The hardest problems were not the initial implementations, but the follow-through:
 

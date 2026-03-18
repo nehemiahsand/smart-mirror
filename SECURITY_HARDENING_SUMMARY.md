@@ -37,7 +37,7 @@ Current compose security posture:
 - `cap_drop: [ALL]` on services that can use it
 - `security_opt: no-new-privileges:true`
 - `read_only: true` plus `tmpfs` on the smaller sidecars where supported
-- `camera` and `voice` run as non-root
+- `camera` runs as non-root
 - `sensor` runs without `privileged: true`
 - internal service traffic stays on the Compose network
 
@@ -57,7 +57,7 @@ Exposed host ports are currently limited to:
 
 ## Runtime Behavior Protections
 
-- standby forces effective camera and voice privacy state to off
+- standby forces effective camera privacy state to off
 - camera wake from standby is not used as the primary wake path
 - PIR-based ESP32 motion is the wake source for the mirror standby flow
 - PWA privacy status reflects effective standby state, not just raw settings values
@@ -76,8 +76,6 @@ It verifies:
 - login lockout behavior
 - Spotify invalid OAuth state rejection
 - Google Calendar invalid OAuth state rejection
-- voice-container backend connectivity
-- audio device visibility in the voice container
   - non-HTTP(S) origins
   - arbitrary public hostnames that happened to use common ports
 
@@ -119,7 +117,6 @@ It verifies:
 - `python3 -m py_compile` passed for:
   - `sensor/dht22_server.py`
   - `camera/camera_service.py`
-  - `voice/voice_service.py`
 - `npm run build` passed in:
   - `mobile-pwa`
   - `display`
@@ -135,9 +132,8 @@ It verifies:
   - `GET /api/spotify/auth-url`
   - `GET /api/calendar/auth-url`
 - Camera-specific follow-up verification passed for:
-  - rebuilt `camera` service with baked MediaPipe model
+  - rebuilt `camera` service for lightweight MJPEG streaming
   - `docker inspect ... ReadonlyRootfs => true`
-  - no runtime `Downloading model to ... pose_landmark_lite.tflite` log line after rebuild
 - Sensor-specific follow-up verification passed for:
   - rebuilt `sensor` service with `ReadonlyRootfs => true`
   - `WorkingDir => /tmp`
@@ -149,16 +145,6 @@ It verifies:
   - `GET /api/power/status` returned `{"available":true,"tokenConfigured":true}` after the `dbus-send` migration
   - backend `npm audit --json` returned `0` vulnerabilities
 
-## Still remaining
-
-- Voice still emits ALSA/JACK noise on startup even though it becomes functional after reconnecting to backend.
-
 ## Next task note
 
-- If desired, suppress the remaining ALSA/JACK noise during voice startup without regressing microphone capture.
 - If desired, extend `scripts/security-smoke-test.sh` into CI or a systemd post-deploy check.
-
-## Recommended next pass
-
-1. Decide whether to suppress or quiet the remaining ALSA/JACK startup noise in `voice`.
-2. If you want deployment enforcement, wire `scripts/security-smoke-test.sh` into your deploy flow.

@@ -24,8 +24,6 @@ The backend is the source of truth for page state, standby state, privacy state,
   - Node/Express API, WebSocket hub, auth/session layer, scene engine, console service, and built PWA
 - `display`
   - React/Vite mirror display on `3000`
-- `voice`
-  - Python/Vosk voice controller connected to backend HTTP + WebSocket
 
 ### External Hardware
 
@@ -56,7 +54,7 @@ Important services:
 - `esp32InputService`
   - subscribes to `smartmirror/esp32/+/event` and `.../status`
 - `cameraService`
-  - tracks `person_detected`, darkness, and camera enable state
+  - tracks camera enable state and stream status (presence comes from ESP32)
 
 ## Current Frontend Model
 
@@ -113,11 +111,11 @@ Current stats lines:
 The current wake/standby policy is:
 
 - PIR motion wakes the mirror from standby
-- entering standby disables camera input and voice
+- entering standby disables camera input
 - camera no-person and dark-room logic can send the mirror back into standby once awake
 - camera alone does not act as the standby wake source
 
-The PWA privacy status endpoint reports effective camera/voice state so standby appears as camera-off and mic-off.
+The PWA privacy status endpoint reports effective camera state so standby appears as camera-off.
 
 ## Data Flow Notes
 
@@ -130,9 +128,6 @@ The PWA privacy status endpoint reports effective camera/voice state so standby 
 `consoleService.getEsp32State()` -> `/api/console/state?device=esp32` -> `ESP32 poll` -> OLED render
 
 ### Voice Flow
-
-`Vosk transcript` -> `voice_service.py` -> backend REST/WebSocket -> display page or Spotify action
-
 ### Camera Flow
 
 `camera_service.py` -> `cameraService` -> `sceneEngine.applyStandbyMode(...)` -> display/privacy broadcasts
@@ -146,12 +141,11 @@ The PWA privacy status endpoint reports effective camera/voice state so standby 
 ## Deployment Architecture
 
 ### Docker Compose
-All services run in separate containers on the same Docker network with `network_mode: host` for hardware access.
+All services run in separate containers on the same Docker Compose network.
 
 **Container Privileges:**
-- `sensor` - Privileged for GPIO access
+- `sensor` - Device access to GPIO
 - `camera` - Device access to /dev/video0
-- `voice` - Device access to /dev/snd (audio)
 - `backend` - Privileged for display control and NetworkManager D-Bus
 
 **Volumes:**
@@ -166,8 +160,7 @@ Internet
     ├─── Google Maps API (traffic/directions)
     ├─── ESPN API (sports scores)
     ├─── Google Calendar API (events)
-    ├─── Spotify Web API (playback control)
-    └─── Google Speech API (voice recognition)
+    └─── Spotify Web API (playback control)
     
 Tailscale VPN (optional)
     │
@@ -177,7 +170,7 @@ Raspberry Pi 5
     │
     ├─── Port 3000 - Display (React)
     ├─── Port 3001 - Backend API + WebSocket
-    └─── Port 3002 - PWA (React)
+    └─── Port 80 - PWA (served by backend)
 ```
 
 ## Security Considerations
@@ -192,17 +185,17 @@ Raspberry Pi 5
 
 - **Startup Time:** ~30 seconds (all containers)
 - **Memory Usage:** ~1.2GB total across all containers
-- **CPU Usage:** <10% idle, ~20% during active voice recognition
+- **CPU Usage:** depends on camera/sensors/workload; validate on-device
 - **Network Bandwidth:** <1 MB/min (periodic API calls)
 - **Display Latency:** <100ms (WebSocket updates)
-- **Voice Recognition Latency:** 1-3 seconds (Google API roundtrip)
+- **Camera/presence latency:** depends on camera FPS/model choice; validate on-device
 
 ## Scalability & Extensibility
 
 **Easy to Add:**
 - New widgets (drop in `display/src/widgets/`)
 - New API integrations (add service in `backend/src/services/`)
-- New voice commands (update `COMMANDS` dict in voice service)
+- New PWA pages (update `mobile-pwa/src/pages/` and backend API routes as needed)
 - New sensors (follow sensor service pattern)
 
 **Design Patterns Used:**
