@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import TimeDateWidget from '../widgets/TimeDate';
 import './SpotifyPlayer.css';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 const API_BASE = '/api/spotify';
 

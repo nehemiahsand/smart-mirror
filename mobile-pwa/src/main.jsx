@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.css';
+import './assets/styles/index.css';
 
 const CACHE_BUSTER_VERSION = '2026-03-13-1';
 

@@ -10,8 +10,8 @@ import SportsSettings from './pages/SportsSettings';
 import MoreMenu from './pages/MoreMenu';
 import Login from './pages/Login';
 import './components/common.css';
-import './App.css';
-import { fetchAuthSession } from './apiClient';
+import './assets/styles/App.css';
+import { fetchAuthSession } from './api/apiClient';
 
 function App() {
   return (

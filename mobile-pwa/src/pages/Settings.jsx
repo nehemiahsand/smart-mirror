@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './Settings.css';
 import AlertModal from '../components/AlertModal';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 export default function Settings({ authenticated = false, onAuthChange = () => {} }) {
   const [systemInfo, setSystemInfo] = useState(null);

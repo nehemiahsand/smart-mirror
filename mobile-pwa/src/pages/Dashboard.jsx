@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './Dashboard.css';
 import ConfirmModal from '../components/ConfirmModal';
 import AlertModal from '../components/AlertModal';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 export default function Dashboard() {
   const pageLabels = {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import './Login.css';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 export default function Login({ sessionChecked = false, authenticated = false, onAuthChange = () => {} }) {
     const navigate = useNavigate();

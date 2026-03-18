@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './Camera.css';
-import { apiFetch, getApiBase } from '../apiClient';
+import { apiFetch, getApiBase } from '../api/apiClient';
 
 export default function Camera() {
     const [cameraStatus, setCameraStatus] = useState(null);

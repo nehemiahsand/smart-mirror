@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import './Photos.css';
-import { apiFetch, getApiUrl } from '../apiClient';
+import { apiFetch, getApiUrl } from '../api/apiClient';
 
 /**
  * PhotosWidget - Displays rotating photos

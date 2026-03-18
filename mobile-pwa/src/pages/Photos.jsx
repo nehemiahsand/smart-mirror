@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import './Photos.css';
 import ConfirmModal from '../components/ConfirmModal';
 import AlertModal from '../components/AlertModal';
-import { apiFetch, getApiBase } from '../apiClient';
+import { apiFetch, getApiBase } from '../api/apiClient';
 
 export default function Photos() {
   const API_BASE = getApiBase();

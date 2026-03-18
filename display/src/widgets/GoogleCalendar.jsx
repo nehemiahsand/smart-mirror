@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import './GoogleCalendar.css';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 /**
  * GoogleCalendar Widget - Displays upcoming events from Google Calendar

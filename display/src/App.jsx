@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import './App.css';
+import './assets/styles/App.css';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useLayoutEngine } from './hooks/useLayoutEngine';
 import TimeDateWidget from './widgets/TimeDate';

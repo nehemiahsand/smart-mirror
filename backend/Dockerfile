@@ -45,10 +45,6 @@ COPY backend/package*.json ./
 # Install Node dependencies
 RUN npm install --omit=dev
 
-# Install Python dependencies for DHT22
-COPY backend/src/sensors/requirements.txt ./sensors/
-RUN pip3 install --no-cache-dir -r sensors/requirements.txt --break-system-packages
-
 # Copy application code
 COPY backend/ ./
 COPY --from=pwa-builder /build/mobile-pwa/dist ./public

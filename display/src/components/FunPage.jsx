@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import TimeDateWidget from '../widgets/TimeDate';
-import { apiFetch, getApiUrl } from '../apiClient';
+import { apiFetch, getApiUrl } from '../api/apiClient';
 import './FunPage.css';
 
 function SunWidget({ widget }) {

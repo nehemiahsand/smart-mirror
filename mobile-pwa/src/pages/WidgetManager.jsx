@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './WidgetManager.css';
 import AlertModal from '../components/AlertModal';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 const PAGES = [
   { id: 'home', name: 'Home Page' },

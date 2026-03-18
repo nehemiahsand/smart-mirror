@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSharedTime } from '../hooks/useSharedTime';
 import PropTypes from 'prop-types';
 import './WeatherTraffic.css';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 /**
  * WeatherTrafficWidget - Combined weather, indoor temp, and traffic display

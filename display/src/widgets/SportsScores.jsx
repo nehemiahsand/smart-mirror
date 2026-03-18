@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import './SportsScores.css';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 function SportsScores({ sport = 'nba', teams = [] }) {
     const [games, setGames] = useState([]);

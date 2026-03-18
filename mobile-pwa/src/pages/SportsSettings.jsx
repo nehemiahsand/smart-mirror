@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './SportsSettings.css';
 import AlertModal from '../components/AlertModal';
-import { apiFetch } from '../apiClient';
+import { apiFetch } from '../api/apiClient';
 
 export default function SportsSettings() {
   const [settings, setSettings] = useState(null);
