@@ -1,95 +1,133 @@
 # Smart Mirror
 
-Smart mirror system for Raspberry Pi with a dedicated display UI, an admin/mobile PWA, camera-driven standby, and an ESP32 OLED/button console.
+Smart mirror system for Raspberry Pi with three active surfaces:
 
-## Current Stack
+- mirror display UI (React/Vite, port 3000)
+- mobile/admin PWA (React/Vite build served by backend at /)
+- ESP32 OLED + five-button console (MQTT input + HTTP state polling)
 
-The current Docker Compose stack runs five services:
+## Current Runtime
 
-- `mosquitto`: authenticated internal MQTT broker for the ESP32 console
-- `sensor`: DHT22 sidecar on GPIO
-- `camera`: lightweight MJPEG streaming sidecar (no AI recognition)
-- `backend`: Node/Express API, WebSocket hub, settings, auth, ESP32 scene/console logic, and the built PWA
-- `display`: React/Vite mirror display on port `3000`
+Docker Compose runs five services:
 
-The backend is exposed on host port `80` and serves both:
+- mosquitto: authenticated MQTT broker for ESP32 events
+- sensor: DHT22 sidecar (internal port 5555)
+- camera: MJPEG sidecar with camera enable/disable support (internal port 5556)
+- backend: Node/Express API + WebSocket + scene/console logic + built PWA (host port 80)
+- display: mirror React app (host port 3000)
 
-- the REST/WebSocket API at `/api/...`
-- the built mobile/admin PWA at `/`
+Main entry points:
 
-## Current User-Facing Features
+- Display: http://<pi-ip>:3000
+- PWA: http://<pi-ip>/
+- API: http://<pi-ip>/api
+- MQTT: <pi-ip>:1883
 
-- Mirror display with two synced pages: `home` and `spotify`
-- Mobile/admin PWA served by the backend
-- Camera streaming + camera on/off control
-- PIR-first wake path through the ESP32 console
-- ESP32 OLED/button console with MQTT input and HTTP state polling
-- Weather, traffic, sports, photos, Google Calendar, Spotify, and sensor data
-- Admin session auth with hardened write routes and redacted settings output
+## Active UX Model
 
-## Current Hardware
+The mirror and OLED are synchronized around three pages:
+
+- home
+- fun
+- spotify
+
+Display behavior:
+
+- home: widgets (time/date, weather+traffic, calendar, sports, photos)
+- fun: fun page content from backend (/api/console/page/fun)
+- spotify: full Spotify player page
+- standby: display-only standby screen when display.standbyMode is true
+
+ESP32 OLED behavior:
+
+- screen modes: page, standby, stats
+- button 1: page toggle (home → fun → spotify → home)
+- on spotify: button2 play/pause, button3 prev, button4 next
+- on fun/home: buttons map to fun navigation/sports shortcuts from backend soft buttons
+- button 5: stats overlay toggle
+- in standby: button1 shows Turn On and wakes mirror, button5 shows Stats
+
+PWA pages (current):
+
+- dashboard
+- wifi
+- camera
+- widgets
+- photos
+- sports
+- settings
+- more
+- login
+
+## Hardware
 
 - Raspberry Pi 5
-- DHT22 on GPIO `4`
+- DHT22 on GPIO 4
 - USB camera
 - USB microphone
-- HDMI-connected mirror display
-- ESP32 console with:
-  - button 1 on `GPIO32`
-  - button 2 on `GPIO26`
-  - button 3 on `GPIO27`
-  - button 4 on `GPIO25`
-  - button 5 on `GPIO23`
-  - PIR motion on `GPIO33`
-  - SSD1306 OLED on `GPIO21`/`GPIO22`
+- HDMI display
+- ESP32 console:
+  - button1 GPIO32
+  - button2 GPIO26
+  - button3 GPIO27
+  - button4 GPIO25
+  - button5 GPIO23
+  - PIR GPIO33
+  - SSD1306 OLED on GPIO21/GPIO22
 
-## Start and Access
+## Local Configuration
 
-Build and start everything:
+Local secrets/config expected in:
+
+- backend/.env
+- esp32-console/include/config.local.h
+
+Important backend env values:
+
+- API_KEY
+- ADMIN_PASSWORD
+- AUTH_SECRET
+- OPENWEATHER_API_KEY
+- SPOTIFY_CLIENT_ID
+- SPOTIFY_CLIENT_SECRET
+- SPOTIFY_REDIRECT_URI
+- MQTT_USERNAME
+- MQTT_PASSWORD
+
+Runtime settings are stored in backend/data/settings.json.
+
+## Start, Check, and Verify
+
+Start:
 
 ```bash
 docker compose up -d --build
 ```
 
-Check service state:
+Status:
 
 ```bash
 docker compose ps
 ```
 
-Main entry points:
+Useful checks:
 
-- mirror display: `http://<pi-ip>:3000`
-- admin/mobile PWA: `http://<pi-ip>/`
-- API: `http://<pi-ip>/api`
-- MQTT broker: `<pi-ip>:1883`
+```bash
+curl http://localhost/api/health
+curl http://localhost/api/privacy/status
+curl 'http://localhost/api/console/state?device=esp32'
+./scripts/security-smoke-test.sh
+```
 
-## Local Configuration
+## Data Flow (Current)
 
-The repo expects local secrets in `backend/.env` and `esp32-console/include/config.local.h`.
+- Display ↔ backend WebSocket for settings/page/state updates
+- PWA → backend REST (+ auth cookies)
+- ESP32 → mosquitto MQTT events → backend scene/console services
+- ESP32 → backend /api/console/state?device=esp32 for compact OLED state
+- Backend → weather/traffic/calendar/spotify external APIs
 
-Important backend env values:
-
-- `API_KEY`
-- `ADMIN_PASSWORD`
-- `AUTH_SECRET`
-- `OPENWEATHER_API_KEY`
-- `TOMTOM_API_KEY` or traffic API config used in settings
-- `SPOTIFY_CLIENT_ID`
-- `SPOTIFY_CLIENT_SECRET`
-- `SPOTIFY_REDIRECT_URI`
-- `MQTT_USERNAME`
-- `MQTT_PASSWORD`
-
-Local-only ESP32 config:
-
-- Wi-Fi SSID/password
-- backend base URL
-- MQTT host/port/credentials
-
-`backend/data/settings.json` is local runtime data, not source-of-truth documentation. Sensitive settings are redacted from API responses.
-
-## OAuth Helpers
+## OAuth Helper
 
 Spotify local auth helper:
 
@@ -98,426 +136,11 @@ cd backend
 npm run spotify:auth
 ```
 
-Google Calendar still uses the backend authorization routes and stored credentials under `backend/data/`.
-
-## ESP32 Console Behavior
-
-The ESP32 console mirrors the actual mirror page state.
-
-Normal pages:
-
-- `Main Page`
-- `Spotify`
-
-Button behavior:
-
-- button 1 toggles between `home` and `spotify`
-- on Spotify, button 2 is `Play/Pause`
-- on Spotify, button 3 is `Prev`
-- on Spotify, button 4 is `Next`
-- button 5 toggles the OLED stats overlay
-
-Standby behavior:
-
-- PIR motion wakes the mirror
-- standby disables camera input
-- button 1 shows `Turn On`
-- button 5 opens the OLED stats overlay without printing a separate close label
-
-## Development Notes
-
-- The backend image builds the PWA bundle into `backend/public`
-- There is no separate PWA container in the current compose file
-- The display app is still a separate container on port `3000`
-- The camera service is a lightweight MJPEG streamer; it does not run AI recognition
-
-## Verification Commands
-
-Useful checks:
-
-```bash
-docker compose ps
-curl http://localhost/api/health
-curl http://localhost/api/privacy/status
-curl http://localhost/api/console/state?device=esp32
-./scripts/security-smoke-test.sh
-```
-
-### Data Flow
-```
-┌─────────────┐
-│   Display   │ ←─── WebSocket ───→ ┌──────────┐
-│  (Port 3000)│                      │ Backend  │
-└─────────────┘                      │(Port 3001)│
-                                     └──────────┘
-┌─────────────┐                           ↑
-│     PWA     │ ←─── HTTP/WebSocket ──────┤
-│  (served at /)│                         │
-└─────────────┘                           │
-                                          │
-┌─────────────┐      ┌─────────────┐     │
-│   Sensor    │ ──→  │   Camera    │ ──→ │
-│  (DHT22)    │      │ (Detection) │     │
-└─────────────┘      └─────────────┘     │
-                                          ↓
-                                    ┌──────────┐
-                                    │ External │
-                                    │   APIs   │
-                                    └──────────┘
-                                    • OpenWeather
-                                    • Google Maps
-                                    • Google Calendar
-                                    • ESPN Sports
-                                    • Spotify
-```
-
-### Widget System
-
-Widgets are modular React components that display on the main mirror:
-
-**Available Widgets:**
-- `TimeDate.jsx` - Clock and date display
-- `WeatherTraffic.jsx` - Combined weather, indoor temp, and traffic
-- `GoogleCalendar.jsx` - Calendar events
-- `SportsScores.jsx` - Live sports scores with tabs
-- `Photos.jsx` - Photo slideshow
-- `SpotifyPlayer.jsx` - Spotify controls (separate page)
-
-**Widget Order:**
-Configured in `settings.json` → `widgetOrder` array. Change via PWA or directly in settings file.
-
----
-
-## 🔧 Configuration
-
-### Settings File: `backend/data/settings.json`
-
-```json
-{
-  "display": {
-    "brightness": 100,
-    "orientation": "landscape",
-    "clockFormat": "12h",
-    "standbyMode": false
-  },
-  "weather": {
-    "city": "Birmingham,US",
-    "units": "imperial",
-    "updateInterval": 600000
-  },
-  "traffic": {
-    "enabled": true,
-    "origin": "2301 Brookline Drive, Hoover, AL 35226",
-    "destination": "1201 University Blvd, Birmingham, AL 35233",
-    "googleMapsApiKey": "YOUR_API_KEY"
-  },
-  "widgetOrder": [
-    "timedate",
-    "weathertemp",
-    "googlecalendar",
-    "photos"
-  ],
-  "sports": {
-    "sport": "nba",
-    "teams": []
-  }
-}
-```
-
-### Environment Variables
-
-**Backend** (`.env` or `set-api-key.sh`):
-- `OPENWEATHER_API_KEY` - Weather data
-- `GOOGLE_MAPS_API_KEY` - Traffic and directions
-
-**Sensor Service:**
-- `DHT22_PIN=4` - GPIO pin for DHT22 sensor
-
----
-
-## 🎨 Customization
-
-### Change Widget Layout
-
-**Via PWA:**
-1. Go to Widgets tab
-2. Use ↑↓ buttons to reorder
-3. Click "Save Changes"
-
-**Manually:**
-Edit `backend/data/settings.json` → `widgetOrder`
-
-### Add Photos
-
-**Via PWA:**
-1. Go to Photos tab
-2. Click "Upload Photos"
-3. Select images
-4. Drag to reorder
-5. Changes save automatically
-
-**Manually:**
-```bash
-cp your-photo.jpg backend/data/photos/
-```
-
-### Customize Sports
-
-**Via PWA:**
-1. Go to More → Sports
-2. Select sport (NBA, NFL, etc.)
-3. Optionally filter by favorite teams
-4. Save
-
-### Change Theme
-
-Modify `display/src/App.css` for dark/light theme customization.
-
----
-
-## 🐛 Troubleshooting
-
-### Widgets Not Displaying
-
-**Check display logs:**
-```bash
-docker logs smart-mirror-display -f
-```
-
-**Verify backend is running:**
-```bash
-curl http://localhost:3001/api/health
-```
-
-**Restart display:**
-```bash
-docker compose restart display
-```
-
-### Sports Not Showing Games
-
-**Check if there are games today:**
-```bash
-curl http://localhost:3001/api/sports/nba/scores | python3 -m json.tool
-```
-
-**Sports service automatically:**
-- Shows today's games (scheduled, live, or completed)
-- If no games today, searches up to 7 days ahead
-- Updates every 2 minutes
-
-### Traffic Not Updating
-
-**Verify API key is set:**
-```bash
-docker logs smart-mirror-backend 2>&1 | grep -i "traffic\|google"
-```
-
-**Check traffic endpoint:**
-```bash
-curl http://localhost:3001/api/traffic/commute | python3 -m json.tool
-```
-
-**The traffic widget:**
-- Fetches drive time every 5 minutes
-- Calculates live ETA by adding drive time to current time
-- Updates ETA display every second in real-time
-
-### Camera/Sensor Not Working
-
-**DHT22 Sensor:**
-```bash
-docker logs smart-mirror-sensor -f
-```
-
-**Camera Service:**
-```bash
-docker logs smart-mirror-camera -f
-```
-
-**Check hardware connections:**
-- DHT22 → GPIO4 (by default)
-- Camera → USB port
-
----
-
-## 🔄 Maintenance
-
-### Update the System
-
-```bash
-cd ~/Downloads/smart-mirror
-git pull
-docker compose down
-docker compose up -d --build
-```
-
-### View All Logs
-
-```bash
-docker compose logs -f
-```
-
-### Restart All Services
-
-```bash
-docker compose restart
-```
-
-### Stop Everything
-
-```bash
-docker compose down
-```
-
-### Clear Cache/Data
-
-**Sports cache:**
-```bash
-curl -X POST http://localhost:3001/api/sports/clear-cache
-```
-
-**Complete reset:**
-```bash
-docker compose down -v
-docker compose up -d --build
-```
-
----
-
-## 🚀 Auto-Start on Boot
-
-To make the mirror start automatically when the Raspberry Pi boots:
-
-### Install Auto-Start Script
-
-```bash
-cd ~/Downloads/smart-mirror
-./install-autostart.sh
-```
-
-This creates a desktop autostart entry that launches `start-mirror.sh` on boot.
-
-### Configure Auto-Login (Optional)
-
-For a completely hands-free experience:
-
-```bash
-sudo raspi-config
-```
-
-Navigate to:
-- **System Options** → **Boot / Auto Login** → **Desktop Autologin**
-
-The mirror will now start automatically on boot without any interaction!
-
----
-
-## 📊 API Documentation
-
-### Core Endpoints
-
-**Health Check:**
-```bash
-GET /api/health
-```
-
-**Settings:**
-```bash
-GET /api/settings
-POST /api/settings
-PUT /api/settings
-```
-
-**Weather:**
-```bash
-GET /api/weather
-```
-
-**Traffic:**
-```bash
-GET /api/traffic/commute
-```
-
-**Sports:**
-```bash
-GET /api/sports                    # List supported sports
-GET /api/sports/:sport/scores      # Get scores (nba, nfl, ncaaf, ncaab, mlb, soccer)
-POST /api/sports/clear-cache       # Clear cache
-```
-
-**Calendar:**
-```bash
-GET /api/calendar/events
-```
-
-**Photos:**
-```bash
-GET /api/photos
-POST /api/photos/upload
-PUT /api/photos/order
-DELETE /api/photos/:filename
-```
-
-**Sensor:**
-```bash
-GET /api/sensor
-```
-
-**WebSocket:**
-```javascript
-ws://localhost:3001
-
-// Message types:
-{ type: 'page_change', page: 'home' | 'spotify' }
-{ type: 'standby_change', standby: true | false }
-{ type: 'settings_update', settings: {...} }
-{ type: 'display_refresh' }
-```
-
----
-
-## 🏆 Project Structure
-
-```
-smart-mirror/
-├── backend/                 # Node.js API server
-│   ├── src/
-│   │   ├── api/            # API routes and WebSocket
-│   │   ├── services/       # Business logic (weather, sports, etc.)
-│   │   ├── sensors/        # DHT22 integration
-│   │   └── utils/          # Helpers and logger
-│   ├── data/               # Settings, photos, credentials
-│   └── Dockerfile
-├── display/                 # React display interface
-│   ├── src/
-│   │   ├── widgets/        # Widget components
-│   │   ├── components/     # UI components
-│   │   └── hooks/          # Custom React hooks
-│   └── Dockerfile
-├── mobile-pwa/             # React mobile PWA
-│   ├── src/
-│   │   ├── pages/          # PWA pages
-│   │   └── components/     # Shared components
-│   └── Dockerfile
-├── sensor/                  # DHT22 sensor service
-│   ├── dht22_server.py
-│   └── Dockerfile
-├── camera/                  # Person detection service
-│   ├── camera_service.py
-│   └── Dockerfile
-├── docker-compose.yml       # Service orchestration
-├── start-mirror.sh         # Launch script
-└── README.md               # This file
-```
-
----
-
-## 🤝 Contributing
-
-This is a student project. Feel free to fork and customize for your own smart mirror!
-
----
+## Notes
+
+- The backend image builds mobile-pwa into backend/public.
+- There is no separate PWA compose service.
+- Camera service is stream/control support; standby wake source is PIR motion via ESP32.
 
 ## 📝 License
 

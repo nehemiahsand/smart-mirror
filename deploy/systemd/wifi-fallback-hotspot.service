@@ -5,7 +5,7 @@ Wants=NetworkManager.service
 
 [Service]
 Type=oneshot
-ExecStart=/home/smartmirror/Downloads/smart-mirror/wifi-fallback-hotspot.sh
+ExecStart=/home/smartmirror/Downloads/smart-mirror/scripts/wifi-fallback-hotspot.sh
 RemainAfterExit=yes
 StandardOutput=journal
 StandardError=journal
