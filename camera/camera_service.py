@@ -201,6 +201,9 @@ class CameraStreamer:
                 if self.latest_stream_jpeg is not None and self.latest_stream_frame_id != last_frame_id:
                     return self.latest_stream_jpeg, self.latest_stream_frame_id
 
+                if not self.enabled:
+                    return None, last_frame_id
+
                 remaining = deadline - time.time()
                 if remaining <= 0:
                     return None, last_frame_id
@@ -216,9 +219,12 @@ def capture_loop():
     logger.info("Starting lightweight native MJPEG camera loop (%sx%s @ %sfps)", streamer.capture_width, streamer.capture_height, streamer.capture_fps)
     while True:
         try:
-            if streamer.stream_viewers == 0:
+            if not streamer.enabled or streamer.stream_viewers == 0:
                 if streamer.capture_active:
-                    logger.info("0 viewers - stopping capture to save power")
+                    logger.info(
+                        "%s - stopping capture",
+                        "camera disabled" if not streamer.enabled else "0 viewers - stopping capture to save power",
+                    )
                     streamer.stop_capture()
                 time.sleep(0.5)
                 continue
@@ -280,6 +286,7 @@ def enable_camera():
 @app.route("/control/disable", methods=["POST"])
 def disable_camera():
     streamer.enabled = False
+    streamer.stop_capture()
     return jsonify({"success": True, "enabled": False})
 
 @app.route("/video/raw")
@@ -290,7 +297,12 @@ def video_raw():
         try:
             while True:
                 frame, frame_id = streamer.wait_for_stream_frame(last_frame_id)
-                if frame is None or frame_id == last_frame_id:
+                if frame is None:
+                    if not streamer.enabled:
+                        logger.info("Closing raw video stream because camera is disabled")
+                        break
+                    continue
+                if frame_id == last_frame_id:
                     continue
                 last_frame_id = frame_id
                 yield b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + frame + b"\r\n"

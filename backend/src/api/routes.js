@@ -30,6 +30,7 @@ const { getLoginRateLimitStatus, recordFailedLoginAttempt, recordSuccessfulLogin
 const { ADMIN_SESSION_TTL_SECONDS, clearAdminSessionCookie, extractAdminToken, setAdminSessionCookie } = require('../utils/requestAuth');
 const { createToken, TOKEN_AUDIENCES } = require('../utils/auth');
 const { issueAdminSession, revokeAdminSessionToken, verifyAdminSessionToken } = require('../utils/adminSessions');
+const CAMERA_STREAM_TOKEN_TTL_SECONDS = 300;
 
 // Configure multer for photo uploads
 const upload = multer({
@@ -125,13 +126,13 @@ router.post('/auth/stream-token', adminAuth, (req, res) => {
 
   const token = createToken(
     { role: 'stream', scope },
-    60,
+    CAMERA_STREAM_TOKEN_TTL_SECONDS,
     {
       audience: TOKEN_AUDIENCES.CAMERA_STREAM,
       subject: scope,
     }
   );
-  res.json({ token, expiresInSeconds: 60 });
+  res.json({ token, expiresInSeconds: CAMERA_STREAM_TOKEN_TTL_SECONDS });
 });
 
 // ===== Privacy / Input Control Endpoints =====

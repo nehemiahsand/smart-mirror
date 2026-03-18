@@ -8,12 +8,68 @@ export default function Camera() {
     const [loading, setLoading] = useState(true);
     const [streamEnabled, setStreamEnabled] = useState(false);
     const [streamUrl, setStreamUrl] = useState('');
+    const [streamError, setStreamError] = useState('');
+    const [streamRetryCount, setStreamRetryCount] = useState(0);
+
+    function reloadPage() {
+        window.location.reload();
+    }
+
+    async function startStream(keepEnabledOnFailure = false) {
+        try {
+            setStreamError('');
+            const response = await apiFetch('/api/auth/stream-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scope: 'camera_raw' })
+            });
+
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok || !data.token) {
+                throw new Error(data.error || 'Failed to create stream token');
+            }
+
+            const query = new URLSearchParams({
+                streamToken: data.token,
+                _: String(Date.now()),
+            });
+            setStreamUrl(`${getApiBase()}/api/camera/raw?${query.toString()}`);
+            setStreamEnabled(true);
+            setStreamRetryCount(0);
+        } catch (error) {
+            setStreamEnabled(keepEnabledOnFailure);
+            setStreamError(error.message || 'Failed to load stream');
+            setStreamRetryCount((current) => current + 1);
+            console.error('Failed to start stream:', error);
+        }
+    }
 
     useEffect(() => {
         loadCameraStatus();
         const interval = setInterval(loadCameraStatus, 2000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        if (!streamEnabled || !streamError || cameraStatus?.enabled === false) {
+            return undefined;
+        }
+
+        const retryDelayMs = Math.min(1000 * (streamRetryCount + 1), 5000);
+        const timeout = setTimeout(() => {
+            startStream(true);
+        }, retryDelayMs);
+
+        return () => clearTimeout(timeout);
+    }, [cameraStatus?.enabled, streamEnabled, streamError, streamRetryCount]);
+
+    useEffect(() => {
+        if (!streamEnabled || cameraStatus?.enabled !== false) {
+            return;
+        }
+
+        reloadPage();
+    }, [cameraStatus?.enabled, streamEnabled]);
 
     const loadCameraStatus = async () => {
         try {
@@ -47,29 +103,8 @@ export default function Camera() {
         }
     };
 
-    const enableStream = async () => {
-        try {
-            const response = await apiFetch('/api/auth/stream-token', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ scope: 'camera_raw' })
-            });
-
-            const data = await response.json().catch(() => ({}));
-            if (!response.ok || !data.token) {
-                throw new Error(data.error || 'Failed to create stream token');
-            }
-
-            const query = new URLSearchParams({ streamToken: data.token });
-            setStreamUrl(`${getApiBase()}/api/camera/raw?${query.toString()}`);
-            setStreamEnabled(true);
-        } catch (error) {
-            console.error('Failed to enable stream:', error);
-        }
-    };
-
     const disableStream = () => {
-        window.location.reload();
+        reloadPage();
     };
 
     const formatTime = (ms) => {
@@ -177,7 +212,7 @@ export default function Camera() {
 
                     <button
                         className={`stream-button ${streamEnabled ? 'enabled' : 'disabled'}`}
-                        onClick={streamEnabled ? disableStream : enableStream}
+                        onClick={streamEnabled ? disableStream : startStream}
                     >
                         <span className="button-icon">
                             {streamEnabled ? '⏹' : '▶'}
@@ -187,15 +222,29 @@ export default function Camera() {
 
                     {streamEnabled && (
                         <div className="feed-container">
-                            <img
-                                src={streamUrl}
-                                alt="Live Camera Feed"
-                                className="video-feed"
-                                onError={(e) => {
-                                    console.error('Stream load error');
-                                    e.target.parentNode.innerHTML = '<div class="feed-error">Failed to load stream.<br/>Check container connection.</div>';
-                                }}
-                            />
+                            {cameraStatus?.enabled === false || streamError ? (
+                                <div className="feed-error">
+                                    {cameraStatus?.enabled === false
+                                        ? 'Camera is off. Waiting for it to come back on...'
+                                        : 'Reconnecting to camera stream...'}
+                                </div>
+                            ) : (
+                                <img
+                                    src={streamUrl}
+                                    alt="Live Camera Feed"
+                                    className="video-feed"
+                                    onLoad={() => {
+                                        setStreamError('');
+                                        setStreamRetryCount(0);
+                                    }}
+                                    onError={() => {
+                                        setStreamUrl('');
+                                        setStreamError('Stream load error');
+                                        setStreamRetryCount((current) => current + 1);
+                                        console.error('Stream load error');
+                                    }}
+                                />
+                            )}
                             <div className="feed-status">
                                 <span className="live-indicator">🔴 LIVE</span>
                                 <span>MJPEG Proxy Feed</span>
