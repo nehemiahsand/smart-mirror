@@ -196,8 +196,10 @@ function updateSystemStats() {
     sock.destroy();
   }).connect(53, '8.8.8.8');
 }
-setInterval(updateSystemStats, 10000);
-updateSystemStats();
+if (process.env.NODE_ENV !== 'test') {
+  setInterval(updateSystemStats, 10000);
+  updateSystemStats();
+}
 
 class ConsoleService {
   constructor() {
