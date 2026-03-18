@@ -85,3 +85,29 @@ docker compose logs --tail=200 sensor
 
 - Version: 1.1
 - Last Updated: March 18, 2026
+
+## 7) Automated Unit Testing (Jest)
+
+The backend now uses Jest to provide rigorous hardware-abstraction and security testing entirely independent of physical Raspberry Pi constraints. 
+
+To run the complete test suite locally:
+
+```bash
+cd backend
+npm install
+npm test
+```
+
+### Test Coverage Highlights
+* **Hardware Abstraction Layer (HAL):**
+  * `dht22.test.js`: Validates that the sensor injects synthetic mock JSON data when `NODE_ENV=development` and correctly attempts to dial the physical sensor in production mode.
+* **Security & Authorization:**
+  * `apiKey.test.js`: Validates `503` misconfiguration blocks and `401` header rejection.
+  * `adminAuth.test.js`: Asserts admin role payload verification on secure tokens.
+  * `cameraStreamAuth.test.js`: Verifies the specific `camera:stream` audience pipeline and intercepts bad stream-tokens.
+  * `redaction.test.js`: Validates the `redactSensitive` generic utility cleanly masks credentials.
+* **Frontend Payload Integrity:**
+  * `settings.test.js`: Validates DOT-notation nested schema merging and factory defaults fallback.
+  * `layoutAPI.test.js`: Spins up a mocked `supertest` Express web server to enforce payload requirements for the UI coordinates, and verifies layout updates properly trigger a Websocket broadcast.
+
+Continuous Integration (CI) automatically executes `npm test` on every push to the `main` repo branch.
