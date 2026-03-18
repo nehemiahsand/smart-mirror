@@ -41,6 +41,10 @@ class DHT22Service {
    * On failure, returns last known value
    */
   async read() {
+    // In development mode, return synthetic data for testing without hardware
+    if (process.env.NODE_ENV === 'development') {
+      return { mocked: true, temperatureCelsius: 22.5, temperatureFahrenheit: 72.5, humidity: 45.0, stale: false };
+    }
     return new Promise((resolve) => {
       http.get(this.sensorServerUrl, (res) => {
         let data = '';

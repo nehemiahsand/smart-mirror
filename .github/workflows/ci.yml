@@ -1,0 +1,54 @@
+name: Smart Mirror CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x] # Ensure we test on Node 18 (what your Dockerfile uses)
+
+    steps:
+    # 1. Check out the code
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # 2. Set up Node.js
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    # 3. Security Check: Vulnerability Scanning
+    - name: Audit Backend Dependencies
+      working-directory: ./backend
+      run: npm audit
+
+    # 4. Install backend dependencies (ci = clean install)
+    - name: Install Backend Dependencies
+      working-directory: ./backend
+      run: npm ci
+
+    # 5. Run the hardware abstraction Jest unit tests!
+    - name: Run Backend Unit Tests
+      working-directory: ./backend
+      run: npm test
+
+    # 6. Verify the frontend React code compiles without fatal errors
+    - name: Build Mobile PWA
+      working-directory: ./mobile-pwa
+      run: |
+        npm ci
+        npm run build
+
+    - name: Build Mirror Display
+      working-directory: ./display
+      run: |
+        npm ci
+        npm run build
