@@ -165,31 +165,10 @@ npm run spotify:auth
 - There is no separate PWA compose service.
 - Camera service is stream/control support; standby wake source is PIR motion via ESP32.
 
-## 📝 License
+## Author
 
-This project is provided as-is for educational purposes.
+- Nehemiah Sanders
 
----
 
-## 🙏 Acknowledgments
-
-- **ESPN API** - Sports scores
-- **OpenWeather API** - Weather data
-- **Google APIs** - Calendar, Maps, Directions
-- **Tailscale** - Secure remote access
-- **Docker** - Containerization
-- **React** - UI framework
-
----
-
-## 📞 Support
-
-For issues or questions:
-1. Check the troubleshooting section above
-2. Review container logs: `docker compose logs -f`
-3. Verify API keys are configured correctly
-4. Ensure all containers are running: `docker compose ps`
-
----
 
 **Built with ❤️ on Raspberry Pi 5**
