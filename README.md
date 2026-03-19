@@ -168,7 +168,3 @@ npm run spotify:auth
 ## Author
 
 - Nehemiah Sanders
-
-
-
-**Built with ❤️ on Raspberry Pi 5**
