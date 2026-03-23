@@ -220,6 +220,7 @@ class ConsoleService {
       alarmTriggeredDate: null,
       snoozeUntil: null,
       funDateKey: null,
+      musicIsPlaying: false,
       focusStatus: 'idle',
       focusPhase: 'work',
       focusEndsAt: null,
@@ -479,15 +480,15 @@ class ConsoleService {
           button1: pageToggleTarget.name,
           button2: 'Prev',
           button3: 'Next',
-          button4: 'Today',
+          button4: 'Home',
           button5: 'Stats',
         };
       case 'media':
         return {
           button1: pageToggleTarget.name,
-          button2: 'Play/Pause',
-          button3: 'Prev',
-          button4: 'Next',
+          button2: 'Prev',
+          button3: 'Next',
+          button4: this.runtime.musicIsPlaying ? 'Stop' : 'Play',
           button5: 'Stats',
         };
       case 'timer-focus':
@@ -705,14 +706,20 @@ class ConsoleService {
     const playback = await this.getPlaybackState();
     if (playback?.is_playing) {
       await spotifyService.pause();
+      this.runtime.musicIsPlaying = false;
     } else {
       await spotifyService.play();
+      this.runtime.musicIsPlaying = true;
     }
   }
 
   async getPlaybackState() {
     try {
-      return await spotifyService.getCurrentPlayback();
+      const playback = await spotifyService.getCurrentPlayback();
+      if (typeof playback?.is_playing === 'boolean') {
+        this.runtime.musicIsPlaying = playback.is_playing;
+      }
+      return playback;
     } catch (error) {
       logger.debug('Spotify playback unavailable', { error: error.message });
       return null;
@@ -910,8 +917,8 @@ class ConsoleService {
     } else if (['previous'].includes(action)) {
       const nextDateKey = funContentService.shiftDateKey(currentDateKey, 1);
       this.setFunDateKey(nextDateKey > todayDateKey ? todayDateKey : nextDateKey);
-    } else if (['next', 'refresh', 'confirm'].includes(action)) {
-      this.setFunDateKey(todayDateKey);
+    } else if (['next', 'refresh', 'confirm', 'home'].includes(action)) {
+      return this.goHome('fun_home');
     }
 
     this.touchInteraction(`fun:${action}`);
@@ -941,11 +948,11 @@ class ConsoleService {
   }
 
   async handleMediaAction(action) {
-    if (action === 'previous') {
+    if (action === 'primary') {
       await spotifyService.previous();
-    } else if (action === 'next') {
+    } else if (action === 'previous') {
       await spotifyService.next();
-    } else if (['primary', 'toggle', 'confirm'].includes(action)) {
+    } else if (['next', 'toggle', 'confirm'].includes(action)) {
       await this.toggleMusicPlayback();
     } else if (['back', 'close'].includes(action)) {
       return this.openStatsOverlay('media:stats');
