@@ -135,6 +135,13 @@ int16_t measureTextWidth(const String& value) {
   return static_cast<int16_t>(width);
 }
 
+int16_t measureTextWidthWithSize(const String& value, uint8_t textSize) {
+  gDisplay.setTextSize(textSize);
+  const int16_t width = measureTextWidth(value);
+  gDisplay.setTextSize(1);
+  return width;
+}
+
 String abbreviateLabel(const String& value) {
   if (value == "Play/Pause") {
     return "Play";
@@ -188,6 +195,14 @@ String fitTextToWidth(const String& value, int16_t maxWidth, size_t maxLength = 
   return "";
 }
 
+String fitTextToWidthSized(const String& value, int16_t maxWidth, uint8_t textSize,
+                           size_t maxLength = 20, bool abbreviate = true) {
+  gDisplay.setTextSize(textSize);
+  const String fitted = fitTextToWidth(value, maxWidth, maxLength, abbreviate);
+  gDisplay.setTextSize(1);
+  return fitted;
+}
+
 String backendUrl(const char* path) {
   return String(Config::BACKEND_BASE_URL) + path;
 }
@@ -233,6 +248,26 @@ String getStatsPageLine(uint8_t index) {
   }
 
   return "";
+}
+
+String extractStatValue(const String& line, const String& label, const String& nextLabel = "") {
+  const String prefix = label + " ";
+  const int start = line.indexOf(prefix);
+  if (start < 0) {
+    return "";
+  }
+
+  const int valueStart = start + prefix.length();
+  if (nextLabel.isEmpty()) {
+    return line.substring(valueStart);
+  }
+
+  const int nextStart = line.indexOf(String(" ") + nextLabel + " ", valueStart);
+  if (nextStart < 0) {
+    return line.substring(valueStart);
+  }
+
+  return line.substring(valueStart, nextStart);
 }
 
 void resetMirrorState() {
@@ -501,6 +536,22 @@ void drawCenteredText(int16_t x, int16_t y, int16_t width, int16_t height, const
   gDisplay.print(value);
 }
 
+void drawCenteredTextSized(int16_t x, int16_t y, int16_t width, int16_t height, const String& value,
+                           uint8_t textSize) {
+  if (value.isEmpty()) {
+    return;
+  }
+
+  gDisplay.setTextSize(textSize);
+  const int16_t textWidth = measureTextWidth(value);
+  const int16_t textHeight = 8 * textSize;
+  const int16_t textX = x + max<int16_t>(0, (width - textWidth) / 2);
+  const int16_t textY = y + max<int16_t>(0, (height - textHeight) / 2);
+  gDisplay.setCursor(textX, textY);
+  gDisplay.print(value);
+  gDisplay.setTextSize(1);
+}
+
 void drawLineIfPresent(int16_t y, const String& value, size_t maxLength = 20) {
   if (value.isEmpty()) {
     return;
@@ -590,24 +641,76 @@ void renderStandbyScreen() {
 
 void renderStatsScreen() {
   const uint8_t statsPageCount = getStatsPageCount();
-  const String title = String("Stats ") + String(statsPageCount == 0 ? 0 : gStatsPageIndex + 1) +
-                       "/" + String(statsPageCount == 0 ? 0 : statsPageCount);
   const String statsLine = statsPageCount == 0 ? "No stats" : getStatsPageLine(gStatsPageIndex);
+  const String diskValue = extractStatValue(gMirrorState.statsLine1, "Disk", "Ping");
+  const String pingValue = extractStatValue(gMirrorState.statsLine1, "Ping");
+  const String cpuValue = extractStatValue(gMirrorState.statsLine2, "CPU", "RAM");
+  const String ramValue = extractStatValue(gMirrorState.statsLine2, "RAM");
+  const String uptimeValue = extractStatValue(gMirrorState.statsLine3, "Up", "T");
+  const String tempValue = extractStatValue(gMirrorState.statsLine3, "T");
+  const String motionValue = extractStatValue(gMirrorState.statsLine4, "Motion");
 
-  if (isCompactScreen()) {
-    renderHeader(title);
-    drawMessageCard(0, 10, Config::SCREEN_WIDTH, 14, statsLine, 20);
-    drawButtonCard(0, 24, 41, 8, 2, "Prev", 6);
-    drawButtonCard(43, 24, 41, 8, 3, "Next", 6);
-    drawButtonCard(86, 24, 42, 8, 5, "Back", 6);
+  if (gStatsPageIndex == 0 && !diskValue.isEmpty()) {
+    renderHeader("Disk / Ping");
+    gDisplay.setCursor(8, 11);
+    gDisplay.print("DISK");
+    gDisplay.setCursor(76, 11);
+    gDisplay.print("PING");
+    gDisplay.drawLine(63, 12, 63, Config::SCREEN_HEIGHT - 1, SSD1306_WHITE);
+    drawCenteredTextSized(0, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(diskValue, 56, 2), 2);
+    drawCenteredTextSized(66, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(pingValue, 56, 2), 2);
     return;
   }
 
-  renderHeader(title);
-  drawMessageCard(0, 16, Config::SCREEN_WIDTH, 30, statsLine);
-  drawButtonCard(0, 49, 41, 15, 2, "Prev", 6);
-  drawButtonCard(43, 49, 41, 15, 3, "Next", 6);
-  drawButtonCard(86, 49, 42, 15, 5, "Back", 6);
+  if (gStatsPageIndex == 1 && !cpuValue.isEmpty()) {
+    renderHeader("CPU / RAM");
+    gDisplay.setCursor(10, 11);
+    gDisplay.print("CPU");
+    gDisplay.setCursor(78, 11);
+    gDisplay.print("RAM");
+    gDisplay.drawLine(63, 12, 63, Config::SCREEN_HEIGHT - 1, SSD1306_WHITE);
+    drawCenteredTextSized(0, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(cpuValue, 56, 2), 2);
+    drawCenteredTextSized(66, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(ramValue, 56, 2), 2);
+    return;
+  }
+
+  if (gStatsPageIndex == 2 && !uptimeValue.isEmpty()) {
+    renderHeader("Uptime");
+    if (!tempValue.isEmpty()) {
+      gDisplay.setCursor(4, 11);
+      gDisplay.print("TEMP");
+      drawCenteredTextSized(74, 10, 50, 10, fitTextToWidth(tempValue, 48), 1);
+      gDisplay.drawRoundRect(70, 10, 54, 12, 2, SSD1306_WHITE);
+    }
+
+    gDisplay.setCursor(4, tempValue.isEmpty() ? 12 : 24);
+    gDisplay.print("SYSTEM");
+    drawCenteredTextSized(0, tempValue.isEmpty() ? 14 : 18, Config::SCREEN_WIDTH,
+                          tempValue.isEmpty() ? 18 : 14,
+                          fitTextToWidthSized(uptimeValue, Config::SCREEN_WIDTH - 8, 2, 20, false), 2);
+    return;
+  }
+
+  if (gStatsPageIndex == 3 && !motionValue.isEmpty()) {
+    const bool motionDetected = motionValue == "Yes";
+    renderHeader("Motion");
+    gDisplay.setCursor(33, 12);
+    gDisplay.print("DETECTED");
+    if (motionDetected) {
+      gDisplay.fillRoundRect(18, 18, 92, 13, 3, SSD1306_WHITE);
+      gDisplay.setTextColor(SSD1306_BLACK);
+      drawCenteredTextSized(18, 18, 92, 13, "YES", 2);
+      gDisplay.setTextColor(SSD1306_WHITE);
+    } else {
+      gDisplay.drawRoundRect(18, 18, 92, 13, 3, SSD1306_WHITE);
+      drawCenteredTextSized(18, 18, 92, 13, "NO", 2);
+    }
+    return;
+  }
+
+  renderHeader(String("Stats ") + String(statsPageCount == 0 ? 0 : gStatsPageIndex + 1) +
+               "/" + String(statsPageCount == 0 ? 0 : statsPageCount));
+  drawMessageCard(0, 10, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT - 10, statsLine, 20);
 }
 
 void renderPageScreen() {
