@@ -504,8 +504,8 @@ class ConsoleService {
       default:
         return {
           button1: pageToggleTarget.name,
-          button2: 'Next',
-          button3: 'Prev',
+          button2: 'Prev',
+          button3: 'Next',
           button4: 'Default',
           button5: 'Stats',
         };
@@ -879,15 +879,15 @@ class ConsoleService {
       const currentSportId = this.getCurrentSportId();
       const currentIndex = availableSports.indexOf(currentSportId);
       const safeIndex = currentIndex >= 0 ? currentIndex : 0;
-      const nextSportId = availableSports[cycleIndex(safeIndex, availableSports.length, 1)];
-      await this.setCurrentSportId(nextSportId);
+      const previousSportId = availableSports[cycleIndex(safeIndex, availableSports.length, -1)];
+      await this.setCurrentSportId(previousSportId);
     } else if (action === 'previous') {
       const availableSports = this.getSportsOptions();
       const currentSportId = this.getCurrentSportId();
       const currentIndex = availableSports.indexOf(currentSportId);
       const safeIndex = currentIndex >= 0 ? currentIndex : 0;
-      const previousSportId = availableSports[cycleIndex(safeIndex, availableSports.length, -1)];
-      await this.setCurrentSportId(previousSportId);
+      const nextSportId = availableSports[cycleIndex(safeIndex, availableSports.length, 1)];
+      await this.setCurrentSportId(nextSportId);
     } else if (['next', 'refresh', 'confirm'].includes(action)) {
       await this.setCurrentSportId(this.getDefaultSportId());
     }

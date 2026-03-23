@@ -41,8 +41,8 @@ class SportsService {
         icon: '⚾'
       },
       soccer: {
-        name: 'Soccer',
-        url: 'soccer/usa.1', // MLS
+        name: 'Premier League',
+        url: 'soccer/eng.1',
         icon: '⚽'
       }
     };
@@ -176,15 +176,7 @@ class SportsService {
           detail = `${status.displayClock || ''}'`.trim();
         }
       } else {
-        // For upcoming games, convert time to Central timezone
-        const gameDate = new Date(event.date);
-        const centralTime = gameDate.toLocaleTimeString('en-US', {
-          timeZone: 'America/Chicago',
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true
-        });
-        detail = centralTime;
+        detail = this.formatUpcomingDetail(event.date);
       }
 
       // Get broadcast info - show only first network
@@ -250,6 +242,41 @@ class SportsService {
       return `OT${period - 2}`;
     }
     return `Period ${period}`;
+  }
+
+  formatUpcomingDetail(dateString, now = new Date()) {
+    const gameDate = new Date(dateString);
+    const currentDateKey = now.toLocaleDateString('en-CA', {
+      timeZone: 'America/Chicago'
+    });
+    const gameDateKey = gameDate.toLocaleDateString('en-CA', {
+      timeZone: 'America/Chicago'
+    });
+    const centralTime = gameDate.toLocaleTimeString('en-US', {
+      timeZone: 'America/Chicago',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
+    if (gameDateKey === currentDateKey) {
+      return centralTime;
+    }
+
+    const weekday = gameDate.toLocaleDateString('en-US', {
+      timeZone: 'America/Chicago',
+      weekday: 'short'
+    });
+    const month = gameDate.toLocaleDateString('en-US', {
+      timeZone: 'America/Chicago',
+      month: 'numeric'
+    });
+    const day = gameDate.toLocaleDateString('en-US', {
+      timeZone: 'America/Chicago',
+      day: 'numeric'
+    });
+
+    return `${weekday} ${month}/${day} ${centralTime}`;
   }
 
   getQuarter(period) {

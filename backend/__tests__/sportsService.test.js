@@ -21,4 +21,16 @@ describe('Sports Service', () => {
       expect(sportsService.getPeriod(3, 'ncaab')).toBe('OT1');
     });
   });
+
+  describe('formatUpcomingDetail()', () => {
+    it('shows only the time for same-day games', () => {
+      const now = new Date('2026-03-23T15:00:00-05:00');
+      expect(sportsService.formatUpcomingDetail('2026-03-23T20:30:00Z', now)).toBe('3:30 PM');
+    });
+
+    it('includes weekday and date for future-day games', () => {
+      const now = new Date('2026-03-23T15:00:00-05:00');
+      expect(sportsService.formatUpcomingDetail('2026-03-30T00:00:00Z', now)).toBe('Sun 3/29 7:00 PM');
+    });
+  });
 });
