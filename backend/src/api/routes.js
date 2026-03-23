@@ -425,13 +425,19 @@ router.post('/display/refresh', adminAuth, (req, res) => {
   }
 });
 
-router.post('/display/page', adminAuth, (req, res) => {
+router.post('/display/page', adminAuth, async (req, res) => {
   try {
     const { page } = req.body || {};
+    if (settingsService.get('display.standbyMode') === true) {
+      await sceneEngine.applyStandbyMode(false, `display_page:${page}`);
+    }
+    await consoleService.openPage(page, 'admin_route');
     websocketServer.broadcastPageChange(page, { source: 'admin_route' });
     res.json({ success: true, page });
   } catch (error) {
-    const status = error.message === 'Invalid page change request' ? 400 : 500;
+    const status = /Invalid page change request|Unknown or disabled console page/.test(error.message)
+      ? 400
+      : 500;
     logger.error('Failed to change display page', { error: error.message });
     res.status(status).json({ error: error.message || 'Failed to change display page' });
   }

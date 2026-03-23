@@ -314,7 +314,7 @@ class ConsoleService {
 
   getInactivityTimeoutMs() {
     const seconds = Number(settingsService.get('console.inactivityTimeoutSeconds'));
-    return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 180000;
+    return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 300000;
   }
 
   getDefaultPageId() {
@@ -1330,6 +1330,7 @@ class ConsoleService {
   async tick() {
     const now = Date.now();
     let changed = false;
+    let pageChangeSource = null;
 
     if (this.isManualPage() && Number.isFinite(this.state.expiresAt) && this.state.expiresAt <= now) {
       this.state.activePageId = this.getDefaultPageId();
@@ -1337,6 +1338,7 @@ class ConsoleService {
       this.state.lastAction = 'timeout';
       this.state.updatedAt = now;
       changed = true;
+      pageChangeSource = 'timeout';
     }
 
     const alarmSettings = settingsService.get('alarm') || {};
@@ -1389,6 +1391,12 @@ class ConsoleService {
     if (changed) {
       this.state.updatedAt = now;
       this.broadcastState();
+      if (pageChangeSource) {
+        const websocketServer = require('../api/websocket');
+        websocketServer.broadcastPageChange(getPresentedPageId(this.state.activePageId), {
+          source: pageChangeSource,
+        });
+      }
       if (this.isManualPage()) {
         await this.broadcastPageData(this.state.activePageId);
       }

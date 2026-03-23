@@ -373,13 +373,21 @@ class WebSocketServer {
           });
           return;
         }
-        this.broadcastPageChange(data.page, { source: 'display_sync' });
-        consoleService.openPage(data.page, 'display_sync').catch((error) => {
-          logger.error('Failed to sync console page from display', {
-            error: error.message,
-            page: data.page,
+        consoleService.openPage(data.page, 'display_sync')
+          .then(() => {
+            this.broadcastPageChange(data.page, { source: 'display_sync' });
+          })
+          .catch((error) => {
+            logger.error('Failed to sync console page from display', {
+              error: error.message,
+              page: data.page,
+            });
+            this.send(ws, {
+              type: 'error',
+              message: 'Failed to sync page state',
+              timestamp: Date.now()
+            });
           });
-        });
         break;
 
       default:

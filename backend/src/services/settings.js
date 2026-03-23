@@ -71,6 +71,9 @@ const DEFAULT_SETTINGS = {
     standbyOnIdle: true,
     idleTimeoutSeconds: 300
   },
+  console: {
+    inactivityTimeoutSeconds: 300
+  },
   sensorSource: {
     climatePrimary: 'esp32',
     compareMode: false

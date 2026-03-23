@@ -84,6 +84,7 @@ Button role model:
 - spotify page: button2 play/pause, button3 previous, button4 next
 - button5 toggles stats overlay
 - standby: button1 wakes display, button5 opens stats
+- manual pages such as fun and spotify return to home after 5 minutes of inactivity by default
 
 ## Backend Responsibilities
 
@@ -105,7 +106,10 @@ Primary services:
 
 ### Page Sync Flow
 
-display websocket sync_page -> backend websocket handler -> console openPage -> page_change broadcast
+- backend console state is authoritative for page selection
+- websocket connection sends current console_state to the display on connect/reconnect
+- manual page changes update consoleService first, then broadcast page_change
+- inactivity timeout returns manual pages to home and broadcasts that change to both display and OLED clients
 
 ### ESP32 Input Flow
 
@@ -130,5 +134,5 @@ consoleService getEsp32State -> GET /api/console/state?device=esp32 -> esp32 pol
 
 ## Document Metadata
 
-- Version: 1.1
-- Last Updated: March 18, 2026
+- Version: 1.2
+- Last Updated: March 23, 2026

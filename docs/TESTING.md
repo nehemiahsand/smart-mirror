@@ -70,6 +70,7 @@ Validate:
 - button5 toggles stats overlay
 - standby shows Turn On and can wake via button1 or PIR motion
 - oled receives current state from /api/console/state?device=esp32
+- after 5 minutes of inactivity on spotify or fun, both the OLED and mirror return to home together
 
 ## 6) Useful Logs
 
@@ -83,8 +84,8 @@ docker compose logs --tail=200 sensor
 
 ## Document Metadata
 
-- Version: 1.1
-- Last Updated: March 18, 2026
+- Version: 1.2
+- Last Updated: March 23, 2026
 
 ## 7) Automated Unit Testing (Jest)
 

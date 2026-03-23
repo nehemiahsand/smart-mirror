@@ -47,13 +47,8 @@ function App() {
         weatherData,
         consolePageData,
         settings,
-        message,
-        syncPage
+        message
     } = useWebSocket(handlePageChange, handleListeningChange);
-
-    useEffect(() => {
-        syncPage(currentPage);
-    }, [currentPage, syncPage]);
 
     // Initialize layout engine
     const {

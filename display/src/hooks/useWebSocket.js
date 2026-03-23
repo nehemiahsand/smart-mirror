@@ -27,6 +27,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const previousStandbyMode = useRef(null);
+  const settingsRef = useRef(null);
 
   const connect = useCallback(() => {
     try {
@@ -35,13 +36,6 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
       ws.onopen = () => {
         console.log('WebSocket connected');
         setIsConnected(true);
-        
-        // Broadcast current page so other clients can sync state.
-        const currentPage = normalizePage(localStorage.getItem('currentPage'));
-        ws.send(JSON.stringify({
-          type: 'sync_page',
-          page: currentPage
-        }));
       };
 
       ws.onmessage = (event) => {
@@ -61,13 +55,14 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
             }
             
             previousStandbyMode.current = newStandbyMode;
+            settingsRef.current = data.data;
             setSettings(data.data);
             return;
           }
           
           // In standby mode, ignore all other messages to minimize CPU usage
           // We check settings here because it might be null on first load
-          if (settings?.display?.standbyMode === true) {
+          if (settingsRef.current?.display?.standbyMode === true) {
             return;
           }
           
@@ -80,6 +75,11 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
               break;
             case 'weather_data':
               setWeatherData(data.data);
+              break;
+            case 'console_state':
+              if (data.data?.activePageId && onPageChange) {
+                onPageChange(normalizePage(data.data.activePageId));
+              }
               break;
             case 'console_page_data':
               if (data.pageId) {
@@ -179,15 +179,6 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
     };
   }, [connect]);
 
-  const syncPage = useCallback((page) => {
-    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify({
-        type: 'sync_page',
-        page: normalizePage(page)
-      }));
-    }
-  }, []);
-
   return {
     isConnected,
     time,
@@ -195,7 +186,6 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
     weatherData,
     consolePageData,
     settings,
-    message,
-    syncPage
+    message
   };
 };
