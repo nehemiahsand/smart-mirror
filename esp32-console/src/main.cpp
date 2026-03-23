@@ -134,6 +134,59 @@ int16_t measureTextWidth(const String& value) {
   return static_cast<int16_t>(width);
 }
 
+String abbreviateLabel(const String& value) {
+  if (value == "Play/Pause") {
+    return "Play";
+  }
+
+  if (value == "Previous") {
+    return "Prev";
+  }
+
+  if (value == "Default") {
+    return "Home";
+  }
+
+  if (value == "Main Page") {
+    return "Home";
+  }
+
+  if (value == "Turn On") {
+    return "Wake";
+  }
+
+  return value;
+}
+
+String fitTextToWidth(const String& value, int16_t maxWidth, size_t maxLength = 20,
+                      bool abbreviate = true) {
+  if (value.isEmpty() || maxWidth <= 0) {
+    return "";
+  }
+
+  String fitted = abbreviate ? abbreviateLabel(value) : value;
+  fitted = clipLine(fitted, maxLength);
+
+  if (measureTextWidth(fitted) <= maxWidth) {
+    return fitted;
+  }
+
+  if (measureTextWidth("~") > maxWidth) {
+    return "";
+  }
+
+  String trimmed = fitted;
+  while (trimmed.length() > 1) {
+    trimmed = trimmed.substring(0, trimmed.length() - 1);
+    const String candidate = trimmed + "~";
+    if (measureTextWidth(candidate) <= maxWidth) {
+      return candidate;
+    }
+  }
+
+  return "";
+}
+
 String backendUrl(const char* path) {
   return String(Config::BACKEND_BASE_URL) + path;
 }
@@ -372,11 +425,7 @@ void renderHeader(const String& title) {
   const int16_t rightPadding = 3;
   const int16_t titleMaxWidth =
       Config::SCREEN_WIDTH - statusWidth - (rightPadding * 3) - 2;
-  String headerTitle = title;
-
-  while (measureTextWidth(headerTitle) > titleMaxWidth && !headerTitle.isEmpty()) {
-    headerTitle = clipLine(headerTitle, headerTitle.length() - 1);
-  }
+  const String headerTitle = fitTextToWidth(title, titleMaxWidth, 20, false);
 
   gDisplay.fillRect(0, 0, Config::SCREEN_WIDTH, headerHeight, SSD1306_WHITE);
   gDisplay.setTextColor(SSD1306_BLACK);
@@ -393,7 +442,7 @@ void drawCenteredText(int16_t x, int16_t y, int16_t width, int16_t height, const
   }
 
   const int16_t textWidth = measureTextWidth(value);
-  const int16_t textX = x + max<int16_t>(2, (width - textWidth) / 2);
+  const int16_t textX = x + max<int16_t>(0, (width - textWidth) / 2);
   const int16_t textY = y + max<int16_t>(1, (height - 8) / 2);
   gDisplay.setCursor(textX, textY);
   gDisplay.print(value);
@@ -424,7 +473,8 @@ void drawButtonCard(
   }
 
   const int16_t badgeWidth = 11;
-  const String cardLabel = clipLine(label, maxLength);
+  const String cardLabel =
+      fitTextToWidth(label, width - badgeWidth - 6, maxLength);
 
   gDisplay.drawRoundRect(x, y, width, height, 2, SSD1306_WHITE);
   gDisplay.fillRect(x + 1, y + 1, badgeWidth - 1, height - 2, SSD1306_WHITE);
@@ -441,7 +491,7 @@ void drawMessageCard(int16_t x, int16_t y, int16_t width, int16_t height, const 
   }
 
   gDisplay.drawRoundRect(x, y, width, height, 2, SSD1306_WHITE);
-  drawCenteredText(x + 2, y, width - 4, height, clipLine(value, maxLength));
+  drawCenteredText(x + 2, y, width - 4, height, fitTextToWidth(value, width - 8, maxLength));
 }
 
 void drawCompactButtonGrid(bool showExtendedControls) {
@@ -515,14 +565,13 @@ void renderPageScreen() {
   if (showExtendedControls) {
     const int16_t topWidth = (Config::SCREEN_WIDTH - 2) / 2;
     const int16_t bottomWidth = (Config::SCREEN_WIDTH - 4) / 3;
-    drawButtonCard(0, 15, topWidth, 14, 1, gMirrorState.button1, 10);
-    drawButtonCard(topWidth + 2, 15, Config::SCREEN_WIDTH - topWidth - 2, 14, 5,
+    drawButtonCard(0, 15, topWidth, 21, 1, gMirrorState.button1, 10);
+    drawButtonCard(topWidth + 2, 15, Config::SCREEN_WIDTH - topWidth - 2, 21, 5,
                    gMirrorState.button5, 10);
-    drawButtonCard(0, 33, bottomWidth, 14, 2, gMirrorState.button2, 8);
-    drawButtonCard(bottomWidth + 2, 33, bottomWidth, 14, 3, gMirrorState.button3, 8);
-    drawButtonCard((bottomWidth * 2) + 4, 33, Config::SCREEN_WIDTH - ((bottomWidth * 2) + 4), 14,
+    drawButtonCard(0, 40, bottomWidth, 24, 2, gMirrorState.button2, 8);
+    drawButtonCard(bottomWidth + 2, 40, bottomWidth, 24, 3, gMirrorState.button3, 8);
+    drawButtonCard((bottomWidth * 2) + 4, 40, Config::SCREEN_WIDTH - ((bottomWidth * 2) + 4), 24,
                    4, gMirrorState.button4, 8);
-    drawMessageCard(0, 51, Config::SCREEN_WIDTH, 13, gMirrorState.statusLabel);
     return;
   }
 
