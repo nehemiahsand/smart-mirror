@@ -1,3 +1,0 @@
-adafruit-circuitpython-dht==4.0.3
-adafruit-blinka==8.47.0
-rpi-lgpio==0.6

@@ -117,7 +117,6 @@ It verifies:
 - Systemd `.timer` is active (`smart-mirror-updater.timer`), providing fully automated Continuous Deployment (CD).
 - `node --check` passed on modified backend files.
 - `python3 -m py_compile` passed for:
-  - `sensor/dht22_server.py`
   - `camera/camera_service.py`
 - `npm run build` passed in:
   - `mobile-pwa`
@@ -136,10 +135,6 @@ It verifies:
 - Camera-specific follow-up verification passed for:
   - rebuilt `camera` service for lightweight MJPEG streaming
   - `docker inspect ... ReadonlyRootfs => true`
-- Sensor-specific follow-up verification passed for:
-  - rebuilt `sensor` service with `ReadonlyRootfs => true`
-  - `WorkingDir => /tmp`
-  - direct `http://sensor:5555` response from the backend container network
 - Final hardening verification passed for:
   - `./scripts/security-smoke-test.sh`
   - server-side admin session revocation (`GET /api/auth/session` changed from `200` before logout to `401` after logout using the same cookie jar)

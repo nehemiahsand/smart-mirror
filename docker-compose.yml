@@ -24,32 +24,6 @@ services:
       - /mosquitto/log
     restart: unless-stopped
 
-  sensor:
-    build:
-      context: ./sensor
-      dockerfile: Dockerfile
-    container_name: smart-mirror-sensor
-    working_dir: /tmp
-    command: ["python3", "/app/dht22_server.py"]
-    environment:
-      - BLINKA_FORCECHIP=BCM2XXX
-      - BLINKA_FORCEBOARD=RASPBERRY_PI_5
-      - RPI_LGPIO_REVISION=d04170
-    devices:
-      - /dev/gpiomem0:/dev/gpiomem
-      - /dev/gpiochip0:/dev/gpiochip0
-      - /dev/gpiochip4:/dev/gpiochip4
-    expose:
-      - "5555"
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    read_only: true
-    tmpfs:
-      - /tmp
-    restart: unless-stopped
-
   camera:
     build:
       context: ./camera
@@ -85,9 +59,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3001
-      - SENSOR_URL=http://sensor:5555
       - CAMERA_URL=http://camera:5556
-      - DHT22_GPIO_PIN=4
       - DISPLAY=:0
       - WAYLAND_DISPLAY=wayland-0
       - XDG_RUNTIME_DIR=/run/user/1000
@@ -106,7 +78,6 @@ services:
       - /run/user/1000:/run/user/1000
     depends_on:
       - mosquitto
-      - sensor
       - camera
     cap_drop:
       - ALL

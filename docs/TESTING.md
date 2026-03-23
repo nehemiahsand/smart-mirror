@@ -99,8 +99,6 @@ npm test
 ```
 
 ### Test Coverage Highlights
-* **Hardware Abstraction Layer (HAL):**
-  * `dht22.test.js`: Validates that the sensor injects synthetic mock JSON data when `NODE_ENV=development` and correctly attempts to dial the physical sensor in production mode.
 * **Security & Authorization:**
   * `apiKey.test.js`: Validates `503` misconfiguration blocks and `401` header rejection.
   * `adminAuth.test.js`: Asserts admin role payload verification on secure tokens.

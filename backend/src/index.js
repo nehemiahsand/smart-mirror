@@ -20,7 +20,6 @@ const climateService = require('./services/climate');
 const consoleService = require('./services/console');
 const sceneEngine = require('./services/sceneEngine');
 const esp32InputService = require('./services/esp32Input');
-const dht22Service = require('./sensors/dht22');
 const websocketServer = require('./api/websocket');
 const apiRoutes = require('./api/routes');
 const spotifyRoutes = require('./api/spotify-routes');
@@ -203,7 +202,7 @@ if (HAS_FRONTEND_BUILD) {
         settings: '/api/settings',
         weather: '/api/weather/current',
         wifi: '/api/wifi/status',
-        sensor: '/api/sensor/dht22',
+        sensor: '/api/sensor',
         system: '/api/system/info'
       }
     });
@@ -282,46 +281,6 @@ async function start() {
 
     esp32InputService.initialize();
     logger.info('ESP32 input integration initialized');
-
-    // Start continuous sensor reading (if available and not in standby mode)
-    let sensorIntervalId = null;
-    if (dht22Service.isAvailable()) {
-      const settings = settingsService.getAll();
-      const sensorInterval = parseInt(process.env.SENSOR_INTERVAL) || 60000;
-      
-      const startSensorReading = () => {
-        if (sensorIntervalId) {
-          clearInterval(sensorIntervalId);
-        }
-        
-        const currentSettings = settingsService.getAll();
-        if (!currentSettings?.display?.standbyMode) {
-          sensorIntervalId = setInterval(async () => {
-            const currentSettings = settingsService.getAll();
-            if (!currentSettings?.display?.standbyMode) {
-              const reading = await climateService.getCurrentReading();
-              if (!reading.error) {
-                // Reduced logging - only log on websocket broadcast
-                websocketServer.broadcastSensorData(reading);
-              }
-            }
-          }, sensorInterval);
-          
-          logger.info('Continuous sensor reading started', {
-            interval: sensorInterval,
-            gpio: dht22Service.gpioPin
-          });
-        } else {
-          logger.info('Sensor reading paused (standby mode active)');
-        }
-      };
-      
-      // Start initial reading
-      startSensorReading();
-      
-      // Listen for settings changes to start/stop sensor reading
-      app.set('restartSensorReading', startSensorReading);
-    }
 
     // Start periodic weather updates
     const weatherUpdateInterval = settingsService.get('weather.updateInterval') || 600000;

@@ -10,7 +10,7 @@ const weatherService = require('../services/weather');
 const photosService = require('../services/photos');
 const funContentService = require('../services/funContent');
 const wifiService = require('../services/wifi');
-const dht22Service = require('../sensors/dht22');
+const climateService = require('../services/climate');
 const googleCalendarService = require('../services/googleCalendar');
 const powerService = require('../services/power');
 const displayService = require('../services/display');
@@ -1029,31 +1029,8 @@ router.post('/wifi/hotspot/stop', adminAuth, async (req, res) => {
 // Get current sensor reading (simplified endpoint)
 router.get('/sensor', async (req, res) => {
   try {
-    // In standby mode, return last cached reading without querying hardware
-    const settings = settingsService.getAll();
-    if (settings?.display?.standbyMode) {
-      const lastReading = dht22Service.getLastReading();
-      if (lastReading) {
-        res.json(lastReading);
-      } else {
-        const reading = await dht22Service.getCurrentReading();
-        res.json(reading);
-      }
-      return;
-    }
-    
-    const reading = await dht22Service.getCurrentReading();
-    res.json(reading);
-  } catch (error) {
-    logger.error('Failed to read sensor', { error: error.message });
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get current sensor reading (legacy endpoint)
-router.get('/sensor/dht22', async (req, res) => {
-  try {
-    const reading = await dht22Service.read();
+    // Route through climate service so the configured primary source is honored (ESP32 or Pi).
+    const reading = await climateService.getCurrentReading();
     res.json(reading);
   } catch (error) {
     logger.error('Failed to read sensor', { error: error.message });
@@ -1064,13 +1041,13 @@ router.get('/sensor/dht22', async (req, res) => {
 // Get sensor status
 router.get('/sensor/status', (req, res) => {
   try {
-    const lastReading = dht22Service.getLastReading();
-    const available = dht22Service.isAvailable();
+    const lastReading = climateService.getEsp32Reading();
+    const available = !!lastReading;
     
     res.json({
       available,
       lastReading,
-      gpio: dht22Service.gpioPin
+      source: 'esp32'
     });
   } catch (error) {
     logger.error('Failed to get sensor status', { error: error.message });

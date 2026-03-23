@@ -1,4 +1,3 @@
-const dht22Service = require('../sensors/dht22');
 const logger = require('../utils/logger');
 const settingsService = require('./settings');
 
@@ -25,11 +24,11 @@ class ClimateService {
   }
 
   getPrimarySource() {
-    return settingsService.get('sensorSource.climatePrimary') || 'pi';
+    return 'esp32';
   }
 
   isCompareModeEnabled() {
-    return settingsService.get('sensorSource.compareMode') !== false;
+    return false;
   }
 
   normalizeEsp32Reading(payload = {}, meta = {}) {
@@ -96,41 +95,18 @@ class ClimateService {
     return this.esp32Reading ? { ...this.esp32Reading } : null;
   }
 
-  async getPiReading() {
-    const reading = await dht22Service.getCurrentReading();
-    if (reading?.error) {
-      return null;
-    }
-
-    return {
-      ...reading,
-      source: 'pi',
-      sourceId: 'raspberry-pi',
-    };
-  }
-
-  selectPrimaryReading(primarySource, piReading, esp32Reading) {
-    if (primarySource === 'esp32') {
-      return esp32Reading || piReading;
-    }
-    return piReading || esp32Reading;
-  }
-
   async getComparison() {
-    const [piReading, esp32Reading] = await Promise.all([
-      this.getPiReading(),
-      Promise.resolve(this.getEsp32Reading()),
-    ]);
+    const esp32Reading = this.getEsp32Reading();
     const primarySource = this.getPrimarySource();
-    const selectedReading = this.selectPrimaryReading(primarySource, piReading, esp32Reading);
+    const selectedReading = esp32Reading;
 
     return {
       primarySource,
       compareMode: this.isCompareModeEnabled(),
       selected: selectedReading,
-      pi: piReading,
+      pi: null,
       esp32: esp32Reading,
-      availableSources: [piReading ? 'pi' : null, esp32Reading ? 'esp32' : null].filter(Boolean),
+      availableSources: [esp32Reading ? 'esp32' : null].filter(Boolean),
     };
   }
 

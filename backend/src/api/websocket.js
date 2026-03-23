@@ -11,7 +11,6 @@ const consoleService = require('../services/console');
 const sceneEngine = require('../services/sceneEngine');
 const settingsService = require('../services/settings');
 const weatherService = require('../services/weather');
-const dht22Service = require('../sensors/dht22');
 const { redactSensitive } = require('../utils/redaction');
 
 const ALLOWED_SYNC_PAGES = new Set(['home', 'fun', 'spotify']);
@@ -123,7 +122,6 @@ class WebSocketServer {
     try {
       const settingsService = require('../services/settings');
       const weatherService = require('../services/weather');
-      const dht22Service = require('../sensors/dht22');
       
       // Send current settings
       const settings = redactSensitive(settingsService.getAll());
@@ -154,7 +152,7 @@ class WebSocketServer {
 
         // Send current sensor data
         try {
-          const reading = await dht22Service.getCurrentReading();
+          const reading = await climateService.getCurrentReading();
           if (!reading.error) {
             this.send(ws, {
               type: 'sensor_data',
@@ -282,8 +280,7 @@ class WebSocketServer {
    */
   async broadcastCurrentSensor() {
     try {
-      const dht22Service = require('../sensors/dht22');
-      const reading = await dht22Service.getCurrentReading();
+      const reading = await climateService.getCurrentReading();
       
       if (!reading.error) {
         this.broadcast({

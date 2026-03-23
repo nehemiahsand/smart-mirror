@@ -73,7 +73,7 @@ const DEFAULT_SETTINGS = {
   },
   sensorSource: {
     climatePrimary: 'esp32',
-    compareMode: true
+    compareMode: false
   },
   current_scene: 'day',
   current_page: 'home'
