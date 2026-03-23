@@ -84,6 +84,7 @@ String gLastEvent = "Booting";
 
 bool gMotionActive = false;
 bool gDisplayReady = false;
+uint8_t gStatsPageIndex = 0;
 
 unsigned long gLastWifiAttemptMs = 0;
 unsigned long gLastMqttAttemptMs = 0;
@@ -192,6 +193,47 @@ String backendUrl(const char* path) {
 }
 
 bool wifiConnected() { return WiFi.status() == WL_CONNECTED; }
+
+uint8_t getStatsPageCount() {
+  uint8_t count = 0;
+  if (!gMirrorState.statsLine1.isEmpty()) {
+    count += 1;
+  }
+  if (!gMirrorState.statsLine2.isEmpty()) {
+    count += 1;
+  }
+  if (!gMirrorState.statsLine3.isEmpty()) {
+    count += 1;
+  }
+  if (!gMirrorState.statsLine4.isEmpty()) {
+    count += 1;
+  }
+  return count;
+}
+
+String getStatsPageLine(uint8_t index) {
+  const String lines[] = {
+      gMirrorState.statsLine1,
+      gMirrorState.statsLine2,
+      gMirrorState.statsLine3,
+      gMirrorState.statsLine4,
+  };
+
+  uint8_t currentIndex = 0;
+  for (const String& line : lines) {
+    if (line.isEmpty()) {
+      continue;
+    }
+
+    if (currentIndex == index) {
+      return line;
+    }
+
+    currentIndex += 1;
+  }
+
+  return "";
+}
 
 void resetMirrorState() {
   gMirrorState.backendReachable = false;
@@ -392,6 +434,8 @@ void pollConsoleState() {
     return;
   }
 
+  const bool wasStatsScreen = gMirrorState.screenMode == "stats";
+
   gHasConsoleState = true;
   gMirrorState.backendReachable = true;
   gMirrorState.interactiveActive = document["interactiveActive"].as<bool>() || document["active"].as<bool>();
@@ -405,6 +449,15 @@ void pollConsoleState() {
   gMirrorState.statsLine2 = String(document["statsLine2"] | "");
   gMirrorState.statsLine3 = String(document["statsLine3"] | "");
   gMirrorState.statsLine4 = String(document["statsLine4"] | "");
+
+  const uint8_t statsPageCount = getStatsPageCount();
+  if (!wasStatsScreen && gMirrorState.screenMode == "stats") {
+    gStatsPageIndex = 0;
+  } else if (statsPageCount == 0) {
+    gStatsPageIndex = 0;
+  } else if (gStatsPageIndex >= statsPageCount) {
+    gStatsPageIndex = statsPageCount - 1;
+  }
 
   JsonObject softButtons = document["softButtons"].as<JsonObject>();
   if (!softButtons.isNull()) {
@@ -536,19 +589,25 @@ void renderStandbyScreen() {
 }
 
 void renderStatsScreen() {
+  const uint8_t statsPageCount = getStatsPageCount();
+  const String title = String("Stats ") + String(statsPageCount == 0 ? 0 : gStatsPageIndex + 1) +
+                       "/" + String(statsPageCount == 0 ? 0 : statsPageCount);
+  const String statsLine = statsPageCount == 0 ? "No stats" : getStatsPageLine(gStatsPageIndex);
+
   if (isCompactScreen()) {
-    drawMessageCard(0, 0, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine1, 20);
-    drawMessageCard(0, 8, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine2, 20);
-    drawMessageCard(0, 16, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine3, 20);
-    drawMessageCard(0, 24, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine4, 20);
+    renderHeader(title);
+    drawMessageCard(0, 10, Config::SCREEN_WIDTH, 14, statsLine, 20);
+    drawButtonCard(0, 24, 41, 8, 2, "Prev", 6);
+    drawButtonCard(43, 24, 41, 8, 3, "Next", 6);
+    drawButtonCard(86, 24, 42, 8, 5, "Back", 6);
     return;
   }
 
-  renderHeader("Stats");
-  drawMessageCard(0, 15, Config::SCREEN_WIDTH, 11, gMirrorState.statsLine1);
-  drawMessageCard(0, 28, Config::SCREEN_WIDTH, 11, gMirrorState.statsLine2);
-  drawMessageCard(0, 41, Config::SCREEN_WIDTH, 11, gMirrorState.statsLine3);
-  drawMessageCard(0, 54, Config::SCREEN_WIDTH, 10, gMirrorState.statsLine4);
+  renderHeader(title);
+  drawMessageCard(0, 16, Config::SCREEN_WIDTH, 30, statsLine);
+  drawButtonCard(0, 49, 41, 15, 2, "Prev", 6);
+  drawButtonCard(43, 49, 41, 15, 3, "Next", 6);
+  drawButtonCard(86, 49, 42, 15, 5, "Back", 6);
 }
 
 void renderPageScreen() {
@@ -631,6 +690,25 @@ void pollButtons() {
         button.pressedAtMs = nowMs;
         button.longSent = false;
       } else if (!button.longSent) {
+        if (gMirrorState.screenMode == "stats") {
+          const uint8_t statsPageCount = getStatsPageCount();
+          if (button.command == ButtonCommand::Primary && statsPageCount > 1) {
+            gStatsPageIndex = gStatsPageIndex == 0 ? statsPageCount - 1 : gStatsPageIndex - 1;
+            gLastOledRenderMs = 0;
+            continue;
+          }
+
+          if (button.command == ButtonCommand::Previous && statsPageCount > 1) {
+            gStatsPageIndex = (gStatsPageIndex + 1) % statsPageCount;
+            gLastOledRenderMs = 0;
+            continue;
+          }
+
+          if (button.command == ButtonCommand::TogglePage || button.command == ButtonCommand::Next) {
+            continue;
+          }
+        }
+
         publishAction(button, false);
       }
     }
@@ -638,6 +716,10 @@ void pollButtons() {
     if (button.stablePressed && !button.longSent &&
         (nowMs - button.pressedAtMs) >= Config::BUTTON_LONG_PRESS_MS) {
       button.longSent = true;
+      if (gMirrorState.screenMode == "stats") {
+        continue;
+      }
+
       publishAction(button, true);
     }
   }

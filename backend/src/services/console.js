@@ -454,10 +454,10 @@ class ConsoleService {
     if (options.screenMode === 'stats') {
       return {
         button1: '',
-        button2: '',
-        button3: '',
+        button2: 'Prev',
+        button3: 'Next',
         button4: '',
-        button5: 'Close',
+        button5: 'Back',
       };
     }
 
