@@ -23,11 +23,17 @@ function SportsScores({ sport = 'nba', teams = [] }) {
     useEffect(() => {
         console.log('SportsScores: sport changed to:', sport);
         setSportName(SPORT_NAMES[sport] || sport.toUpperCase());
+        setCurrentIndex(0);
         setLoading(true); // Reset loading state when sport changes
         fetchScores();
         const interval = setInterval(fetchScores, 2 * 60 * 1000); // Update every 2 minutes
         return () => clearInterval(interval);
     }, [sport, teams]);
+
+    useEffect(() => {
+        const maxIndex = Math.max(Math.ceil(games.length / GAMES_PER_PAGE) - 1, 0);
+        setCurrentIndex((prevIndex) => Math.min(prevIndex, maxIndex));
+    }, [games.length]);
 
     useEffect(() => {
         if (games.length <= GAMES_PER_PAGE) return;

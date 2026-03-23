@@ -1,5 +1,6 @@
 const axios = require('axios');
 const logger = require('../utils/logger');
+const SPORTS_API_TIMEOUT_MS = 8000;
 
 class SportsService {
   constructor() {
@@ -72,7 +73,7 @@ class SportsService {
       const url = `https://site.web.api.espn.com/apis/site/v2/sports/${config.url}/scoreboard?dates=${today}&limit=200`;
 
       logger.info(`${config.name}: Fetching today's games from ${url}`);
-      const response = await axios.get(url);
+      const response = await axios.get(url, { timeout: SPORTS_API_TIMEOUT_MS });
       
       let formattedGames = null;
 
@@ -113,7 +114,7 @@ class SportsService {
           const futureUrl = `https://site.web.api.espn.com/apis/site/v2/sports/${config.url}/scoreboard?dates=${dateStr}&limit=200`;
           
           logger.info(`${config.name}: Checking ${daysAhead} day(s) ahead...`);
-          const futureResponse = await axios.get(futureUrl);
+          const futureResponse = await axios.get(futureUrl, { timeout: SPORTS_API_TIMEOUT_MS });
           
           if (futureResponse.data && futureResponse.data.events && futureResponse.data.events.length > 0) {
             formattedGames = this.formatGames(futureResponse.data.events, sport);
@@ -240,9 +241,13 @@ class SportsService {
   }
 
   getPeriod(period, sport) {
-    if (sport === 'nba' || sport === 'ncaab') {
+    if (sport === 'nba') {
       if (period <= 4) return `Q${period}`;
       return `OT${period - 4}`;
+    }
+    if (sport === 'ncaab') {
+      if (period <= 2) return `H${period}`;
+      return `OT${period - 2}`;
     }
     return `Period ${period}`;
   }
