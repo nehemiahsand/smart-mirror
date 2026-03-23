@@ -125,6 +125,15 @@ String clipLine(const String& value, size_t maxLength = 20) {
 
 bool isCompactScreen() { return Config::SCREEN_HEIGHT <= 32; }
 
+int16_t measureTextWidth(const String& value) {
+  int16_t x1 = 0;
+  int16_t y1 = 0;
+  uint16_t width = 0;
+  uint16_t height = 0;
+  gDisplay.getTextBounds(value, 0, 0, &x1, &y1, &width, &height);
+  return static_cast<int16_t>(width);
+}
+
 String backendUrl(const char* path) {
   return String(Config::BACKEND_BASE_URL) + path;
 }
@@ -355,12 +364,39 @@ void pollConsoleState() {
 }
 
 void renderHeader(const String& title) {
-  gDisplay.setCursor(0, 0);
-  gDisplay.print(clipLine(title, 12));
-  gDisplay.setCursor(84, 0);
-  gDisplay.printf("%c%c%c", wifiConnected() ? 'W' : '-', gMqttClient.connected() ? 'M' : '-',
-                  gMirrorState.backendReachable ? 'B' : '-');
-  gDisplay.drawLine(0, 10, Config::SCREEN_WIDTH - 1, 10, SSD1306_WHITE);
+  const String status =
+      String(wifiConnected() ? 'W' : '-') + String(gMqttClient.connected() ? 'M' : '-') +
+      String(gMirrorState.backendReachable ? 'B' : '-');
+  const int16_t headerHeight = isCompactScreen() ? 9 : 12;
+  const int16_t statusWidth = measureTextWidth(status);
+  const int16_t rightPadding = 3;
+  const int16_t titleMaxWidth =
+      Config::SCREEN_WIDTH - statusWidth - (rightPadding * 3) - 2;
+  String headerTitle = title;
+
+  while (measureTextWidth(headerTitle) > titleMaxWidth && !headerTitle.isEmpty()) {
+    headerTitle = clipLine(headerTitle, headerTitle.length() - 1);
+  }
+
+  gDisplay.fillRect(0, 0, Config::SCREEN_WIDTH, headerHeight, SSD1306_WHITE);
+  gDisplay.setTextColor(SSD1306_BLACK);
+  gDisplay.setCursor(3, isCompactScreen() ? 1 : 2);
+  gDisplay.print(headerTitle);
+  gDisplay.setCursor(Config::SCREEN_WIDTH - statusWidth - rightPadding, isCompactScreen() ? 1 : 2);
+  gDisplay.print(status);
+  gDisplay.setTextColor(SSD1306_WHITE);
+}
+
+void drawCenteredText(int16_t x, int16_t y, int16_t width, int16_t height, const String& value) {
+  if (value.isEmpty()) {
+    return;
+  }
+
+  const int16_t textWidth = measureTextWidth(value);
+  const int16_t textX = x + max<int16_t>(2, (width - textWidth) / 2);
+  const int16_t textY = y + max<int16_t>(1, (height - 8) / 2);
+  gDisplay.setCursor(textX, textY);
+  gDisplay.print(value);
 }
 
 void drawLineIfPresent(int16_t y, const String& value, size_t maxLength = 20) {
@@ -380,33 +416,89 @@ void drawButtonLine(int16_t y, uint8_t buttonNumber, const String& label, size_t
   drawLineIfPresent(y, String(buttonNumber) + " " + label, maxLength);
 }
 
-void renderStandbyScreen() {
-  renderHeader("Standby");
-  if (isCompactScreen()) {
-    drawButtonLine(16, 1, gMirrorState.button1, 20);
-    drawButtonLine(24, 5, gMirrorState.button5, 20);
+void drawButtonCard(
+    int16_t x, int16_t y, int16_t width, int16_t height, uint8_t buttonNumber, const String& label,
+    size_t maxLength = 20) {
+  if (label.isEmpty()) {
     return;
   }
 
-  drawLineIfPresent(18, gMirrorState.statusLabel);
-  drawButtonLine(42, 1, gMirrorState.button1);
-  drawButtonLine(54, 5, gMirrorState.button5);
+  const int16_t badgeWidth = 11;
+  const String cardLabel = clipLine(label, maxLength);
+
+  gDisplay.drawRoundRect(x, y, width, height, 2, SSD1306_WHITE);
+  gDisplay.fillRect(x + 1, y + 1, badgeWidth - 1, height - 2, SSD1306_WHITE);
+  gDisplay.setTextColor(SSD1306_BLACK);
+  drawCenteredText(x + 1, y + 1, badgeWidth - 1, height - 2, String(buttonNumber));
+  gDisplay.setTextColor(SSD1306_WHITE);
+  drawCenteredText(x + badgeWidth + 1, y, width - badgeWidth - 3, height, cardLabel);
+}
+
+void drawMessageCard(int16_t x, int16_t y, int16_t width, int16_t height, const String& value,
+                     size_t maxLength = 20) {
+  if (value.isEmpty()) {
+    return;
+  }
+
+  gDisplay.drawRoundRect(x, y, width, height, 2, SSD1306_WHITE);
+  drawCenteredText(x + 2, y, width - 4, height, clipLine(value, maxLength));
+}
+
+void drawCompactButtonGrid(bool showExtendedControls) {
+  const int16_t contentY = 10;
+  const int16_t rowHeight = 8;
+  const int16_t gap = 2;
+  const int16_t halfWidth = (Config::SCREEN_WIDTH - gap) / 2;
+
+  if (showExtendedControls) {
+    drawButtonCard(0, contentY, halfWidth, rowHeight, 1, gMirrorState.button1, 8);
+    drawButtonCard(halfWidth + gap, contentY, Config::SCREEN_WIDTH - halfWidth - gap, rowHeight, 5,
+                   gMirrorState.button5, 8);
+    drawButtonCard(0, contentY + rowHeight, halfWidth, rowHeight, 2, gMirrorState.button2, 8);
+    drawButtonCard(halfWidth + gap, contentY + rowHeight,
+                   Config::SCREEN_WIDTH - halfWidth - gap, rowHeight, 3, gMirrorState.button3, 8);
+    drawButtonCard(0, contentY + (rowHeight * 2), Config::SCREEN_WIDTH, rowHeight, 4,
+                   gMirrorState.button4, 16);
+    return;
+  }
+
+  drawMessageCard(0, contentY, Config::SCREEN_WIDTH, rowHeight, gMirrorState.statusLabel, 20);
+  drawButtonCard(0, contentY + rowHeight, Config::SCREEN_WIDTH, rowHeight, 1, gMirrorState.button1, 18);
+  if (!gMirrorState.button5.isEmpty()) {
+    drawButtonCard(0, contentY + (rowHeight * 2), Config::SCREEN_WIDTH, rowHeight, 5,
+                   gMirrorState.button5, 18);
+  } else {
+    drawMessageCard(0, contentY + (rowHeight * 2), Config::SCREEN_WIDTH, rowHeight,
+                    gMirrorState.lastAction, 20);
+  }
+}
+
+void renderStandbyScreen() {
+  renderHeader("Standby");
+  if (isCompactScreen()) {
+    drawCompactButtonGrid(false);
+    return;
+  }
+
+  drawMessageCard(0, 15, Config::SCREEN_WIDTH, 14, gMirrorState.statusLabel);
+  drawButtonCard(0, 33, Config::SCREEN_WIDTH, 13, 1, gMirrorState.button1, 18);
+  drawButtonCard(0, 49, Config::SCREEN_WIDTH, 13, 5, gMirrorState.button5, 18);
 }
 
 void renderStatsScreen() {
   if (isCompactScreen()) {
-    drawLineIfPresent(0, gMirrorState.statsLine1, 20);
-    drawLineIfPresent(8, gMirrorState.statsLine2, 20);
-    drawLineIfPresent(16, gMirrorState.statsLine3, 20);
-    drawLineIfPresent(24, gMirrorState.statsLine4, 20);
+    drawMessageCard(0, 0, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine1, 20);
+    drawMessageCard(0, 8, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine2, 20);
+    drawMessageCard(0, 16, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine3, 20);
+    drawMessageCard(0, 24, Config::SCREEN_WIDTH, 8, gMirrorState.statsLine4, 20);
     return;
   }
 
   renderHeader("Stats");
-  drawLineIfPresent(16, gMirrorState.statsLine1);
-  drawLineIfPresent(28, gMirrorState.statsLine2);
-  drawLineIfPresent(40, gMirrorState.statsLine3);
-  drawLineIfPresent(52, gMirrorState.statsLine4);
+  drawMessageCard(0, 15, Config::SCREEN_WIDTH, 11, gMirrorState.statsLine1);
+  drawMessageCard(0, 28, Config::SCREEN_WIDTH, 11, gMirrorState.statsLine2);
+  drawMessageCard(0, 41, Config::SCREEN_WIDTH, 11, gMirrorState.statsLine3);
+  drawMessageCard(0, 54, Config::SCREEN_WIDTH, 10, gMirrorState.statsLine4);
 }
 
 void renderPageScreen() {
@@ -416,31 +508,31 @@ void renderPageScreen() {
       gMirrorState.activePageId == "home";
 
   if (isCompactScreen()) {
-    if (showExtendedControls) {
-      drawLineIfPresent(16, String("1 ") + gMirrorState.button1 + "  5 " + gMirrorState.button5, 20);
-      drawLineIfPresent(24, String("2 ") + gMirrorState.button2 + " 3 " + gMirrorState.button3 + " 4 " +
-                                 gMirrorState.button4,
-                        20);
-      return;
-    }
-
-    drawButtonLine(16, 1, gMirrorState.button1, 20);
-    drawButtonLine(24, 5, gMirrorState.button5, 20);
+    drawCompactButtonGrid(showExtendedControls);
     return;
   }
 
   if (showExtendedControls) {
-    drawButtonLine(16, 1, gMirrorState.button1);
-    drawButtonLine(28, 2, gMirrorState.button2);
-    if (!gMirrorState.button3.isEmpty() || !gMirrorState.button4.isEmpty()) {
-      drawLineIfPresent(40, String("3 ") + gMirrorState.button3 + "  4 " + gMirrorState.button4);
-    }
-    drawButtonLine(52, 5, gMirrorState.button5);
+    const int16_t topWidth = (Config::SCREEN_WIDTH - 2) / 2;
+    const int16_t bottomWidth = (Config::SCREEN_WIDTH - 4) / 3;
+    drawButtonCard(0, 15, topWidth, 14, 1, gMirrorState.button1, 10);
+    drawButtonCard(topWidth + 2, 15, Config::SCREEN_WIDTH - topWidth - 2, 14, 5,
+                   gMirrorState.button5, 10);
+    drawButtonCard(0, 33, bottomWidth, 14, 2, gMirrorState.button2, 8);
+    drawButtonCard(bottomWidth + 2, 33, bottomWidth, 14, 3, gMirrorState.button3, 8);
+    drawButtonCard((bottomWidth * 2) + 4, 33, Config::SCREEN_WIDTH - ((bottomWidth * 2) + 4), 14,
+                   4, gMirrorState.button4, 8);
+    drawMessageCard(0, 51, Config::SCREEN_WIDTH, 13, gMirrorState.statusLabel);
     return;
   }
 
-  drawButtonLine(22, 1, gMirrorState.button1);
-  drawButtonLine(44, 5, gMirrorState.button5);
+  drawMessageCard(0, 15, Config::SCREEN_WIDTH, 14, gMirrorState.statusLabel);
+  drawButtonCard(0, 33, Config::SCREEN_WIDTH, 13, 1, gMirrorState.button1, 18);
+  if (!gMirrorState.button5.isEmpty()) {
+    drawButtonCard(0, 49, Config::SCREEN_WIDTH, 13, 5, gMirrorState.button5, 18);
+  } else {
+    drawMessageCard(0, 49, Config::SCREEN_WIDTH, 13, gMirrorState.lastAction);
+  }
 }
 
 void renderDisplay() {

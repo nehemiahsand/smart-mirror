@@ -126,7 +126,12 @@ class SportsService {
 
       if (!formattedGames) {
         logger.warn(`${config.name}: No games found in next 7 days`);
-        return { games: [], lastUpdate: new Date().toISOString(), sport };
+        return {
+          games: [],
+          lastUpdate: new Date().toISOString(),
+          sport,
+          emptyMessage: 'No games this week'
+        };
       }
       
       this.cache[sport].data = formattedGames;
@@ -295,10 +300,23 @@ class SportsService {
       return data;
     }
 
-    const teamArray = Array.isArray(teams) ? teams : teams.split(',').map(t => t.trim());
+    const teamArray = (Array.isArray(teams) ? teams : teams.split(','))
+      .map((team) => String(team || '').trim().toUpperCase())
+      .filter(Boolean);
+
+    if (teamArray.length === 0) {
+      return data;
+    }
+
     const filteredGames = data.games.filter(game => 
-      teamArray.includes(game.home.team) || teamArray.includes(game.away.team)
+      teamArray.includes(String(game.home.team || '').toUpperCase())
+      || teamArray.includes(String(game.away.team || '').toUpperCase())
     );
+
+    if (filteredGames.length === 0 && data.games.length > 0) {
+      logger.info(`${data.sport}: team filter produced no matches, returning unfiltered games`);
+      return data;
+    }
 
     return {
       ...data,

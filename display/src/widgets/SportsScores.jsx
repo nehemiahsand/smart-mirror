@@ -7,6 +7,7 @@ function SportsScores({ sport = 'nba', teams = [] }) {
     const [loading, setLoading] = useState(true);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [sportName, setSportName] = useState('');
+    const [emptyMessage, setEmptyMessage] = useState('No games this week');
 
     const GAMES_PER_PAGE = 2;
     const ROTATION_INTERVAL = 5000; // 5 seconds
@@ -66,14 +67,17 @@ function SportsScores({ sport = 'nba', teams = [] }) {
             if (data && data.games) {
                 console.log(`SportsScores: setting ${data.games.length} games`);
                 setGames(data.games);
+                setEmptyMessage(data.emptyMessage || 'No games this week');
             } else {
                 console.warn(`No games data for ${sport}`);
                 setGames([]);
+                setEmptyMessage('No games this week');
             }
             setLoading(false);
         } catch (error) {
             console.error(`Error fetching ${sport} scores:`, error);
             setGames([]);
+            setEmptyMessage('Scores unavailable');
             setLoading(false);
         }
     };
@@ -101,7 +105,7 @@ function SportsScores({ sport = 'nba', teams = [] }) {
         return (
             <div className="sports-scores-container">
                 <div className="sports-header">{sportName}</div>
-                <div className="no-games">No games today</div>
+                <div className="no-games">{emptyMessage}</div>
             </div>
         );
     }
