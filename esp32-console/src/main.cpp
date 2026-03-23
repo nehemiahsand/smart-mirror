@@ -126,6 +126,8 @@ String clipLine(const String& value, size_t maxLength = 20) {
 
 bool isCompactScreen() { return Config::SCREEN_HEIGHT <= 32; }
 
+int16_t getHeaderHeight() { return isCompactScreen() ? 9 : 12; }
+
 int16_t measureTextWidth(const String& value) {
   int16_t x1 = 0;
   int16_t y1 = 0;
@@ -508,7 +510,7 @@ void renderHeader(const String& title) {
   const String status =
       String(wifiConnected() ? 'W' : '-') + String(gMqttClient.connected() ? 'M' : '-') +
       String(gMirrorState.backendReachable ? 'B' : '-');
-  const int16_t headerHeight = isCompactScreen() ? 9 : 12;
+  const int16_t headerHeight = getHeaderHeight();
   const int16_t statusWidth = measureTextWidth(status);
   const int16_t rightPadding = 3;
   const int16_t titleMaxWidth =
@@ -649,44 +651,47 @@ void renderStatsScreen() {
   const String uptimeValue = extractStatValue(gMirrorState.statsLine3, "Up", "T");
   const String tempValue = extractStatValue(gMirrorState.statsLine3, "T");
   const String motionValue = extractStatValue(gMirrorState.statsLine4, "Motion");
+  const int16_t contentTop = getHeaderHeight() + 1;
 
   if (gStatsPageIndex == 0 && !diskValue.isEmpty()) {
     renderHeader("Disk / Ping");
-    gDisplay.setCursor(8, 11);
+    gDisplay.setCursor(8, contentTop);
     gDisplay.print("DISK");
-    gDisplay.setCursor(76, 11);
+    gDisplay.setCursor(76, contentTop);
     gDisplay.print("PING");
-    gDisplay.drawLine(63, 12, 63, Config::SCREEN_HEIGHT - 1, SSD1306_WHITE);
-    drawCenteredTextSized(0, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(diskValue, 56, 2), 2);
-    drawCenteredTextSized(66, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(pingValue, 56, 2), 2);
+    gDisplay.drawLine(63, contentTop + 1, 63, Config::SCREEN_HEIGHT - 1, SSD1306_WHITE);
+    drawCenteredTextSized(0, contentTop + 7, 62, Config::SCREEN_HEIGHT - (contentTop + 7),
+                          fitTextToWidthSized(diskValue, 56, 2), 2);
+    drawCenteredTextSized(66, contentTop + 7, 62, Config::SCREEN_HEIGHT - (contentTop + 7),
+                          fitTextToWidthSized(pingValue, 56, 2), 2);
     return;
   }
 
   if (gStatsPageIndex == 1 && !cpuValue.isEmpty()) {
     renderHeader("CPU / RAM");
-    gDisplay.setCursor(10, 11);
+    gDisplay.setCursor(10, contentTop);
     gDisplay.print("CPU");
-    gDisplay.setCursor(78, 11);
+    gDisplay.setCursor(78, contentTop);
     gDisplay.print("RAM");
-    gDisplay.drawLine(63, 12, 63, Config::SCREEN_HEIGHT - 1, SSD1306_WHITE);
-    drawCenteredTextSized(0, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(cpuValue, 56, 2), 2);
-    drawCenteredTextSized(66, 15, 62, Config::SCREEN_HEIGHT - 15, fitTextToWidthSized(ramValue, 56, 2), 2);
+    gDisplay.drawLine(63, contentTop + 1, 63, Config::SCREEN_HEIGHT - 1, SSD1306_WHITE);
+    drawCenteredTextSized(0, contentTop + 7, 62, Config::SCREEN_HEIGHT - (contentTop + 7),
+                          fitTextToWidthSized(cpuValue, 56, 2), 2);
+    drawCenteredTextSized(66, contentTop + 7, 62, Config::SCREEN_HEIGHT - (contentTop + 7),
+                          fitTextToWidthSized(ramValue, 56, 2), 2);
     return;
   }
 
   if (gStatsPageIndex == 2 && !uptimeValue.isEmpty()) {
     renderHeader("Uptime");
     if (!tempValue.isEmpty()) {
-      gDisplay.setCursor(4, 11);
-      gDisplay.print("TEMP");
-      drawCenteredTextSized(74, 10, 50, 10, fitTextToWidth(tempValue, 48), 1);
-      gDisplay.drawRoundRect(70, 10, 54, 12, 2, SSD1306_WHITE);
+      gDisplay.drawRoundRect(82, contentTop, 42, 9, 2, SSD1306_WHITE);
+      drawCenteredText(84, contentTop, 38, 9, fitTextToWidth(tempValue, 36));
     }
 
-    gDisplay.setCursor(4, tempValue.isEmpty() ? 12 : 24);
-    gDisplay.print("SYSTEM");
-    drawCenteredTextSized(0, tempValue.isEmpty() ? 14 : 18, Config::SCREEN_WIDTH,
-                          tempValue.isEmpty() ? 18 : 14,
+    gDisplay.setCursor(4, contentTop + 1);
+    gDisplay.print("UP");
+    drawCenteredTextSized(0, contentTop + 8, Config::SCREEN_WIDTH,
+                          Config::SCREEN_HEIGHT - (contentTop + 8),
                           fitTextToWidthSized(uptimeValue, Config::SCREEN_WIDTH - 8, 2, 20, false), 2);
     return;
   }
@@ -694,16 +699,14 @@ void renderStatsScreen() {
   if (gStatsPageIndex == 3 && !motionValue.isEmpty()) {
     const bool motionDetected = motionValue == "Yes";
     renderHeader("Motion");
-    gDisplay.setCursor(33, 12);
-    gDisplay.print("DETECTED");
     if (motionDetected) {
-      gDisplay.fillRoundRect(18, 18, 92, 13, 3, SSD1306_WHITE);
+      gDisplay.fillRoundRect(12, contentTop + 4, 104, 17, 3, SSD1306_WHITE);
       gDisplay.setTextColor(SSD1306_BLACK);
-      drawCenteredTextSized(18, 18, 92, 13, "YES", 2);
+      drawCenteredTextSized(12, contentTop + 4, 104, 17, "YES", 2);
       gDisplay.setTextColor(SSD1306_WHITE);
     } else {
-      gDisplay.drawRoundRect(18, 18, 92, 13, 3, SSD1306_WHITE);
-      drawCenteredTextSized(18, 18, 92, 13, "NO", 2);
+      gDisplay.drawRoundRect(12, contentTop + 4, 104, 17, 3, SSD1306_WHITE);
+      drawCenteredTextSized(12, contentTop + 4, 104, 17, "NO", 2);
     }
     return;
   }
