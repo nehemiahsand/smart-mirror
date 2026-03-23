@@ -2,6 +2,7 @@
 #include <Adafruit_SSD1306.h>
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <DHTesp.h>
 #include <HTTPClient.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
@@ -18,6 +19,7 @@ constexpr uint8_t BUTTON_5 = 23;
 constexpr uint8_t PIR_MOTION = 33;
 constexpr uint8_t OLED_SDA = 21;
 constexpr uint8_t OLED_SCL = 22;
+constexpr uint8_t DHT22_DATA = 4;
 }  // namespace Pins
 
 enum class ButtonCommand : uint8_t {
@@ -63,6 +65,7 @@ namespace {
 Adafruit_SSD1306 gDisplay(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, &Wire, -1);
 WiFiClient gWiFiClient;
 PubSubClient gMqttClient(gWiFiClient);
+DHTesp gDht22;
 
 ButtonState gButtons[] = {
     {Pins::BUTTON_1, "button1", ButtonCommand::TogglePage, false, false, false, 0, 0},
@@ -87,6 +90,9 @@ unsigned long gLastMqttAttemptMs = 0;
 unsigned long gLastStatePollMs = 0;
 unsigned long gLastOledRenderMs = 0;
 unsigned long gLastMotionMs = 0;
+unsigned long gLastClimatePublishMs = 0;
+bool gClimateReady = false;
+constexpr unsigned long CLIMATE_PUBLISH_INTERVAL_MS = 30000UL;
 
 const char* buttonAction(ButtonCommand command) {
   switch (command) {
@@ -212,6 +218,38 @@ bool publishAction(const ButtonState& button, bool hold) {
 bool publishMotion(const char* type) {
   StaticJsonDocument<32> payload;
   return publishJson(type, payload);
+}
+
+void pollClimate() {
+  const unsigned long nowMs = millis();
+  if ((nowMs - gLastClimatePublishMs) < CLIMATE_PUBLISH_INTERVAL_MS) {
+    return;
+  }
+  gLastClimatePublishMs = nowMs;
+
+  if (!gClimateReady) {
+    return;
+  }
+
+  const TempAndHumidity reading = gDht22.getTempAndHumidity();
+  if (isnan(reading.temperature) || isnan(reading.humidity)) {
+    Serial.println("[climate] DHT22 read failed");
+    return;
+  }
+
+  const float tempC = reading.temperature;
+  const float tempF = (tempC * 9.0f / 5.0f) + 32.0f;
+  StaticJsonDocument<160> payload;
+  payload["temperatureCelsius"] = tempC;
+  payload["temperatureFahrenheit"] = tempF;
+  payload["humidity"] = reading.humidity;
+  payload["units"] = "metric";
+
+  if (publishJson("climate.reading", payload)) {
+    Serial.printf("[climate] published %.1fC %.1fF %.1f%%\n", tempC, tempF, reading.humidity);
+  } else {
+    Serial.println("[climate] publish skipped (mqtt disconnected)");
+  }
 }
 
 void connectWiFi() {
@@ -534,6 +572,11 @@ void setup() {
 
   gMqttClient.setServer(Config::MQTT_HOST, Config::MQTT_PORT);
   gMqttClient.setBufferSize(512);
+
+  gDht22.setup(Pins::DHT22_DATA, DHTesp::DHT22);
+  gClimateReady = true;
+  gLastClimatePublishMs = millis();
+  Serial.printf("[climate] DHT22 initialized on GPIO%d\n", Pins::DHT22_DATA);
 }
 
 void loop() {
@@ -547,5 +590,6 @@ void loop() {
   pollConsoleState();
   pollButtons();
   pollMotion();
+  pollClimate();
   renderDisplay();
 }

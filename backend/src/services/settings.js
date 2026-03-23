@@ -71,6 +71,10 @@ const DEFAULT_SETTINGS = {
     standbyOnIdle: true,
     idleTimeoutSeconds: 300
   },
+  sensorSource: {
+    climatePrimary: 'esp32',
+    compareMode: true
+  },
   current_scene: 'day',
   current_page: 'home'
 };
