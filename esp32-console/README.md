@@ -12,6 +12,7 @@ PlatformIO firmware for the mirror-side ESP32 console.
 - `GPIO33`: PIR motion sensor
 - `GPIO21`: OLED SDA
 - `GPIO22`: OLED SCL
+- `GPIO14`: DHT22 data
 
 The knob has been removed from the current firmware.
 

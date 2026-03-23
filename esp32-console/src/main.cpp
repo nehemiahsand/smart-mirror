@@ -19,7 +19,7 @@ constexpr uint8_t BUTTON_5 = 23;
 constexpr uint8_t PIR_MOTION = 33;
 constexpr uint8_t OLED_SDA = 21;
 constexpr uint8_t OLED_SCL = 22;
-constexpr uint8_t DHT22_DATA = 4;
+constexpr uint8_t DHT22_DATA = 14;
 }  // namespace Pins
 
 enum class ButtonCommand : uint8_t {
