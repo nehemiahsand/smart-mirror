@@ -81,10 +81,19 @@ OLED modes:
 Button role model:
 
 - button1 toggles page cycle home -> fun -> spotify -> home
-- spotify page: button2 play/pause, button3 previous, button4 next
+- home page: button2 previous sport, button3 next sport, button4 default sport
+- fun page: button2 previous date, button3 next date, button4 home
+- spotify page: button2 previous track, button3 next track, button4 play/stop
 - button5 toggles stats overlay
+- stats mode: button2 previous stats page, button3 next stats page, button5 back
 - standby: button1 wakes display, button5 opens stats
 - manual pages such as fun and spotify return to home after 5 minutes of inactivity by default
+
+Stats presentation:
+
+- compact 128x32 OLED uses one stats subpage at a time rather than four cramped rows
+- current stats pages are disk/ping, cpu/ram, uptime/temp, and motion state
+- stats navigation is handled locally on the ESP32 so page changes feel immediate
 
 ## Backend Responsibilities
 
@@ -134,5 +143,5 @@ consoleService getEsp32State -> GET /api/console/state?device=esp32 -> esp32 pol
 
 ## Document Metadata
 
-- Version: 1.2
+- Version: 1.3
 - Last Updated: March 23, 2026

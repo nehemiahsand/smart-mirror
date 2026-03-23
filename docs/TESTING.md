@@ -66,8 +66,15 @@ cd esp32-console
 Validate:
 
 - button1 toggles home -> fun -> spotify -> home
-- spotify page button2/3/4 map to play-pause/prev/next
+- main page button2/3/4 map to prev sport/next sport/default sport
+- fun page button2/3/4 map to prev date/next date/home
+- spotify page button2/3/4 map to prev/next/play-stop
 - button5 toggles stats overlay
+- stats overlay uses paged views:
+  - button2 = previous stats page
+  - button3 = next stats page
+  - button5 = back
+- stats pages render cleanly without overlapping the header on the compact 128x32 OLED
 - standby shows Turn On and can wake via button1 or PIR motion
 - oled receives current state from /api/console/state?device=esp32
 - after 5 minutes of inactivity on spotify or fun, both the OLED and mirror return to home together
@@ -84,7 +91,7 @@ docker compose logs --tail=200 sensor
 
 ## Document Metadata
 
-- Version: 1.2
+- Version: 1.3
 - Last Updated: March 23, 2026
 
 ## 7) Automated Unit Testing (Jest)

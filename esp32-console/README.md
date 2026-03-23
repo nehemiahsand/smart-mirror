@@ -20,7 +20,8 @@ The knob has been removed from the current firmware.
 
 - SSD1306 I2C OLED
 - `128x32` layout in the current local config
-- compact stats overlay with four data rows
+- monochrome black/white rendering only
+- paged stats overlay optimized for the compact `128x32` layout
 
 ## What the Firmware Does
 
@@ -58,14 +59,18 @@ Awake pages:
 Buttons:
 
 - button 1 cycles between `Main Page`, `Fun`, and `Spotify`
+- on Main Page:
+  - button 2 = `Prev`
+  - button 3 = `Next`
+  - button 4 = `Default`
 - on Fun:
   - button 2 = `Prev`
   - button 3 = `Next`
-  - button 4 = `Today`
+  - button 4 = `Home`
 - on Spotify:
-  - button 2 = `Play/Pause`
-  - button 3 = `Prev`
-  - button 4 = `Next`
+  - button 2 = `Prev`
+  - button 3 = `Next`
+  - button 4 = `Play` or `Stop`
 - button 5 toggles the stats overlay
 
 Standby:
@@ -74,12 +79,19 @@ Standby:
 - button 1 shows `Turn On`
 - button 5 can still open stats
 
-Current stats lines:
+Stats pages:
 
-- camera state
+- disk and ping
 - CPU and RAM
 - uptime and CPU temp
-- person detected yes/no
+- motion detected yes/no
+
+While stats is open:
+
+- button 2 = previous stats page
+- button 3 = next stats page
+- button 5 = back/close
+- button 1 and button 4 are ignored to keep the stats layout uncluttered
 
 ## Local Setup
 
