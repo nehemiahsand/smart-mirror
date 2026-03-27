@@ -61,6 +61,7 @@ Exposed host ports are currently limited to:
 - camera wake from standby is not used as the primary wake path
 - PIR-based ESP32 motion is the wake source for the mirror standby flow
 - PWA privacy status reflects effective standby state, not just raw settings values
+- the fallback Wi-Fi hotspot service has been removed; the mirror no longer exposes an open setup access point on boot
 
 ## Verification
 

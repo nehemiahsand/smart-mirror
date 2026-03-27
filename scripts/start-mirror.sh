@@ -18,40 +18,6 @@ echo "[start-mirror] Starting Docker containers..."
 sudo docker compose up -d
 sleep 5
 
-# One-time network check: if not connected to any known network, start hotspot
-if ! ip addr show wlan0 | grep -q "inet " || ! ping -c 1 -W 2 8.8.8.8 >/dev/null 2>&1; then
-  if command -v nmcli >/dev/null 2>&1; then
-    echo "[start-mirror] Wi-Fi not connected. Starting open setup hotspot..."
-    
-    # Delete any existing Hotspot connection to ensure clean slate
-    sudo nmcli connection delete Hotspot 2>/dev/null || true
-    
-    # Create and start truly open hotspot with NO security
-    sudo nmcli connection add \
-      type wifi \
-      ifname wlan0 \
-      con-name Hotspot \
-      autoconnect no \
-      ssid "SmartMirror-Setup" \
-      mode ap \
-      802-11-wireless.mode ap \
-      802-11-wireless.band bg \
-      ipv4.method shared \
-      ipv4.addresses 10.42.0.1/24 2>/dev/null || true
-    
-    # Activate the hotspot
-    sudo nmcli connection up Hotspot 2>/dev/null || true
-    
-    # Wait a moment for it to come up
-    sleep 3
-    
-    echo "[start-mirror] Hotspot active. Connect to 'SmartMirror-Setup' and visit http://10.42.0.1:3000"
-    echo "[start-mirror] Backend API available at http://10.42.0.1:3001"
-  fi
-else
-  echo "[start-mirror] Already connected to WiFi, skipping hotspot setup"
-fi
-
 # Disable screen blanking
 export DISPLAY=:0
 xset s off 2>/dev/null || true

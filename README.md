@@ -113,6 +113,19 @@ Start the core services manually:
 docker compose up -d --build
 ```
 
+For boot-time startup on the Pi, enable only the main mirror service:
+
+```bash
+sudo ln -s /home/smartmirror/Downloads/smart-mirror/deploy/systemd/smart-mirror.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now smart-mirror.service
+```
+
+Network note:
+
+- the mirror no longer creates any fallback Wi-Fi hotspot or setup access point
+- provision it onto a trusted network before relying on unattended boot
+
 Status:
 
 ```bash
