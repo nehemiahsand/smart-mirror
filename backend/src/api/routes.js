@@ -384,7 +384,7 @@ router.post('/power/reboot', adminAuth, async (req, res) => {
     }
     // Small delay to let response flush before reboot
     setTimeout(() => {
-      powerService.reboot(true).catch(err => logger.error('Reboot failed', { error: err.message }));
+      powerService.reboot(false).catch(err => logger.error('Reboot failed', { error: err.message }));
     }, 250);
     res.json({ success: true, action: 'reboot' });
   } catch (error) {
@@ -399,7 +399,7 @@ router.post('/power/shutdown', adminAuth, async (req, res) => {
       return res.status(503).json({ error: 'Power service unavailable' });
     }
     setTimeout(() => {
-      powerService.shutdown(true).catch(err => logger.error('Shutdown failed', { error: err.message }));
+      powerService.shutdown(false).catch(err => logger.error('Shutdown failed', { error: err.message }));
     }, 250);
     res.json({ success: true, action: 'shutdown' });
   } catch (error) {
@@ -945,7 +945,7 @@ router.post('/wifi/connect', adminAuth, async (req, res) => {
       // This ensures the system restarts with the new network connection
       logger.info('WiFi connected successfully, scheduling reboot in 5 seconds');
       setTimeout(() => {
-        powerService.reboot(true).catch(err => 
+        powerService.reboot(false).catch(err => 
           logger.error('Auto-reboot after WiFi connection failed', { error: err.message })
         );
       }, 5000);
