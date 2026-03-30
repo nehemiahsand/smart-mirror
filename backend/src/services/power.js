@@ -47,7 +47,7 @@ class PowerService {
     return this.initialized;
   }
 
-  async shutdown(interactive = true) {
+  async shutdown(interactive = false) {
     if (!this.isAvailable()) {
       throw new Error('Power service not available');
     }
@@ -55,7 +55,7 @@ class PowerService {
     return runLoginManagerCommand('org.freedesktop.login1.Manager.PowerOff', [`boolean:${interactive ? 'true' : 'false'}`]);
   }
 
-  async reboot(interactive = true) {
+  async reboot(interactive = false) {
     if (!this.isAvailable()) {
       throw new Error('Power service not available');
     }
