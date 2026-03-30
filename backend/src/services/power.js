@@ -6,6 +6,7 @@ const execFileAsync = promisify(execFile);
 const DBUS_OPTIONS_BASE = [
   '--system',
   '--dest=org.freedesktop.login1',
+  '--type=method_call',
 ];
 const LOGIN1_OBJECT_PATH = '/org/freedesktop/login1';
 
@@ -52,7 +53,11 @@ class PowerService {
       throw new Error('Power service not available');
     }
     logger.warn('System shutdown requested');
-    return runLoginManagerCommand('org.freedesktop.login1.Manager.PowerOff', [`boolean:${interactive ? 'true' : 'false'}`]);
+    return runLoginManagerCommand(
+      'org.freedesktop.login1.Manager.PowerOff',
+      [`boolean:${interactive ? 'true' : 'false'}`],
+      ['--print-reply', '--reply-timeout=5000']
+    );
   }
 
   async reboot(interactive = false) {
@@ -60,7 +65,11 @@ class PowerService {
       throw new Error('Power service not available');
     }
     logger.warn('System reboot requested');
-    return runLoginManagerCommand('org.freedesktop.login1.Manager.Reboot', [`boolean:${interactive ? 'true' : 'false'}`]);
+    return runLoginManagerCommand(
+      'org.freedesktop.login1.Manager.Reboot',
+      [`boolean:${interactive ? 'true' : 'false'}`],
+      ['--print-reply', '--reply-timeout=5000']
+    );
   }
 }
 
