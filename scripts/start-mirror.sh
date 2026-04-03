@@ -8,10 +8,10 @@ echo "[start-mirror] Starting Smart Mirror services..."
 echo "[start-mirror] Disabling WiFi power saving..."
 sudo iw dev wlan0 set power_save off 2>/dev/null || true
 
-# Ensure Tailscale is connected (no timeout, accept routes)
+# Ensure Tailscale is connected (no timeout, accept routes, enable Tailscale SSH)
 echo "[start-mirror] Ensuring Tailscale VPN is active..."
-sudo tailscale up --timeout=0 --accept-routes 2>/dev/null || echo "[start-mirror] Tailscale already active"
-echo "[start-mirror] Tailscale VPN: Active (access remotely via Tailscale IP)"
+sudo tailscale up --timeout=0 --accept-routes --ssh 2>/dev/null || echo "[start-mirror] Tailscale already active"
+echo "[start-mirror] Tailscale VPN: Active (access remotely via Tailscale IP, SSH enabled)"
 
 # Start Docker containers first (they need to be running for the web interface)
 echo "[start-mirror] Starting Docker containers..."
