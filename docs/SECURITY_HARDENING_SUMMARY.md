@@ -115,7 +115,7 @@ It verifies:
 ## Verification completed
 
 - GitHub Actions (`.github/workflows/ci.yml`) is active, enforcing `npm audit` and Jest boundary tests on all commits.
-- Systemd `.timer` is active (`smart-mirror-updater.timer`), providing fully automated Continuous Deployment (CD).
+- Systemd `.timer` is active (`smart-mirror-updater.timer`), providing fully automated Continuous Deployment (CD) with fast-forward-only updates when the local checkout is behind `origin/main`.
 - `node --check` passed on modified backend files.
 - `python3 -m py_compile` passed for:
   - `camera/camera_service.py`

@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite --host 0.0.0.0"
+    "start": "vite preview"
   },
   "dependencies": {
     "date-fns": "^2.30.0",

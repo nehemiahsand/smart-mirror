@@ -2,7 +2,7 @@
 
 Smart mirror system for Raspberry Pi with three active surfaces:
 
-- mirror display UI (React/Vite, port 3000)
+- mirror display UI (React/Vite build served on port 3000)
 - mobile/admin PWA (React/Vite build served by backend at /)
 - ESP32 OLED + five-button console (MQTT input + HTTP state polling)
 
@@ -14,7 +14,7 @@ Docker Compose runs five services:
 - sensor: DHT22 sidecar (internal port 5555)
 - camera: MJPEG sidecar with camera enable/disable support (internal port 5556)
 - backend: Node/Express API + WebSocket + scene/console logic + built PWA (host port 80)
-- display: mirror React app (host port 3000)
+- display: mirror React app bundle served from a container on host port 3000
 
 Main entry points:
 
@@ -135,6 +135,8 @@ docker compose ps
 ### Auto-Deployment (CD) Setup
 
 You can configure the mirror to automatically download and deploy updates pushed to the `main` branch.
+The updater checks every 5 minutes and only deploys when the local checkout is behind `origin/main`.
+If the local branch is ahead of or diverged from `origin/main`, it skips deployment instead of restarting containers repeatedly.
 
 ```bash
 # Link the auto-updater systemd files
@@ -175,8 +177,10 @@ npm run spotify:auth
 ## Notes
 
 - The backend image builds mobile-pwa into backend/public.
+- The display image builds the React app during `docker compose build` and serves the compiled bundle at runtime; it does not run the Vite dev server in Docker.
 - There is no separate PWA compose service.
 - Camera service is stream/control support; standby wake source is PIR motion via ESP32.
+- The camera page reports standby countdown states explicitly: paused while motion is present, counting down, disabled, waiting for first motion, or already in standby.
 
 ## Author
 

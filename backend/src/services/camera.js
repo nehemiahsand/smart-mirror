@@ -140,13 +140,38 @@ class CameraService {
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
       const sceneEngine = require("./sceneEngine");
+      const sceneState = sceneEngine.getState();
       const presenceEnabled = require("./settings").get('presence.enabled') !== false;
       const standbyEnabled = presenceEnabled && require("./settings").get('presence.standbyOnIdle') !== false;
+      const isStandby = sceneState.isStandby === true;
+      const motionDetected = sceneState.motionActive === true;
+      const idleTimeoutMs = sceneEngine.getIdleTimeoutMs();
+      const lastDetection = sceneState.lastMotionAt || null;
+
+      let standbyCountdownState = 'disabled';
+      let timeUntilStandby = null;
+
+      if (presenceEnabled === false) {
+        standbyCountdownState = 'presence_disabled';
+      } else if (standbyEnabled === false) {
+        standbyCountdownState = 'auto_standby_disabled';
+      } else if (isStandby) {
+        standbyCountdownState = 'in_standby';
+        timeUntilStandby = 0;
+      } else if (motionDetected) {
+        standbyCountdownState = 'paused_motion_active';
+        timeUntilStandby = idleTimeoutMs;
+      } else if (lastDetection) {
+        standbyCountdownState = 'counting_down';
+        timeUntilStandby = Math.max(0, idleTimeoutMs - (Date.now() - lastDetection));
+      } else {
+        standbyCountdownState = 'waiting_for_first_motion';
+      }
 
       return {
         available: this.isAvailable,
         enabled: response.data.enabled !== false,
-        motion_detected: sceneEngine.getState().motionActive || false,
+        motion_detected: motionDetected,
         total_detections: response.data.total_detections,
         fps: response.data.fps,
         stream_viewers: response.data.stream_viewers || 0,
@@ -158,12 +183,9 @@ class CameraService {
         dark_standby_enabled: this.darkStandbyEnabled,
         is_dark: response.data.is_dark,
         brightness: response.data.brightness,
-        last_detection: sceneEngine.lastMotionAt || null,
-        time_until_standby: sceneEngine.motionActive 
-          ? sceneEngine.getIdleTimeoutMs() 
-          : (sceneEngine.lastMotionAt && standbyEnabled)
-            ? Math.max(0, sceneEngine.getIdleTimeoutMs() - (Date.now() - sceneEngine.lastMotionAt))
-            : null,
+        last_detection: lastDetection,
+        standby_countdown_state: standbyCountdownState,
+        time_until_standby: timeUntilStandby,
         standby_start_time: this.standbyStartTime,
         time_until_shutdown: null // Auto-shutdown disabled
       };

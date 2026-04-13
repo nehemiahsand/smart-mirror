@@ -108,10 +108,31 @@ export default function Camera() {
     };
 
     const formatTime = (ms) => {
-        if (!ms) return 'N/A';
+        if (ms == null) return 'N/A';
         const minutes = Math.floor(ms / 60000);
         const seconds = Math.floor((ms % 60000) / 1000);
         return `${minutes}m ${seconds}s`;
+    };
+
+    const getStandbyCountdownLabel = () => {
+        const state = cameraStatus?.standby_countdown_state;
+
+        switch (state) {
+            case 'paused_motion_active':
+                return 'Paused while present';
+            case 'counting_down':
+                return formatTime(cameraStatus?.time_until_standby);
+            case 'in_standby':
+                return 'Mirror is in standby';
+            case 'auto_standby_disabled':
+                return 'Auto-standby disabled';
+            case 'presence_disabled':
+                return 'Presence detection disabled';
+            case 'waiting_for_first_motion':
+                return 'Waiting for first motion event';
+            default:
+                return formatTime(cameraStatus?.time_until_standby);
+        }
     };
 
     const streamDetails = cameraStatus?.stream_resolution
@@ -156,9 +177,7 @@ export default function Camera() {
                             <div className="status-item">
                                 <span className="status-label">Time Until Standby</span>
                                 <span className="status-value">
-                                    {cameraStatus.motion_detected
-                                        ? 'Paused while present'
-                                        : formatTime(cameraStatus.time_until_standby)}
+                                    {getStandbyCountdownLabel()}
                                 </span>
                             </div>
                         </div>
