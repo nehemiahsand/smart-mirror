@@ -26,7 +26,6 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
   const [message, setMessage] = useState(null);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
-  const previousStandbyMode = useRef(null);
   const settingsRef = useRef(null);
 
   const connect = useCallback(() => {
@@ -44,17 +43,6 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
           
           // Always process settings updates (needed to wake from standby)
           if (data.type === 'settings_update') {
-            const newStandbyMode = data.data?.display?.standbyMode;
-            const wasInStandby = previousStandbyMode.current === true;
-            const nowActive = newStandbyMode === false;
-            
-            // If transitioning from standby to active, refresh the display
-            if (wasInStandby && nowActive) {
-              console.log('Exiting standby mode - refreshing display');
-              setTimeout(() => window.location.reload(), 100);
-            }
-            
-            previousStandbyMode.current = newStandbyMode;
             settingsRef.current = data.data;
             setSettings(data.data);
             return;

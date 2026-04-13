@@ -4,6 +4,7 @@ const bibleVerseClockService = require('./bibleVerseClock');
 const cameraService = require('./camera');
 const climateService = require('./climate');
 const funContentService = require('./funContent');
+const funVideoService = require('./funVideo');
 const logger = require('../utils/logger');
 const moonPhaseService = require('./moonPhase');
 const settingsService = require('./settings');
@@ -220,6 +221,7 @@ class ConsoleService {
       alarmTriggeredDate: null,
       snoozeUntil: null,
       funDateKey: null,
+      funClipIndex: 0,
       musicIsPlaying: false,
       focusStatus: 'idle',
       focusPhase: 'work',
@@ -344,6 +346,26 @@ class ConsoleService {
 
   setFunDateKey(dateKey) {
     this.runtime.funDateKey = funContentService.normalizeDateKey(dateKey) || funContentService.getCurrentDateKey();
+  }
+
+  normalizeFunClipIndex(index, totalClips) {
+    const safeTotal = Number.isFinite(totalClips) ? Math.max(0, Math.floor(totalClips)) : 0;
+    if (safeTotal <= 0) {
+      return 0;
+    }
+
+    const parsedIndex = Number.isFinite(index) ? Math.floor(index) : 0;
+    return (parsedIndex % safeTotal + safeTotal) % safeTotal;
+  }
+
+  getFunClipIndex(totalClips) {
+    this.runtime.funClipIndex = this.normalizeFunClipIndex(this.runtime.funClipIndex, totalClips);
+    return this.runtime.funClipIndex;
+  }
+
+  setFunClipIndex(index, totalClips) {
+    this.runtime.funClipIndex = this.normalizeFunClipIndex(index, totalClips);
+    return this.runtime.funClipIndex;
   }
 
   getSportsOptions() {
@@ -480,7 +502,7 @@ class ConsoleService {
           button1: pageToggleTarget.name,
           button2: 'Prev',
           button3: 'Next',
-          button4: 'Home',
+          button4: 'First',
           button5: 'Stats',
         };
       case 'media':
@@ -909,16 +931,16 @@ class ConsoleService {
       return this.openStatsOverlay('fun:stats');
     }
 
-    const currentDateKey = this.getFunDateKey();
-    const todayDateKey = funContentService.getCurrentDateKey();
+    const videoFeed = await funVideoService.getCurrentFeed();
+    const totalClips = Array.isArray(videoFeed?.items) ? videoFeed.items.length : 0;
+    const currentClipIndex = this.getFunClipIndex(totalClips);
 
-    if (['primary'].includes(action)) {
-      this.setFunDateKey(funContentService.shiftDateKey(currentDateKey, -1));
-    } else if (['previous'].includes(action)) {
-      const nextDateKey = funContentService.shiftDateKey(currentDateKey, 1);
-      this.setFunDateKey(nextDateKey > todayDateKey ? todayDateKey : nextDateKey);
+    if (action === 'primary') {
+      this.setFunClipIndex(currentClipIndex - 1, totalClips);
+    } else if (action === 'previous') {
+      this.setFunClipIndex(currentClipIndex + 1, totalClips);
     } else if (['next', 'refresh', 'confirm', 'home'].includes(action)) {
-      return this.goHome('fun_home');
+      this.setFunClipIndex(0, totalClips);
     }
 
     this.touchInteraction(`fun:${action}`);
@@ -1120,43 +1142,17 @@ class ConsoleService {
   }
 
   async getFunPageData(options = {}) {
-    const selectedDateKey = this.getFunDateKey();
-    let selectedDate = new Date();
-    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(selectedDateKey || ''));
-    if (match) {
-      selectedDate = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
-    }
-    const dayOfWeek = selectedDate.getDay();
-
-    const { item: mainItem } = await funContentService.getItemByDate(selectedDateKey);
-    let items = [mainItem];
-
-    if (dayOfWeek !== 0 && mainItem && !mainItem.unavailable) {
-      // Calculate exactly one year ago
-      const lastYearDate = new Date(selectedDate);
-      lastYearDate.setFullYear(lastYearDate.getFullYear() - 1);
-      
-      // If exactly one year ago falls on a Sunday, it will break the Mon-Sat stacking layout.
-      // Shift it back one day to Saturday so we still get a normal comic strip.
-      if (lastYearDate.getDay() === 0) {
-        lastYearDate.setDate(lastYearDate.getDate() - 1);
-      }
-
-      const pad = (n) => String(n).padStart(2, '0');
-      const lastYearDateKey = `${lastYearDate.getFullYear()}-${pad(lastYearDate.getMonth() + 1)}-${pad(lastYearDate.getDate())}`;
-
-      const { item: topItem } = await funContentService.getItemByDate(lastYearDateKey);
-      
-      if (topItem && !topItem.unavailable) {
-        // Unshift puts it at the beginning of the array, so it renders ON TOP in the flex column layout
-        items.unshift(topItem);
-      }
-    }
-
     const clockFormat = settingsService.get('display.clockFormat') === '12h' ? '12h' : '24h';
     const settings = settingsService.getAll();
-    const weather = await weatherService.getCurrentWeather(settings.weather.city, settings.weather.units).catch(() => null);
-    
+    const [videoFeed, weather, widgets] = await Promise.all([
+      funVideoService.getCurrentFeed(),
+      weatherService.getCurrentWeather(settings.weather.city, settings.weather.units).catch(() => null),
+      Promise.all([
+        Promise.resolve(moonPhaseService.getCurrentWidget()),
+        bibleVerseClockService.getCurrentWidget({ clockFormat, targetDate: options.targetDate }),
+      ]),
+    ]);
+
     let sunWidget = null;
     if (weather && weather.sunrise && weather.sunset) {
       const formatSunTime = (ts) => {
@@ -1189,25 +1185,31 @@ class ConsoleService {
       };
     }
 
-    const widgets = await Promise.all([
-      Promise.resolve(moonPhaseService.getCurrentWidget()),
-      bibleVerseClockService.getCurrentWidget({ clockFormat, targetDate: options.targetDate }),
-    ]);
+    const totalClips = Array.isArray(videoFeed?.items) ? videoFeed.items.length : 0;
+    const selectedClipIndex = this.getFunClipIndex(totalClips);
+    const selectedClip = totalClips > 0 ? videoFeed.items[selectedClipIndex] : null;
+    const videoFeedWithSelection = {
+      ...videoFeed,
+      selectedClipIndex,
+      selectedVideoId: selectedClip?.videoId || null,
+    };
 
     return {
       pageId: 'fun',
       canonicalPageId: 'fun',
       title: this.getPages().fun?.title || 'Fun',
+      videoFeed: videoFeedWithSelection,
       widgets: {
         sun: sunWidget,
         moon: widgets[0],
         left: widgets[0], // fallback for old UI
         right: widgets[1],
       },
-      item: items[0],
-      items: items,
-      selectedDateKey,
-      summary: mainItem.unavailable ? 'No fun content available' : (mainItem.title || 'Fun content ready'),
+      item: null,
+      items: [],
+      selectedClipIndex,
+      selectedDateKey: this.getFunDateKey(),
+      summary: videoFeed.unavailable ? 'Video highlights unavailable' : 'Stephen Curry highlights ready',
       softButtons: this.getSoftButtons('fun'),
     };
   }
@@ -1325,6 +1327,9 @@ class ConsoleService {
       this.state.weatherTabId = 'current';
     }
     this.setFunDateKey(this.runtime.funDateKey);
+    this.runtime.funClipIndex = Number.isFinite(this.runtime.funClipIndex)
+      ? Math.max(0, Math.floor(this.runtime.funClipIndex))
+      : 0;
     this.state.lastAction = reason;
     this.state.updatedAt = Date.now();
     this.broadcastState();

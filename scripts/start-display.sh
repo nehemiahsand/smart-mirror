@@ -3,8 +3,10 @@
 # Wait for X server
 sleep 5
 
-# Start Chromium in kiosk mode
-chromium-browser --kiosk --noerrdialogs --disable-infobars --no-first-run --enable-features=OverlayScrollbar --start-fullscreen http://localhost:3000 &
+# Start Brave in kiosk mode
+/home/smartmirror/Downloads/smart-mirror/scripts/launch-kiosk-browser.sh http://localhost:3000 || exit 1
 
 # Start unclutter to hide mouse cursor
-unclutter -idle 0.1 &
+if command -v unclutter >/dev/null 2>&1; then
+  unclutter -idle 0.1 &
+fi

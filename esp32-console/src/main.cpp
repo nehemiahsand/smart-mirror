@@ -91,6 +91,7 @@ unsigned long gLastMqttAttemptMs = 0;
 unsigned long gLastStatePollMs = 0;
 unsigned long gLastOledRenderMs = 0;
 unsigned long gLastMotionMs = 0;
+unsigned long gMotionHighSinceMs = 0;
 unsigned long gLastClimatePublishMs = 0;
 bool gClimateReady = false;
 constexpr unsigned long CLIMATE_PUBLISH_INTERVAL_MS = 30000UL;
@@ -844,14 +845,26 @@ void pollMotion() {
   }
 
   if (motionHigh) {
-    gLastMotionMs = nowMs;
-    if (!gMotionActive) {
+    if (gMotionHighSinceMs == 0) {
+      gMotionHighSinceMs = nowMs;
+    }
+
+    if (gMotionActive) {
+      gLastMotionMs = nowMs;
+      return;
+    }
+
+    if ((nowMs - gMotionHighSinceMs) >= Config::MOTION_ACTIVE_DEBOUNCE_MS) {
       gMotionActive = true;
+      gLastMotionMs = nowMs;
       Serial.println("[motion] Transitioned to ACTIVE state!");
       publishMotion("motion.active");
     }
+
     return;
   }
+
+  gMotionHighSinceMs = 0;
 
   if (gMotionActive && (nowMs - gLastMotionMs) >= Config::MOTION_IDLE_TIMEOUT_MS) {
     gMotionActive = false;

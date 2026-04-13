@@ -69,7 +69,8 @@ const DEFAULT_SETTINGS = {
   presence: {
     enabled: true,
     standbyOnIdle: true,
-    idleTimeoutSeconds: 300
+    idleTimeoutSeconds: 300,
+    wakeOnMotion: true
   },
   console: {
     inactivityTimeoutSeconds: 300

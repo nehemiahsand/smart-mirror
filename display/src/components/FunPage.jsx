@@ -1,8 +1,27 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import TimeDateWidget from '../widgets/TimeDate';
 import { apiFetch, getApiUrl } from '../api/apiClient';
 import './FunPage.css';
+
+const VIDEO_LOAD_TIMEOUT_MS = 15000;
+
+function formatPublishedAt(value) {
+    if (!value) {
+        return 'Recently uploaded';
+    }
+
+    const publishedDate = new Date(value);
+    if (Number.isNaN(publishedDate.getTime())) {
+        return 'Recently uploaded';
+    }
+
+    return publishedDate.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+    });
+}
 
 function SunWidget({ widget }) {
     if (!widget) {
@@ -126,13 +145,158 @@ BibleClockWidget.propTypes = {
     })
 };
 
-function FunContent({ items, loading }) {
+function VideoUnavailablePanel({ videoFeed }) {
+    const query = videoFeed?.query || 'Stephen Curry highlights';
+    const message = videoFeed?.message || 'Waiting for the next successful video refresh.';
+
+    return (
+        <div className="fun-comic-frame fun-video-frame">
+            <div className="fun-comic-header">
+                <span className="fun-item-title">{query}</span>
+                <span className="fun-item-pill">Retrying</span>
+            </div>
+
+            <div className="fun-video-unavailable">
+                <div className="fun-empty-title">Highlights unavailable</div>
+                <div className="fun-empty-message">{message}</div>
+            </div>
+        </div>
+    );
+}
+
+VideoUnavailablePanel.propTypes = {
+    videoFeed: PropTypes.shape({
+        query: PropTypes.string,
+        message: PropTypes.string
+    })
+};
+
+function YouTubeVideoPanel({ videoFeed }) {
+    const items = Array.isArray(videoFeed?.items) ? videoFeed.items : [];
+    const selectedClipIndex = Number.isFinite(videoFeed?.selectedClipIndex)
+        ? Number(videoFeed.selectedClipIndex)
+        : 0;
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [retryNonce, setRetryNonce] = useState(0);
+    const [frameStatus, setFrameStatus] = useState('loading');
+    const hasLoadedRef = useRef(false);
+
+    useEffect(() => {
+        setCurrentIndex(0);
+        setRetryNonce(0);
+        setFrameStatus('loading');
+    }, [videoFeed?.date, videoFeed?.fetchedAt, items.length]);
+
+    useEffect(() => {
+        if (items.length === 0) {
+            return undefined;
+        }
+        const normalizedIndex = ((selectedClipIndex % items.length) + items.length) % items.length;
+        setCurrentIndex(normalizedIndex);
+        setRetryNonce(0);
+        return undefined;
+    }, [items.length, selectedClipIndex]);
+
+    useEffect(() => {
+        if (items.length === 0) {
+            return undefined;
+        }
+
+        hasLoadedRef.current = false;
+        setFrameStatus('loading');
+
+        const timerId = setTimeout(() => {
+            if (!hasLoadedRef.current) {
+                setFrameStatus('retrying');
+                setRetryNonce((value) => value + 1);
+            }
+        }, VIDEO_LOAD_TIMEOUT_MS);
+
+        return () => clearTimeout(timerId);
+    }, [currentIndex, retryNonce, items.length]);
+
+    if (items.length === 0) {
+        return <VideoUnavailablePanel videoFeed={videoFeed} />;
+    }
+
+    const currentItem = items[currentIndex] || items[0];
+    const panelKey = `${currentItem.videoId}-${retryNonce}`;
+
+    return (
+        <div className="fun-comic-frame fun-video-frame">
+            <div className="fun-comic-header">
+                <span className="fun-item-title">{videoFeed?.query || 'Stephen Curry highlights'}</span>
+                <span className="fun-item-pill">Brave + YouTube</span>
+                {videoFeed?.stale && <span className="fun-stale-pill">Cached</span>}
+            </div>
+
+            <div className="fun-video-embed-shell">
+                <div className="fun-video-embed-frame">
+                    <iframe
+                        key={panelKey}
+                        src={currentItem.embedUrl}
+                        title={currentItem.title || 'Stephen Curry highlights'}
+                        className="fun-video-embed"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                        loading="eager"
+                        onLoad={() => {
+                            hasLoadedRef.current = true;
+                            setFrameStatus('ready');
+                        }}
+                    />
+                </div>
+            </div>
+
+            <div className="fun-video-meta">
+                <div className="fun-video-title">{currentItem.title}</div>
+                <div className="fun-video-subtitle">
+                    <span>{currentItem.channelTitle || 'YouTube'}</span>
+                    <span>{formatPublishedAt(currentItem.publishedAt)}</span>
+                    <span>Clip {currentIndex + 1} of {items.length}</span>
+                </div>
+            </div>
+
+            <div className="fun-comic-footer">
+                <span>Muted autoplay, controlled from OLED buttons</span>
+                {frameStatus === 'retrying' && <span className="fun-item-pill">Retrying embed</span>}
+            </div>
+        </div>
+    );
+}
+
+YouTubeVideoPanel.propTypes = {
+    videoFeed: PropTypes.shape({
+        date: PropTypes.string,
+        fetchedAt: PropTypes.string,
+        query: PropTypes.string,
+        stale: PropTypes.bool,
+        rotationSeconds: PropTypes.number,
+        selectedClipIndex: PropTypes.number,
+        items: PropTypes.arrayOf(PropTypes.shape({
+            videoId: PropTypes.string,
+            embedUrl: PropTypes.string,
+            title: PropTypes.string,
+            channelTitle: PropTypes.string,
+            publishedAt: PropTypes.string
+        }))
+    })
+};
+
+function FunContent({ items, loading, videoFeed }) {
     if (loading) {
         return (
             <div className="fun-comic-frame fun-empty-state">
                 <div className="fun-empty-title">Loading fun content...</div>
             </div>
         );
+    }
+
+    if (videoFeed) {
+        if (videoFeed.unavailable) {
+            return <VideoUnavailablePanel videoFeed={videoFeed} />;
+        }
+        return <YouTubeVideoPanel videoFeed={videoFeed} />;
     }
 
     if (!items || items.length === 0 || items[0].unavailable) {
@@ -184,8 +348,15 @@ function FunContent({ items, loading }) {
 
 export default function FunPage({ pageData, settings }) {
     const [items, setItems] = useState(null);
+    const [videoFeed, setVideoFeed] = useState(null);
     const [widgets, setWidgets] = useState({});
     const [loading, setLoading] = useState(true);
+
+    const applyFunData = (data) => {
+        setItems(data.items || (data.item ? [data.item] : null));
+        setVideoFeed(data.videoFeed || null);
+        setWidgets(data.widgets || {});
+    };
 
     useEffect(() => {
         let mounted = true;
@@ -196,8 +367,7 @@ export default function FunPage({ pageData, settings }) {
         const doSwap = () => {
             if (!mounted) return;
             if (pendingData) {
-                setItems(pendingData.items || (pendingData.item ? [pendingData.item] : null));
-                setWidgets(pendingData.widgets || {});
+                applyFunData(pendingData);
                 pendingData = null;
             }
             schedulePrefetch();
@@ -242,8 +412,7 @@ export default function FunPage({ pageData, settings }) {
                 const response = await apiFetch('/api/console/page/fun');
                 const data = await response.json();
                 if (mounted) {
-                    setItems(data.items || (data.item ? [data.item] : null));
-                    setWidgets(data.widgets || {});
+                    applyFunData(data);
                 }
             } catch (error) {
                 console.error('Failed to fetch fun content:', error);
@@ -252,6 +421,7 @@ export default function FunPage({ pageData, settings }) {
                         unavailable: true,
                         message: 'Unable to load fun content right now.',
                     }]);
+                    setVideoFeed(null);
                     setWidgets({});
                 }
             } finally {
@@ -272,20 +442,35 @@ export default function FunPage({ pageData, settings }) {
     }, []);
 
     useEffect(() => {
+        if (!videoFeed?.unavailable) {
+            return undefined;
+        }
+
+        let cancelled = false;
+        const retryTimeoutId = setTimeout(async () => {
+            try {
+                const response = await apiFetch('/api/console/page/fun');
+                const data = await response.json();
+                if (!cancelled) {
+                    applyFunData(data);
+                }
+            } catch (error) {
+                console.error('Failed to retry YouTube highlights:', error);
+            }
+        }, 30000);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(retryTimeoutId);
+        };
+    }, [videoFeed]);
+
+    useEffect(() => {
         if (!pageData) {
             return;
         }
 
-        if (pageData.items) {
-            setItems(pageData.items);
-        } else if (pageData.item) {
-            setItems([pageData.item]);
-        }
-
-        if (pageData.widgets) {
-            setWidgets(pageData.widgets);
-        }
-
+        applyFunData(pageData);
         setLoading(false);
     }, [pageData]);
 
@@ -316,7 +501,7 @@ export default function FunPage({ pageData, settings }) {
                 </div>
 
                 <div className="fun-comic-section" style={{ order: getOrder('comics') }}>
-                    <FunContent items={items} loading={loading} />
+                    <FunContent items={items} loading={loading} videoFeed={videoFeed} />
                 </div>
             </div>
         </div>
@@ -326,6 +511,7 @@ export default function FunPage({ pageData, settings }) {
 FunPage.propTypes = {
     pageData: PropTypes.shape({
         item: PropTypes.object,
+        videoFeed: PropTypes.object,
         widgets: PropTypes.object
     })
 };

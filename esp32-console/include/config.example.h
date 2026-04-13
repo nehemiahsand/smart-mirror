@@ -21,6 +21,7 @@ constexpr unsigned long WIFI_RECONNECT_INTERVAL_MS = 10000UL;
 constexpr unsigned long MQTT_RECONNECT_INTERVAL_MS = 5000UL;
 constexpr unsigned long BUTTON_DEBOUNCE_MS = 35UL;
 constexpr unsigned long BUTTON_LONG_PRESS_MS = 800UL;
+constexpr unsigned long MOTION_ACTIVE_DEBOUNCE_MS = 1500UL;
 constexpr unsigned long MOTION_IDLE_TIMEOUT_MS = 90000UL;
 constexpr unsigned long DIAL_EMIT_COOLDOWN_MS = 180UL;
 constexpr unsigned long CONSOLE_STATE_POLL_INTERVAL_MS = 2000UL;

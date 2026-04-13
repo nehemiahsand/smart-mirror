@@ -19,7 +19,7 @@ const WIDGETS_BY_PAGE = {
     { id: 'timedate', name: 'Time & Date', icon: '🕐' },
     { id: 'sunmoon', name: 'Sun/Moon Phase', icon: '🌞' },
     { id: 'bibleclock', name: 'Bible Clock', icon: '📖' },
-    { id: 'comics', name: 'Comics', icon: '🤡' },
+    { id: 'comics', name: 'Highlights', icon: '🏀' },
   ]
 };
 

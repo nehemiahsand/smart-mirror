@@ -24,25 +24,20 @@ xset s off 2>/dev/null || true
 xset -dpms 2>/dev/null || true
 xset s noblank 2>/dev/null || true
 
-# Start Firefox in kiosk mode (only if not already running)
-if ! pgrep -f "firefox.*localhost:3000" > /dev/null; then
-  # Install unclutter if not present (hides cursor after inactivity)
-  if ! command -v unclutter &> /dev/null; then
-    sudo apt-get update && sudo apt-get install -y unclutter
-  fi
-  
-  # Start unclutter to hide cursor after 1 second of inactivity
-  unclutter -idle 1 -root &
-  
-  # Start Firefox in kiosk mode with minimal flags
-  firefox \
-    --kiosk \
-    http://localhost:3000 &
-  
-  # Give firefox a moment to start, then move cursor to trigger auto-hide
-  sleep 3
-  xdotool mousemove 0 0
+# Install unclutter if not present (hides cursor after inactivity)
+if ! command -v unclutter &> /dev/null; then
+  sudo apt-get update && sudo apt-get install -y unclutter
 fi
+
+# Start unclutter to hide cursor after 1 second of inactivity
+unclutter -idle 1 -root &
+
+# Start Brave in kiosk mode.
+/home/smartmirror/Downloads/smart-mirror/scripts/launch-kiosk-browser.sh http://localhost:3000 || exit 1
+
+# Give Brave a moment to start, then move cursor to trigger auto-hide
+sleep 3
+xdotool mousemove 0 0
 
 # Keep script alive indefinitely
 while true; do
