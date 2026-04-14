@@ -3,6 +3,8 @@ const path = require('path');
 const axios = require('axios');
 const logger = require('../utils/logger');
 
+const gameRecap = require('./funGameRecap');
+
 const DATA_DIR = path.join(__dirname, '../../data/fun-video');
 const YOUTUBE_SEARCH_URL = 'https://www.googleapis.com/youtube/v3/search';
 const YOUTUBE_VIDEOS_URL = 'https://www.googleapis.com/youtube/v3/videos';
@@ -181,6 +183,19 @@ function haveSameFilterConfig(value) {
     && Number(value.minDurationSeconds) === getMinDurationSeconds();
 }
 
+function decodeHtmlEntities(text) {
+  const str = String(text || '');
+  return str
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
+}
+
 function buildEmbedUrl(videoId) {
   const params = new URLSearchParams({
     autoplay: '1',
@@ -209,8 +224,8 @@ function normalizeVideoItem(item) {
 
   return {
     videoId,
-    title: String(snippet.title || 'Stephen Curry highlight'),
-    channelTitle: String(snippet.channelTitle || 'YouTube'),
+    title: decodeHtmlEntities(snippet.title || 'Stephen Curry highlight'),
+    channelTitle: decodeHtmlEntities(snippet.channelTitle || 'YouTube'),
     channelId: snippet.channelId || null,
     publishedAt: snippet.publishedAt || null,
     thumbnailUrl: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || null,
@@ -275,6 +290,7 @@ class FunVideoService {
 
     return {
       provider: DEFAULT_PROVIDER,
+      mode: payload?.mode || 'search',
       query: payload?.query || getQuery(),
       date: payload?.date || getDateKey(),
       items,
@@ -436,25 +452,112 @@ class FunVideoService {
     return payload;
   }
 
+  getFeedMode() {
+    return String(process.env.FUN_VIDEO_MODE || 'search').trim().toLowerCase();
+  }
+
+  async fetchGameRecapFeed(dateKey) {
+    const apiKey = String(process.env.YOUTUBE_API_KEY || '').trim();
+    if (!apiKey) {
+      throw new Error('YOUTUBE_API_KEY is not configured');
+    }
+
+    const recaps = await gameRecap.fetchGameRecaps();
+    const items = [];
+
+    for (const recap of recaps) {
+      try {
+        const response = await axios.get(YOUTUBE_SEARCH_URL, {
+          timeout: 15000,
+          params: {
+            key: apiKey,
+            part: 'snippet',
+            type: 'video',
+            q: recap.searchQuery,
+            maxResults: 3,
+            videoEmbeddable: 'true',
+            videoSyndicated: 'true',
+          },
+        });
+
+        const hit = (response.data?.items || [])[0];
+        const videoId = hit?.id?.videoId;
+        if (!videoId) {
+          logger.warn('No YouTube result for game recap query', { query: recap.searchQuery });
+          continue;
+        }
+
+        items.push({
+          videoId,
+          title: decodeHtmlEntities(hit.snippet?.title || recap.searchQuery),
+          channelTitle: decodeHtmlEntities(hit.snippet?.channelTitle || 'NBA'),
+          channelId: hit.snippet?.channelId || null,
+          publishedAt: hit.snippet?.publishedAt || null,
+          thumbnailUrl: hit.snippet?.thumbnails?.high?.url || null,
+          watchUrl: `https://www.youtube.com/watch?v=${encodeURIComponent(videoId)}`,
+          game: {
+            gameId: recap.gameId,
+            date: recap.date,
+            dateFormatted: recap.dateFormatted,
+            homeAway: recap.homeAway,
+            result: recap.result,
+            score: recap.score,
+            home: recap.home,
+            away: recap.away,
+            opponent: recap.opponent,
+            boxScore: recap.boxScore,
+          },
+        });
+      } catch (error) {
+        logger.warn('YouTube search failed for game recap', {
+          query: recap.searchQuery,
+          error: error.message,
+        });
+      }
+    }
+
+    if (items.length === 0) {
+      throw new Error('No game recap videos found');
+    }
+
+    const payload = {
+      provider: DEFAULT_PROVIDER,
+      mode: 'game_recap',
+      query: 'Warriors Game Highlights',
+      filterConfig: buildFilterConfig(),
+      date: dateKey,
+      items,
+      rotationSeconds: getRotationSeconds(),
+      fetchedAt: new Date().toISOString(),
+    };
+
+    await fs.writeFile(this.getCachePath(dateKey), JSON.stringify(payload, null, 2), 'utf8');
+    return payload;
+  }
+
   async getCurrentFeed(options = {}) {
     const forceRefresh = options.forceRefresh === true;
     const dateKey = getDateKey();
+    const mode = this.getFeedMode();
 
     await this.ensureDataDir();
 
     if (!forceRefresh) {
       const cached = await this.readCachedFeed(dateKey);
-      if (cached) {
+      if (cached && (cached.mode || 'search') === mode) {
         return this.buildFeed(cached);
       }
     }
 
     try {
-      const fetched = await this.fetchDailyFeed(dateKey);
+      const fetched = mode === 'game_recap'
+        ? await this.fetchGameRecapFeed(dateKey)
+        : await this.fetchDailyFeed(dateKey);
       return this.buildFeed(fetched);
     } catch (error) {
       logger.warn('Failed to refresh daily YouTube fun feed', {
         error: error.message,
+        mode,
         query: getQuery(),
       });
 
@@ -468,7 +571,7 @@ class FunVideoService {
         return this.buildFeed(latestCached, { stale: true });
       }
 
-      return this.buildUnavailableFeed('Stephen Curry highlights are temporarily unavailable');
+      return this.buildUnavailableFeed('Game highlights are temporarily unavailable');
     }
   }
 }

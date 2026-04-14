@@ -43,7 +43,12 @@ ESP32 OLED behavior:
 - screen modes: page, standby, stats
 - button 1: page toggle (home → fun → spotify → home)
 - on spotify: button2 play/pause, button3 prev, button4 next
-- on fun/home: buttons map to fun navigation/sports shortcuts from backend soft buttons
+- on home: buttons map to sports shortcuts from backend soft buttons
+- on fun:
+  - button2: previous highlight/game
+  - button3: next highlight/game
+  - button4: toggle `Video` ↔ `Box` view for the selected game
+  - the matchup banner (team/logo/score/result) stays visible in both views
 - button 5: stats overlay toggle
 - in standby: button1 shows Turn On and wakes mirror, button5 shows Stats
 
@@ -93,6 +98,8 @@ Important backend env values:
 - SPOTIFY_REDIRECT_URI
 - MQTT_USERNAME
 - MQTT_PASSWORD
+- FUN_VIDEO_MODE (`search` or `game_recap`)
+- FUN_VIDEO_TEAM_ID (ESPN NBA team id, `9` for Warriors)
 
 Runtime settings are stored in backend/data/settings.json.
 

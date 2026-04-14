@@ -66,7 +66,8 @@ Buttons:
 - on Fun:
   - button 2 = `Prev`
   - button 3 = `Next`
-  - button 4 = `Home`
+  - button 4 = `Video` / `Box` toggle
+  - the Fun matchup banner (teams, logos, score, result) remains visible in both modes
 - on Spotify:
   - button 2 = `Prev`
   - button 3 = `Next`

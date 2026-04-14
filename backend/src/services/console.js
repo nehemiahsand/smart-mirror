@@ -222,6 +222,7 @@ class ConsoleService {
       snoozeUntil: null,
       funDateKey: null,
       funClipIndex: 0,
+      funViewMode: 'video',
       musicIsPlaying: false,
       focusStatus: 'idle',
       focusPhase: 'work',
@@ -502,7 +503,7 @@ class ConsoleService {
           button1: pageToggleTarget.name,
           button2: 'Prev',
           button3: 'Next',
-          button4: 'First',
+          button4: this.runtime.funViewMode === 'boxscore' ? 'Video' : 'Box',
           button5: 'Stats',
         };
       case 'media':
@@ -937,10 +938,15 @@ class ConsoleService {
 
     if (action === 'primary') {
       this.setFunClipIndex(currentClipIndex - 1, totalClips);
+      this.runtime.funViewMode = 'video';
     } else if (action === 'previous') {
       this.setFunClipIndex(currentClipIndex + 1, totalClips);
-    } else if (['next', 'refresh', 'confirm', 'home'].includes(action)) {
+      this.runtime.funViewMode = 'video';
+    } else if (action === 'next') {
+      this.runtime.funViewMode = this.runtime.funViewMode === 'boxscore' ? 'video' : 'boxscore';
+    } else if (['refresh', 'confirm', 'home'].includes(action)) {
       this.setFunClipIndex(0, totalClips);
+      this.runtime.funViewMode = 'video';
     }
 
     this.touchInteraction(`fun:${action}`);
@@ -1188,10 +1194,12 @@ class ConsoleService {
     const totalClips = Array.isArray(videoFeed?.items) ? videoFeed.items.length : 0;
     const selectedClipIndex = this.getFunClipIndex(totalClips);
     const selectedClip = totalClips > 0 ? videoFeed.items[selectedClipIndex] : null;
+    const viewMode = this.runtime.funViewMode || 'video';
     const videoFeedWithSelection = {
       ...videoFeed,
       selectedClipIndex,
       selectedVideoId: selectedClip?.videoId || null,
+      viewMode,
     };
 
     return {
@@ -1209,7 +1217,9 @@ class ConsoleService {
       items: [],
       selectedClipIndex,
       selectedDateKey: this.getFunDateKey(),
-      summary: videoFeed.unavailable ? 'Video highlights unavailable' : 'Stephen Curry highlights ready',
+      summary: videoFeed.unavailable ? 'Video highlights unavailable'
+        : videoFeed.mode === 'game_recap' ? 'Game highlights ready'
+          : 'Stephen Curry highlights ready',
       softButtons: this.getSoftButtons('fun'),
     };
   }
@@ -1345,12 +1355,16 @@ class ConsoleService {
     let pageChangeSource = null;
 
     if (this.isManualPage() && Number.isFinite(this.state.expiresAt) && this.state.expiresAt <= now) {
-      this.state.activePageId = this.getDefaultPageId();
-      this.state.expiresAt = null;
-      this.state.lastAction = 'timeout';
-      this.state.updatedAt = now;
-      changed = true;
-      pageChangeSource = 'timeout';
+      if (normalizePageId(this.state.activePageId) === 'fun') {
+        this.state.expiresAt = null;
+      } else {
+        this.state.activePageId = this.getDefaultPageId();
+        this.state.expiresAt = null;
+        this.state.lastAction = 'timeout';
+        this.state.updatedAt = now;
+        changed = true;
+        pageChangeSource = 'timeout';
+      }
     }
 
     const alarmSettings = settingsService.get('alarm') || {};
