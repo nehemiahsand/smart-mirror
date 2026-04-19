@@ -60,8 +60,6 @@ class SceneEngine {
     this.initialized = false;
     this.tickInterval = null;
     this.manualOverride = null;
-    this.lastMotionAt = null;
-    this.motionActive = false;
     this.lastInputEvent = null;
     this.state = {
       activeSceneId: 'day',
@@ -70,8 +68,10 @@ class SceneEngine {
       source: 'schedule',
       reason: 'initial',
       isStandby: false,
-      presence: 'idle',
+      presence: 'manual',
       lastMotionAt: null,
+      standbyEnteredAt: null,
+      motionActive: false,
       overrideExpiresAt: null,
       lastInputEvent: null,
       updatedAt: Date.now(),
@@ -145,11 +145,6 @@ class SceneEngine {
     return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 900000;
   }
 
-  getIdleTimeoutMs() {
-    const seconds = Number(settingsService.get('presence.idleTimeoutSeconds'));
-    return Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 900000;
-  }
-
   getPageAlias(sceneId) {
     return 'home';
   }
@@ -181,21 +176,8 @@ class SceneEngine {
     return sceneIds[nextIndex];
   }
 
-  computePresence(now = Date.now()) {
-    if (!settingsService.get('presence.enabled')) {
-      return 'disabled';
-    }
-
-    if (!this.lastMotionAt) {
-      return 'idle';
-    }
-
-    return (now - this.lastMotionAt) < this.getIdleTimeoutMs() ? 'present' : 'idle';
-  }
-
   resolveScene(now = new Date()) {
     const standbyMode = settingsService.get('display.standbyMode') === true;
-    const presence = this.computePresence(now.getTime());
 
     if (
       this.manualOverride &&
@@ -213,7 +195,7 @@ class SceneEngine {
         reason: 'display.standbyMode',
         isStandby: true,
         pageAlias: 'home',
-        presence,
+        presence: 'manual',
         overrideExpiresAt: null,
       };
     }
@@ -226,7 +208,7 @@ class SceneEngine {
         reason: 'manual_override',
         isStandby: false,
         pageAlias: this.getPageAlias(this.manualOverride.sceneId),
-        presence,
+        presence: 'manual',
         overrideExpiresAt: this.manualOverride.expiresAt,
       };
     }
@@ -239,7 +221,7 @@ class SceneEngine {
       reason: 'schedule_match',
       isStandby: false,
       pageAlias: this.getPageAlias(scheduledSceneId),
-      presence,
+      presence: 'manual',
       overrideExpiresAt: null,
     };
   }
@@ -266,8 +248,9 @@ class SceneEngine {
       ...this.state,
       ...resolved,
       console: consoleService.getState(),
-      lastMotionAt: this.lastMotionAt,
-      motionActive: this.motionActive,
+      lastMotionAt: null,
+      motionActive: false,
+      standbyEnteredAt: null,
       lastInputEvent: this.lastInputEvent,
       updatedAt: Date.now(),
       source,
@@ -451,21 +434,8 @@ class SceneEngine {
       timestamp: Date.now(),
     });
 
-    if (eventType === 'motion.active') {
-      this.motionActive = true;
-      this.lastMotionAt = Date.now();
-      if (settingsService.get('presence.wakeOnMotion') !== false && settingsService.get('display.standbyMode') === true) {
-        return this.applyStandbyMode(false, 'motion.active');
-      }
-      return this.refreshState({ source: 'esp32', reason: 'motion.active', broadcast: true, persist: true });
-    }
-
-    if (eventType === 'motion.idle') {
-      this.motionActive = false;
-      return this.refreshState({ source: 'esp32', reason: 'motion.idle', broadcast: true, persist: false });
-    }
-
     if (eventType === 'display.page.toggle') {
+      const isHeldToggle = payload.hold === true;
       if (isStandby) {
         logger.info('Waking display from standby via page toggle button', {
           deviceId: event.deviceId || 'unknown',
@@ -474,10 +444,18 @@ class SceneEngine {
       }
 
       if (typeof consoleService.isStatsOverlayActive === 'function' && consoleService.isStatsOverlayActive()) {
+        if (isHeldToggle) {
+          return this.applyStandbyMode(true, 'button:standby_toggle');
+        }
+
         logger.info('Ignoring page toggle while stats overlay is active', {
           deviceId: event.deviceId || 'unknown',
         });
         return this.refreshState({ source: 'esp32', reason: 'display.page.toggle:stats_ignored', broadcast: true, persist: false });
+      }
+
+      if (isHeldToggle) {
+        return this.applyStandbyMode(true, 'button:standby_toggle');
       }
 
       const websocketServer = require('../api/websocket');
@@ -555,23 +533,6 @@ class SceneEngine {
 
   async tick() {
     if (!this.initialized) {
-      return;
-    }
-
-    const idleTimeoutMs = this.getIdleTimeoutMs();
-    const standbyOnIdle = settingsService.get('presence.standbyOnIdle') !== false;
-    const presenceEnabled = settingsService.get('presence.enabled') !== false;
-    const isCurrentlyStandby = settingsService.get('display.standbyMode') === true;
-
-    if (
-      presenceEnabled &&
-      standbyOnIdle &&
-      this.lastMotionAt &&
-      !this.motionActive &&
-      !isCurrentlyStandby &&
-      (Date.now() - this.lastMotionAt) >= idleTimeoutMs
-    ) {
-      await this.applyStandbyMode(true, 'presence_idle_timeout');
       return;
     }
 

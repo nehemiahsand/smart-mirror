@@ -16,7 +16,6 @@ constexpr uint8_t BUTTON_2 = 26;
 constexpr uint8_t BUTTON_3 = 27;
 constexpr uint8_t BUTTON_4 = 25;
 constexpr uint8_t BUTTON_5 = 23;
-constexpr uint8_t PIR_MOTION = 33;
 constexpr uint8_t OLED_SDA = 21;
 constexpr uint8_t OLED_SCL = 22;
 constexpr uint8_t DHT22_DATA = 14;
@@ -82,7 +81,6 @@ String gEventTopic;
 String gStatusTopic;
 String gLastEvent = "Booting";
 
-bool gMotionActive = false;
 bool gDisplayReady = false;
 uint8_t gStatsPageIndex = 0;
 
@@ -90,8 +88,6 @@ unsigned long gLastWifiAttemptMs = 0;
 unsigned long gLastMqttAttemptMs = 0;
 unsigned long gLastStatePollMs = 0;
 unsigned long gLastOledRenderMs = 0;
-unsigned long gLastMotionMs = 0;
-unsigned long gMotionHighSinceMs = 0;
 unsigned long gLastClimatePublishMs = 0;
 bool gClimateReady = false;
 constexpr unsigned long CLIMATE_PUBLISH_INTERVAL_MS = 30000UL;
@@ -357,11 +353,6 @@ bool publishAction(const ButtonState& button, bool hold) {
   return publishJson("ui.action", payload);
 }
 
-bool publishMotion(const char* type) {
-  StaticJsonDocument<32> payload;
-  return publishJson(type, payload);
-}
-
 void pollClimate() {
   const unsigned long nowMs = millis();
   if ((nowMs - gLastClimatePublishMs) < CLIMATE_PUBLISH_INTERVAL_MS) {
@@ -481,7 +472,7 @@ void pollConsoleState() {
   gMirrorState.screenMode = String(document["screenMode"] | (gMirrorState.standby ? "standby" : "page"));
   gMirrorState.activePageId = String(document["activePageId"] | "home");
   gMirrorState.pageTitle = String(document["pageTitle"] | (gMirrorState.standby ? "Standby" : "Main Page"));
-  gMirrorState.statusLabel = String(document["statusLabel"] | (gMirrorState.standby ? "Motion or 1 wakes" : "Ready"));
+  gMirrorState.statusLabel = String(document["statusLabel"] | (gMirrorState.standby ? "1 wakes mirror" : "Hold 1 for standby"));
   gMirrorState.lastAction = String(document["lastAction"] | gLastEvent);
   gMirrorState.statsLine1 = String(document["statsLine1"] | "");
   gMirrorState.statsLine2 = String(document["statsLine2"] | "");
@@ -651,7 +642,6 @@ void renderStatsScreen() {
   const String ramValue = extractStatValue(gMirrorState.statsLine2, "RAM");
   const String uptimeValue = extractStatValue(gMirrorState.statsLine3, "Up", "T");
   const String tempValue = extractStatValue(gMirrorState.statsLine3, "T");
-  const String motionValue = extractStatValue(gMirrorState.statsLine4, "Motion");
   const int16_t contentTop = getHeaderHeight() + 1;
 
   if (gStatsPageIndex == 0 && !diskValue.isEmpty()) {
@@ -694,21 +684,6 @@ void renderStatsScreen() {
     drawCenteredTextSized(0, contentTop + 8, Config::SCREEN_WIDTH,
                           Config::SCREEN_HEIGHT - (contentTop + 8),
                           fitTextToWidthSized(uptimeValue, Config::SCREEN_WIDTH - 8, 2, 20, false), 2);
-    return;
-  }
-
-  if (gStatsPageIndex == 3 && !motionValue.isEmpty()) {
-    const bool motionDetected = motionValue == "Yes";
-    renderHeader("Motion");
-    if (motionDetected) {
-      gDisplay.fillRoundRect(12, contentTop + 4, 104, 17, 3, SSD1306_WHITE);
-      gDisplay.setTextColor(SSD1306_BLACK);
-      drawCenteredTextSized(12, contentTop + 4, 104, 17, "YES", 2);
-      gDisplay.setTextColor(SSD1306_WHITE);
-    } else {
-      gDisplay.drawRoundRect(12, contentTop + 4, 104, 17, 3, SSD1306_WHITE);
-      drawCenteredTextSized(12, contentTop + 4, 104, 17, "NO", 2);
-    }
     return;
   }
 
@@ -823,53 +798,13 @@ void pollButtons() {
     if (button.stablePressed && !button.longSent &&
         (nowMs - button.pressedAtMs) >= Config::BUTTON_LONG_PRESS_MS) {
       button.longSent = true;
-      if (gMirrorState.screenMode == "stats") {
+      if (gMirrorState.screenMode == "stats" &&
+          button.command != ButtonCommand::TogglePage) {
         continue;
       }
 
       publishAction(button, true);
     }
-  }
-}
-
-void pollMotion() {
-  const unsigned long nowMs = millis();
-  const bool motionHigh = digitalRead(Pins::PIR_MOTION) == HIGH;
-
-  if (nowMs % 1000 == 0) { // Debug log for user to check sensor readout
-    static bool lastDebugHigh = false;
-    if (motionHigh != lastDebugHigh) {
-      Serial.printf("[debug] PIR sensor raw value changed to: %s\n", motionHigh ? "HIGH" : "LOW");
-      lastDebugHigh = motionHigh;
-    }
-  }
-
-  if (motionHigh) {
-    if (gMotionHighSinceMs == 0) {
-      gMotionHighSinceMs = nowMs;
-    }
-
-    if (gMotionActive) {
-      gLastMotionMs = nowMs;
-      return;
-    }
-
-    if ((nowMs - gMotionHighSinceMs) >= Config::MOTION_ACTIVE_DEBOUNCE_MS) {
-      gMotionActive = true;
-      gLastMotionMs = nowMs;
-      Serial.println("[motion] Transitioned to ACTIVE state!");
-      publishMotion("motion.active");
-    }
-
-    return;
-  }
-
-  gMotionHighSinceMs = 0;
-
-  if (gMotionActive && (nowMs - gLastMotionMs) >= Config::MOTION_IDLE_TIMEOUT_MS) {
-    gMotionActive = false;
-    Serial.println("[motion] Idle timeout reached. Transitioned to IDLE.");
-    publishMotion("motion.idle");
   }
 }
 
@@ -907,7 +842,6 @@ void setup() {
   gEventTopic = String(Config::MQTT_TOPIC_PREFIX) + "/" + Config::DEVICE_ID + "/event";
   gStatusTopic = String(Config::MQTT_TOPIC_PREFIX) + "/" + Config::DEVICE_ID + "/status";
 
-  pinMode(Pins::PIR_MOTION, INPUT_PULLDOWN); // Ensure sensor isn't floating
   initializeButtons();
   initializeDisplay();
   resetMirrorState();
@@ -931,7 +865,6 @@ void loop() {
 
   pollConsoleState();
   pollButtons();
-  pollMotion();
   pollClimate();
   renderDisplay();
 }

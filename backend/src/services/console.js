@@ -466,7 +466,7 @@ class ConsoleService {
   getSoftButtons(pageId = null, options = {}) {
     if (options.screenMode === 'standby') {
       return {
-        button1: 'Turn On',
+        button1: 'Wake',
         button2: '',
         button3: '',
         button4: '',
@@ -476,7 +476,7 @@ class ConsoleService {
 
     if (options.screenMode === 'stats') {
       return {
-        button1: '',
+        button1: 'Standby',
         button2: 'Prev',
         button3: 'Next',
         button4: '',
@@ -537,10 +537,6 @@ class ConsoleService {
   }
 
   buildStatsLines(presentedPage) {
-    const standby = this.isStandbyActive();
-    const cameraEnabled = !standby && settingsService.get('camera.enabled') !== false;
-    const sceneEngine = require('./sceneEngine');
-    const motionDetected = sceneEngine.getState().motionActive === true;
     const cpuCount = os.cpus().length || 1;
     const [load1] = os.loadavg();
     const cpuPercent = Math.round((load1 / cpuCount) * 100);
@@ -555,7 +551,7 @@ class ConsoleService {
       line3: cpuTempC == null
         ? `Up ${formatUptime(os.uptime())}`
         : `Up ${formatUptime(os.uptime())} T ${cpuTempC}C`,
-      line4: `Motion ${motionDetected ? 'Yes' : 'No'}`,
+      line4: '',
     };
   }
 
@@ -589,12 +585,8 @@ class ConsoleService {
       pageOrder,
       pageTitle: standby ? 'Standby' : (statsOverlayActive ? 'Mirror Stats' : presentedPage.title),
       statusLabel: standby
-        ? 'Motion or 1 wakes'
-        : (statsOverlayActive
-          ? `Viewing ${presentedPage.title}`
-          : (presentedPage.id === 'spotify'
-            ? 'Spotify controls'
-            : (presentedPage.id === 'fun' ? 'Fun page ready' : 'Mirror ready'))),
+        ? '1 wakes mirror'
+        : 'Hold 1 for standby',
       softButtons,
       statsLine1: statsLines.line1,
       statsLine2: statsLines.line2,

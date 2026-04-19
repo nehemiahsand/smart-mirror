@@ -9,7 +9,6 @@ PlatformIO firmware for the mirror-side ESP32 console.
 - `GPIO27`: button 3
 - `GPIO25`: button 4
 - `GPIO23`: button 5
-- `GPIO33`: PIR motion sensor
 - `GPIO21`: OLED SDA
 - `GPIO22`: OLED SCL
 - `GPIO14`: DHT22 data
@@ -27,7 +26,7 @@ The knob has been removed from the current firmware.
 
 - connects to Wi-Fi
 - connects to the authenticated Mosquitto broker
-- publishes ESP32 button and PIR events over MQTT
+- publishes ESP32 button events over MQTT
 - polls `GET /api/console/state?device=esp32`
 - renders the returned mirror state onto the OLED
 
@@ -42,8 +41,6 @@ Published event types:
 
 - `display.page.toggle`
 - `ui.action`
-- `motion.active`
-- `motion.idle`
 
 The backend is the source of truth for page state, standby state, and OLED labels.
 
@@ -59,6 +56,7 @@ Awake pages:
 Buttons:
 
 - button 1 cycles between `Main Page`, `Fun`, and `Spotify`
+- hold button 1 to enter standby
 - on Main Page:
   - button 2 = `Prev`
   - button 3 = `Next`
@@ -76,8 +74,7 @@ Buttons:
 
 Standby:
 
-- PIR motion wakes the mirror
-- button 1 shows `Turn On`
+- button 1 wakes the mirror
 - button 5 can still open stats
 
 Stats pages:
@@ -85,14 +82,14 @@ Stats pages:
 - disk and ping
 - CPU and RAM
 - uptime and CPU temp
-- motion detected yes/no
 
 While stats is open:
 
 - button 2 = previous stats page
 - button 3 = next stats page
 - button 5 = back/close
-- button 1 and button 4 are ignored to keep the stats layout uncluttered
+- short button 1 and button 4 are ignored to keep the stats layout uncluttered
+- hold button 1 enters standby
 
 ## Local Setup
 

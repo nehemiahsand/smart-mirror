@@ -1,7 +1,7 @@
 /**
  * Camera Service
  * Integrates with the lightweight camera sidecar (MJPEG streaming + enable/disable).
- * Presence/motion comes from the ESP32 (see sceneEngine), not from camera-side AI.
+ * Standby is controlled manually via the dashboard or the ESP32 console buttons.
  */
 
 const axios = require('axios');
@@ -139,39 +139,10 @@ class CameraService {
   async getStatus() {
     try {
       const response = await axios.get(`${CAMERA_URL}/detection/status`, { timeout: 3000 });
-      const sceneEngine = require("./sceneEngine");
-      const sceneState = sceneEngine.getState();
-      const presenceEnabled = require("./settings").get('presence.enabled') !== false;
-      const standbyEnabled = presenceEnabled && require("./settings").get('presence.standbyOnIdle') !== false;
-      const isStandby = sceneState.isStandby === true;
-      const motionDetected = sceneState.motionActive === true;
-      const idleTimeoutMs = sceneEngine.getIdleTimeoutMs();
-      const lastDetection = sceneState.lastMotionAt || null;
-
-      let standbyCountdownState = 'disabled';
-      let timeUntilStandby = null;
-
-      if (presenceEnabled === false) {
-        standbyCountdownState = 'presence_disabled';
-      } else if (standbyEnabled === false) {
-        standbyCountdownState = 'auto_standby_disabled';
-      } else if (isStandby) {
-        standbyCountdownState = 'in_standby';
-        timeUntilStandby = 0;
-      } else if (motionDetected) {
-        standbyCountdownState = 'paused_motion_active';
-        timeUntilStandby = idleTimeoutMs;
-      } else if (lastDetection) {
-        standbyCountdownState = 'counting_down';
-        timeUntilStandby = Math.max(0, idleTimeoutMs - (Date.now() - lastDetection));
-      } else {
-        standbyCountdownState = 'waiting_for_first_motion';
-      }
 
       return {
         available: this.isAvailable,
         enabled: response.data.enabled !== false,
-        motion_detected: motionDetected,
         total_detections: response.data.total_detections,
         fps: response.data.fps,
         stream_viewers: response.data.stream_viewers || 0,
@@ -179,15 +150,13 @@ class CameraService {
         stream_fps_limit: response.data.stream_fps_limit || null,
         stream_jpeg_quality: response.data.stream_jpeg_quality || null,
         capture_resolution: response.data.capture_resolution || null,
-        auto_standby_enabled: standbyEnabled,
         dark_standby_enabled: this.darkStandbyEnabled,
         is_dark: response.data.is_dark,
         brightness: response.data.brightness,
-        last_detection: lastDetection,
-        standby_countdown_state: standbyCountdownState,
-        time_until_standby: timeUntilStandby,
+        standby_active: settingsService.get('display.standbyMode') === true,
         standby_start_time: this.standbyStartTime,
-        time_until_shutdown: null // Auto-shutdown disabled
+        time_until_shutdown: null,
+        standby_hint: 'Hold button 1 on the ESP32 to enter standby. Press button 1 to wake.',
       };
     } catch (error) {
       return {
@@ -203,7 +172,7 @@ class CameraService {
 
   startShutdownTimer() {
     // Auto-shutdown timer functionality removed.
-    // Standby remains active until woken via motion/button flows.
+    // Standby remains active until changed manually.
   }
 
   cancelShutdownTimer() {
@@ -228,14 +197,6 @@ class CameraService {
     }
   }
 
-  async setAutoStandby(enabled) {
-    await settingsService.update('presence.standbyOnIdle', enabled);
-
-    const sceneEngine = require('./sceneEngine');
-    await sceneEngine.handleSettingsChanged('camera:auto_standby_toggle');
-
-    logger.info(`Auto-standby ${enabled ? 'enabled' : 'disabled'}`);
-  }
 }
 
 module.exports = new CameraService();
