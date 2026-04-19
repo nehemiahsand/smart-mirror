@@ -10,6 +10,10 @@ export default function Camera() {
     const [streamError, setStreamError] = useState('');
     const [streamRetryCount, setStreamRetryCount] = useState(0);
 
+    function reloadPage() {
+        window.location.reload();
+    }
+
     async function startStream(keepEnabledOnFailure = false) {
         try {
             setStreamError('');
@@ -93,10 +97,7 @@ export default function Camera() {
     };
 
     const disableStream = () => {
-        setStreamEnabled(false);
-        setStreamUrl('');
-        setStreamError('');
-        setStreamRetryCount(0);
+        reloadPage();
     };
 
     const streamDetails = cameraStatus?.stream_resolution
@@ -107,53 +108,6 @@ export default function Camera() {
         <div className="page">
             <div className="page-header">
                 <h1>ESP32 Console & Camera</h1>
-            </div>
-
-            {/* Camera Status */}
-            <div className="card">
-                <div className="card-header">
-                    <span className="card-icon">🎛️</span>
-                    <h2>ESP32 Console Status</h2>
-                </div>
-
-                {loading ? (
-                    <div className="loading">Loading sensor status...</div>
-                ) : !cameraStatus ? (
-                    <div className="error-box">
-                        <p>⚠️ Data service is not available</p>
-                    </div>
-                ) : (
-                    <div className="camera-status">
-                        <div className="info-box" style={{ marginBottom: "15px" }}>
-                            <p>
-                                💡 Motion-triggered standby is disabled. Hold button 1 on the ESP32
-                                console to enter standby, then press button 1 to wake the mirror.
-                                Standby turns the display off only, so this camera stream can stay
-                                available in the PWA.
-                            </p>
-                        </div>
-                        <div className="status-grid">
-                            <div className="status-item">
-                                <span className="status-label">Standby</span>
-                                <span className={`status-value ${cameraStatus.standby_active ? 'inactive' : 'active'}`}>
-                                    {cameraStatus.standby_active ? '🌙 ACTIVE' : '☀️ AWAKE'}
-                                </span>
-                            </div>
-
-                            <div className="status-item">
-                                <span className="status-label">Camera Input</span>
-                                <span className="status-value">
-                                    {cameraStatus.enabled === false ? '⏸ DISABLED' : '📷 ENABLED'}
-                                </span>
-                            </div>
-                        </div>
-                        <div className="info-box">
-                            <p>
-                                {cameraStatus.standby_hint || 'Standby is controlled manually from the ESP32 console or dashboard.'}
-                            </p>
-                        </div>
-                    </div>
-                )}
             </div>
 
             {/* Live Camera Feed */}
@@ -167,7 +121,8 @@ export default function Camera() {
                     <div className="info-box">
                         <p>
                             💡 Video streaming natively proxies an MJPEG stream without AI processing.
-                            Enable to preview your camera orientation.
+                            Enable to preview your camera orientation. Hold button 1 for standby,
+                            then press button 1 to wake.
                         </p>
                     </div>
 
