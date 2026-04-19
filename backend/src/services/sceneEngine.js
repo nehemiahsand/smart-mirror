@@ -306,15 +306,11 @@ class SceneEngine {
 
     try {
       if (standbyMode) {
-        await cameraService.setCameraEnabled(false);
         await displayService.turnOff();
         if (typeof cameraService.startShutdownTimer === 'function') {
           cameraService.startShutdownTimer();
         }
       } else {
-        if (settingsService.get('camera.enabled') !== false) {
-          await cameraService.setCameraEnabled(true);
-        }
         await displayService.turnOn();
         if (typeof cameraService.cancelShutdownTimer === 'function') {
           cameraService.cancelShutdownTimer();

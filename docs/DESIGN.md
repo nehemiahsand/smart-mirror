@@ -16,8 +16,6 @@ The backend is the source of truth for page state, standby state, console soft b
 
 - mosquitto
   - authenticated MQTT broker for ESP32 topics
-- sensor
-  - DHT22 sidecar on internal port 5555
 - camera
   - camera stream/control sidecar on internal port 5556
 - backend
@@ -28,11 +26,10 @@ The backend is the source of truth for page state, standby state, console soft b
 ### Hardware
 
 - Raspberry Pi 5
-- DHT22 on GPIO 4
 - USB camera
 - USB microphone
 - HDMI display
-- ESP32 with five buttons, PIR sensor, and SSD1306 OLED
+- ESP32 with five buttons, DHT22 input, and SSD1306 OLED
 
 ## Local Development & CI/CD Pipeline
 
@@ -81,9 +78,10 @@ OLED modes:
 
 Button role model:
 
-- button1 toggles page cycle home -> fun -> spotify -> home
+- button1 short press toggles page cycle home -> fun -> spotify -> home
+- button1 hold enters standby while awake
 - home page: button2 previous sport, button3 next sport, button4 default sport
-- fun page: button2 previous date, button3 next date, button4 home
+- fun page: button2 previous highlight, button3 next highlight, button4 video/box toggle
 - spotify page: button2 previous track, button3 next track, button4 play/stop
 - button5 toggles stats overlay
 - stats mode: button2 previous stats page, button3 next stats page, button5 back
@@ -93,7 +91,7 @@ Button role model:
 Stats presentation:
 
 - compact 128x32 OLED uses one stats subpage at a time rather than four cramped rows
-- current stats pages are disk/ping, cpu/ram, uptime/temp, and motion state
+- current stats pages are disk/ping, cpu/ram, and uptime/temp
 - stats navigation is handled locally on the ESP32 so page changes feel immediate
 
 ## Backend Responsibilities
@@ -132,9 +130,10 @@ consoleService getEsp32State -> GET /api/console/state?device=esp32 -> esp32 pol
 ### Standby Flow
 
 - standby flag comes from backend settings/display state
-- PIR motion can wake standby through esp32 event handling
-- standby mode forces camera effective-off in privacy status output
-- camera status exposes explicit standby countdown states so the admin UI can distinguish paused motion, active countdown, disabled standby, waiting for first motion, and already-in-standby cases
+- standby is entered manually from the dashboard or a held button1 press from the ESP32
+- standby wake is handled by button1 from the ESP32 or by dashboard actions
+- standby turns the display off but does not disable the camera service or PWA camera stream
+- the Camera page uses short-lived stream tokens and periodic reconnects so long-lived MJPEG sessions recover without a full page reload
 
 ## Security Notes
 
@@ -145,5 +144,5 @@ consoleService getEsp32State -> GET /api/console/state?device=esp32 -> esp32 pol
 
 ## Document Metadata
 
-- Version: 1.3
-- Last Updated: March 23, 2026
+- Version: 1.4
+- Last Updated: April 18, 2026

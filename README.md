@@ -8,10 +8,9 @@ Smart mirror system for Raspberry Pi with three active surfaces:
 
 ## Current Runtime
 
-Docker Compose runs five services:
+Docker Compose runs four services:
 
 - mosquitto: authenticated MQTT broker for ESP32 events
-- sensor: DHT22 sidecar (internal port 5555)
 - camera: MJPEG sidecar with camera enable/disable support (internal port 5556)
 - backend: Node/Express API + WebSocket + scene/console logic + built PWA (host port 80)
 - display: mirror React app bundle served from a container on host port 3000
@@ -41,7 +40,8 @@ Display behavior:
 ESP32 OLED behavior:
 
 - screen modes: page, standby, stats
-- button 1: page toggle (home → fun → spotify → home)
+- button 1 short press: page toggle (home → fun → spotify → home)
+- button 1 hold: enter standby when awake
 - on spotify: button2 play/pause, button3 prev, button4 next
 - on home: buttons map to sports shortcuts from backend soft buttons
 - on fun:
@@ -51,6 +51,7 @@ ESP32 OLED behavior:
   - the matchup banner (team/logo/score/result) stays visible in both views
 - button 5: stats overlay toggle
 - in standby: button1 shows Turn On and wakes mirror, button5 shows Stats
+- in stats: short button1 is ignored, hold button1 enters standby
 
 PWA pages (current):
 
@@ -67,17 +68,16 @@ PWA pages (current):
 ## Hardware
 
 - Raspberry Pi 5
-- DHT22 on GPIO 4
 - USB camera
 - USB microphone
 - HDMI display
 - ESP32 console:
+  - DHT22 data GPIO14
   - button1 GPIO32
   - button2 GPIO26
   - button3 GPIO27
   - button4 GPIO25
   - button5 GPIO23
-  - PIR GPIO33
   - SSD1306 OLED on GPIO21/GPIO22
 
 ## Local Configuration
@@ -102,15 +102,6 @@ Important backend env values:
 - FUN_VIDEO_TEAM_ID (ESPN NBA team id, `9` for Warriors)
 
 Runtime settings are stored in backend/data/settings.json.
-
-## Start, Check, and Verify
-
-Start:
-
-```bash
-git clone https://github.com/[your-repo]/smart-mirror.git
-cd smart-mirror
-```
 
 ## Start, Check, and Verify
 
@@ -186,8 +177,9 @@ npm run spotify:auth
 - The backend image builds mobile-pwa into backend/public.
 - The display image builds the React app during `docker compose build` and serves the compiled bundle at runtime; it does not run the Vite dev server in Docker.
 - There is no separate PWA compose service.
-- Camera service is stream/control support; standby wake source is PIR motion via ESP32.
-- The camera page reports standby countdown states explicitly: paused while motion is present, counting down, disabled, waiting for first motion, or already in standby.
+- Camera service is stream/control support; standby is now manual from the dashboard or ESP32 button 1 hold.
+- Standby turns the display off but does not disable camera streaming for the PWA unless Camera Input is explicitly disabled.
+- The Camera page uses short-lived scoped stream tokens and refreshes the MJPEG stream periodically so long-lived sessions recover cleanly.
 
 ## Author
 

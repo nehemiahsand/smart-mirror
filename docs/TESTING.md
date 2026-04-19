@@ -9,7 +9,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Expected: services mosquitto, sensor, camera, backend, and display are healthy/running.
+Expected: services mosquitto, camera, backend, and display are healthy/running.
 
 ## 2) Backend/API Smoke Checks
 
@@ -52,6 +52,8 @@ PWA:
 - open http://localhost/
 - verify login gate works
 - verify dashboard, camera, wifi, widgets, photos, sports, settings, and more pages load
+- verify the Camera page can still open the MJPEG stream while the mirror is in standby
+- verify the Camera page reconnects cleanly after several minutes without needing a full page reload
 
 ## 5) ESP32/OLED Validation
 
@@ -65,9 +67,10 @@ cd esp32-console
 
 Validate:
 
-- button1 toggles home -> fun -> spotify -> home
+- button1 short press toggles home -> fun -> spotify -> home
+- button1 hold enters standby while awake
 - main page button2/3/4 map to prev sport/next sport/default sport
-- fun page button2/3/4 map to prev date/next date/home
+- fun page button2/3/4 map to previous highlight/next highlight/video-box toggle
 - spotify page button2/3/4 map to prev/next/play-stop
 - button5 toggles stats overlay
 - stats overlay uses paged views:
@@ -75,7 +78,8 @@ Validate:
   - button3 = next stats page
   - button5 = back
 - stats pages render cleanly without overlapping the header on the compact 128x32 OLED
-- standby shows Turn On and can wake via button1 or PIR motion
+- standby shows Turn On and wakes via button1
+- with the mirror in standby, verify the admin Camera page can still start the live stream
 - oled receives current state from /api/console/state?device=esp32
 - after 5 minutes of inactivity on spotify or fun, both the OLED and mirror return to home together
 
@@ -86,13 +90,12 @@ docker compose logs --tail=200 backend
 docker compose logs --tail=200 display
 docker compose logs --tail=200 mosquitto
 docker compose logs --tail=200 camera
-docker compose logs --tail=200 sensor
 ```
 
 ## Document Metadata
 
-- Version: 1.3
-- Last Updated: March 23, 2026
+- Version: 1.4
+- Last Updated: April 18, 2026
 
 ## 7) Automated Unit Testing (Jest)
 

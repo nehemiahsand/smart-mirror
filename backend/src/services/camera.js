@@ -156,7 +156,7 @@ class CameraService {
         standby_active: settingsService.get('display.standbyMode') === true,
         standby_start_time: this.standbyStartTime,
         time_until_shutdown: null,
-        standby_hint: 'Hold button 1 on the ESP32 to enter standby. Press button 1 to wake.',
+        standby_hint: 'Standby only turns the display off. Camera streaming stays available in the dashboard unless Camera Input is disabled.',
       };
     } catch (error) {
       return {

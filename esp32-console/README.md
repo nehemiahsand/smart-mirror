@@ -44,6 +44,11 @@ Published event types:
 
 The backend is the source of truth for page state, standby state, and OLED labels.
 
+`display.page.toggle` uses its `hold` flag for standby control:
+
+- `hold: false`: cycle pages while awake, wake the mirror while in standby
+- `hold: true`: enter standby while awake, wake the mirror while in standby
+
 ## Current OLED Behavior
 
 Awake pages:
@@ -76,6 +81,7 @@ Standby:
 
 - button 1 wakes the mirror
 - button 5 can still open stats
+- standby only turns the display off; the backend camera stream can still be opened from the admin PWA unless Camera Input is disabled separately
 
 Stats pages:
 

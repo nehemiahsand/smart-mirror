@@ -10,10 +10,6 @@ export default function Camera() {
     const [streamError, setStreamError] = useState('');
     const [streamRetryCount, setStreamRetryCount] = useState(0);
 
-    function reloadPage() {
-        window.location.reload();
-    }
-
     async function startStream(keepEnabledOnFailure = false) {
         try {
             setStreamError('');
@@ -67,8 +63,22 @@ export default function Camera() {
             return;
         }
 
-        reloadPage();
+        setStreamUrl('');
+        setStreamError('Camera input is disabled');
+        setStreamRetryCount(0);
     }, [cameraStatus?.enabled, streamEnabled]);
+
+    useEffect(() => {
+        if (!streamEnabled) {
+            return undefined;
+        }
+
+        const refreshTimer = setInterval(() => {
+            startStream(true);
+        }, 4 * 60 * 1000);
+
+        return () => clearInterval(refreshTimer);
+    }, [streamEnabled]);
 
     const loadCameraStatus = async () => {
         try {
@@ -83,7 +93,10 @@ export default function Camera() {
     };
 
     const disableStream = () => {
-        reloadPage();
+        setStreamEnabled(false);
+        setStreamUrl('');
+        setStreamError('');
+        setStreamRetryCount(0);
     };
 
     const streamDetails = cameraStatus?.stream_resolution
@@ -115,6 +128,8 @@ export default function Camera() {
                             <p>
                                 💡 Motion-triggered standby is disabled. Hold button 1 on the ESP32
                                 console to enter standby, then press button 1 to wake the mirror.
+                                Standby turns the display off only, so this camera stream can stay
+                                available in the PWA.
                             </p>
                         </div>
                         <div className="status-grid">
@@ -171,7 +186,7 @@ export default function Camera() {
                             {cameraStatus?.enabled === false || streamError ? (
                                 <div className="feed-error">
                                     {cameraStatus?.enabled === false
-                                        ? 'Camera is off. Waiting for it to come back on...'
+                                        ? 'Camera input is disabled from the dashboard.'
                                         : 'Reconnecting to camera stream...'}
                                 </div>
                             ) : (

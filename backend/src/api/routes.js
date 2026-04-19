@@ -139,8 +139,7 @@ router.post('/auth/stream-token', adminAuth, (req, res) => {
 router.get('/privacy/status', (req, res) => {
   try {
     const settings = settingsService.getAll();
-    const standbyActive = settings.display?.standbyMode === true;
-    const cameraEnabled = !standbyActive && settings.camera?.enabled !== false;
+    const cameraEnabled = settings.camera?.enabled !== false;
     
     res.json({ cameraEnabled });
   } catch (error) {
@@ -153,8 +152,6 @@ router.post('/privacy', adminAuth, async (req, res) => {
   try {
     const { cameraEnabled } = req.body || {};
     const updates = {};
-    const currentSettings = settingsService.getAll();
-    const isStandby = currentSettings?.display?.standbyMode === true;
 
     if (typeof cameraEnabled === 'boolean') {
       updates['camera.enabled'] = cameraEnabled;
@@ -605,14 +602,10 @@ router.post('/settings', adminAuth, async (req, res) => {
       // Turn display on/off based on standby mode
       try {
         if (standbyMode) {
-          await cameraService.setCameraEnabled(false);
           await displayService.turnOff();
           // Start 30-minute auto-shutdown timer
           cameraService.startShutdownTimer();
         } else {
-          if (settings.camera?.enabled !== false) {
-            await cameraService.setCameraEnabled(true);
-          }
           await displayService.turnOn();
           // Cancel auto-shutdown timer when waking manually
           cameraService.cancelShutdownTimer();
@@ -668,14 +661,10 @@ router.put('/settings', adminAuth, async (req, res) => {
       // Turn display on/off based on standby mode
       try {
         if (standbyMode) {
-          await cameraService.setCameraEnabled(false);
           await displayService.turnOff();
           // Start 30-minute auto-shutdown timer
           cameraService.startShutdownTimer();
         } else {
-          if (settings.camera?.enabled !== false) {
-            await cameraService.setCameraEnabled(true);
-          }
           await displayService.turnOn();
           // Cancel auto-shutdown timer when waking manually
           cameraService.cancelShutdownTimer();

@@ -19,8 +19,6 @@ export default function Dashboard() {
   const [busy, setBusy] = useState(false);
   const [confirmModal, setConfirmModal] = useState(null);
   const [alertModal, setAlertModal] = useState(null);
-  const standbyActive = settings?.display?.standbyMode === true;
-  const effectiveCameraEnabled = !standbyActive && privacy.cameraEnabled;
 
   useEffect(() => {
     fetchData();
@@ -285,7 +283,7 @@ export default function Dashboard() {
             <h2>Quick Actions</h2>
           </div>
           <div className="info-box" style={{ marginBottom: '15px' }}>
-            <p>ESP32 controls: hold 1 for standby, press 1 to wake.</p>
+            <p>ESP32 controls: hold 1 for standby, press 1 to wake. Standby turns the display off but keeps the PWA camera stream available.</p>
           </div>
           <div className="quick-actions">
             <button

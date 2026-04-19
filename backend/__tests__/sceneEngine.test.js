@@ -159,7 +159,7 @@ describe('SceneEngine button-driven standby handling', () => {
   });
 
   it('enters standby on a held display.page.toggle press while awake', async () => {
-    const { sceneEngine, settingsData, displayService, consoleService } = createSceneEngineTestContext();
+    const { sceneEngine, settingsData, displayService, consoleService, cameraService } = createSceneEngineTestContext();
 
     await sceneEngine.handleEsp32Event({
       type: 'display.page.toggle',
@@ -172,11 +172,12 @@ describe('SceneEngine button-driven standby handling', () => {
 
     expect(settingsData.display.standbyMode).toBe(true);
     expect(displayService.turnOff).toHaveBeenCalledTimes(1);
+    expect(cameraService.setCameraEnabled).not.toHaveBeenCalled();
     expect(consoleService.openPage).not.toHaveBeenCalled();
   });
 
   it('wakes from standby on a short display.page.toggle press', async () => {
-    const { sceneEngine, settingsData, displayService } = createSceneEngineTestContext();
+    const { sceneEngine, settingsData, displayService, cameraService } = createSceneEngineTestContext();
 
     await sceneEngine.applyStandbyMode(true, 'test:standby');
     expect(settingsData.display.standbyMode).toBe(true);
@@ -192,10 +193,11 @@ describe('SceneEngine button-driven standby handling', () => {
 
     expect(settingsData.display.standbyMode).toBe(false);
     expect(displayService.turnOn).toHaveBeenCalledTimes(1);
+    expect(cameraService.setCameraEnabled).not.toHaveBeenCalled();
   });
 
   it('wakes from standby on a held display.page.toggle press', async () => {
-    const { sceneEngine, settingsData, displayService } = createSceneEngineTestContext();
+    const { sceneEngine, settingsData, displayService, cameraService } = createSceneEngineTestContext();
 
     await sceneEngine.applyStandbyMode(true, 'test:standby');
     expect(settingsData.display.standbyMode).toBe(true);
@@ -211,6 +213,7 @@ describe('SceneEngine button-driven standby handling', () => {
 
     expect(settingsData.display.standbyMode).toBe(false);
     expect(displayService.turnOn).toHaveBeenCalledTimes(1);
+    expect(cameraService.setCameraEnabled).not.toHaveBeenCalled();
   });
 
   it('ignores a short display.page.toggle press while the stats overlay is open', async () => {
@@ -231,7 +234,7 @@ describe('SceneEngine button-driven standby handling', () => {
   });
 
   it('enters standby on a held display.page.toggle press while the stats overlay is open', async () => {
-    const { sceneEngine, settingsData, displayService, consoleService } = createSceneEngineTestContext();
+    const { sceneEngine, settingsData, displayService, consoleService, cameraService } = createSceneEngineTestContext();
     consoleService.isStatsOverlayActive.mockReturnValue(true);
 
     await sceneEngine.handleEsp32Event({
@@ -245,6 +248,7 @@ describe('SceneEngine button-driven standby handling', () => {
 
     expect(settingsData.display.standbyMode).toBe(true);
     expect(displayService.turnOff).toHaveBeenCalledTimes(1);
+    expect(cameraService.setCameraEnabled).not.toHaveBeenCalled();
     expect(consoleService.openPage).not.toHaveBeenCalled();
   });
 });

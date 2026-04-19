@@ -8,8 +8,7 @@
 | Display | React + Vite | Mirror UI (home/fun/spotify + standby) |
 | Mobile PWA | React + Vite | Admin/mobile control app, built into backend/public |
 | Camera Sidecar | Python service | Camera stream and camera enable/disable integration |
-| Sensor Sidecar | Python service | DHT22 temperature/humidity readings |
-| ESP32 Firmware | Arduino + PubSubClient + SSD1306 | OLED rendering, button/PIR publish, console polling |
+| ESP32 Firmware | Arduino + PubSubClient + SSD1306 | OLED rendering, button publish, DHT22 reporting, console polling |
 | MQTT Broker | Mosquitto | Internal ESP32 event transport |
 
 ## What Is Actively Used
@@ -18,7 +17,7 @@
 - PWA auth/session flow and admin-protected write actions
 - ESP32 event path using mqtt topics smartmirror/esp32/<device>/event and /status
 - OLED state path through GET /api/console/state?device=esp32
-- camera/privacy/standby coordination from backend state
+- camera/privacy/standby coordination from backend state, with standby kept separate from camera streaming availability
 
 ## Practical Notes
 
@@ -28,5 +27,5 @@
 
 ## Document Metadata
 
-- Version: 1.1
-- Last Updated: March 18, 2026
+- Version: 1.2
+- Last Updated: April 18, 2026

@@ -1,6 +1,6 @@
 # Security Hardening Summary
 
-Last updated: 2026-03-15
+Last updated: 2026-04-18
 
 This repo currently runs with a hardened-by-default local deployment model. The items below reflect the current codebase and compose configuration.
 
@@ -38,7 +38,6 @@ Current compose security posture:
 - `security_opt: no-new-privileges:true`
 - `read_only: true` plus `tmpfs` on the smaller sidecars where supported
 - `camera` runs as non-root
-- `sensor` runs without `privileged: true`
 - internal service traffic stays on the Compose network
 
 Exposed host ports are currently limited to:
@@ -57,10 +56,10 @@ Exposed host ports are currently limited to:
 
 ## Runtime Behavior Protections
 
-- standby forces effective camera privacy state to off
-- camera wake from standby is not used as the primary wake path
-- PIR-based ESP32 motion is the wake source for the mirror standby flow
-- PWA privacy status reflects effective standby state, not just raw settings values
+- standby no longer forces effective camera privacy state to off
+- camera privacy is controlled independently from display standby
+- ESP32 standby flow is button-driven rather than PIR-driven
+- PWA camera streaming uses short-lived scoped tokens with reconnect-friendly client behavior
 - the fallback Wi-Fi hotspot service has been removed; the mirror no longer exposes an open setup access point on boot
 
 ## Verification
