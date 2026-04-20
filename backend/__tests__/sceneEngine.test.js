@@ -154,8 +154,8 @@ describe('SceneEngine button-driven standby handling', () => {
       },
     });
 
-    expect(consoleService.openPage).toHaveBeenCalledWith('fun', 'esp32_toggle');
-    expect(websocketServer.broadcastPageChange).toHaveBeenCalledWith('fun', { source: 'esp32_toggle' });
+    expect(consoleService.openPage).toHaveBeenCalledWith('weather', 'esp32_toggle');
+    expect(websocketServer.broadcastPageChange).toHaveBeenCalledWith('weather', { source: 'esp32_toggle' });
   });
 
   it('enters standby on a held display.page.toggle press while awake', async () => {

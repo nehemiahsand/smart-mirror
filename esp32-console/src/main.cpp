@@ -53,11 +53,11 @@ struct MirrorState {
   String statsLine2 = "";
   String statsLine3 = "";
   String statsLine4 = "";
-  String button1 = "Spotify";
-  String button2 = "Play/Pause";
-  String button3 = "Prev";
-  String button4 = "Next";
-  String button5 = "";
+  String button1 = "Weather";
+  String button2 = "Prev";
+  String button3 = "Next";
+  String button4 = "Home";
+  String button5 = "Stats";
 };
 
 namespace {
@@ -282,11 +282,11 @@ void resetMirrorState() {
   gMirrorState.statsLine2 = "";
   gMirrorState.statsLine3 = "";
   gMirrorState.statsLine4 = "";
-  gMirrorState.button1 = "Spotify";
-  gMirrorState.button2 = "Play/Pause";
-  gMirrorState.button3 = "Prev";
-  gMirrorState.button4 = "Next";
-  gMirrorState.button5 = "";
+  gMirrorState.button1 = "Weather";
+  gMirrorState.button2 = "Prev";
+  gMirrorState.button3 = "Next";
+  gMirrorState.button4 = "Home";
+  gMirrorState.button5 = "Stats";
 }
 
 void markBackendUnavailable() {
@@ -695,8 +695,8 @@ void renderStatsScreen() {
 void renderPageScreen() {
   renderHeader(gMirrorState.pageTitle);
   const bool showExtendedControls =
-      gMirrorState.activePageId == "spotify" || gMirrorState.activePageId == "fun" ||
-      gMirrorState.activePageId == "home";
+      gMirrorState.activePageId == "spotify" || gMirrorState.activePageId == "sports" ||
+      gMirrorState.activePageId == "weather" || gMirrorState.activePageId == "home";
 
   if (isCompactScreen()) {
     drawCompactButtonGrid(showExtendedControls);

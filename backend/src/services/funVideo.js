@@ -16,6 +16,13 @@ const DEFAULT_ROTATION_SECONDS = 90;
 const DEFAULT_TIMEZONE = process.env.TZ || 'America/Chicago';
 const DEFAULT_MAX_SEARCH_PAGES = 10;
 const DEFAULT_MIN_DURATION_SECONDS = 90;
+const DEFAULT_DAILY_REFRESH_HOUR = 5;
+const DEFAULT_DAILY_REFRESH_MINUTE = 0;
+const DEFAULT_GAME_REFRESH_DELAY_MINUTES = 60;
+const DEFAULT_EXPECTED_GAME_DURATION_MINUTES = 180;
+const DEFAULT_GAME_SCHEDULE_POLL_MINUTES = 5;
+const DEFAULT_IDLE_RECHECK_HOURS = 12;
+const MIN_SCHEDULE_DELAY_MS = 1000;
 const DEFAULT_ALLOWED_CHANNEL_MATCHES = [
   'espn',
   'golden state warriors',
@@ -81,6 +88,325 @@ function getMinDurationSeconds() {
     return DEFAULT_MIN_DURATION_SECONDS;
   }
   return clamp(parsed, 30, 3600);
+}
+
+function getRefreshHour() {
+  const parsed = Number.parseInt(process.env.FUN_VIDEO_REFRESH_HOUR || String(DEFAULT_DAILY_REFRESH_HOUR), 10);
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_DAILY_REFRESH_HOUR;
+  }
+  return clamp(parsed, 0, 23);
+}
+
+function getGameRefreshDelayMinutes() {
+  const parsed = Number.parseInt(
+    process.env.FUN_VIDEO_GAME_REFRESH_DELAY_MINUTES || String(DEFAULT_GAME_REFRESH_DELAY_MINUTES),
+    10
+  );
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_GAME_REFRESH_DELAY_MINUTES;
+  }
+  return clamp(parsed, 5, 360);
+}
+
+function getExpectedGameDurationMinutes() {
+  const parsed = Number.parseInt(
+    process.env.FUN_VIDEO_GAME_DURATION_MINUTES || String(DEFAULT_EXPECTED_GAME_DURATION_MINUTES),
+    10
+  );
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_EXPECTED_GAME_DURATION_MINUTES;
+  }
+  return clamp(parsed, 90, 360);
+}
+
+function getGameSchedulePollMinutes() {
+  const parsed = Number.parseInt(
+    process.env.FUN_VIDEO_GAME_SCHEDULE_POLL_MINUTES || String(DEFAULT_GAME_SCHEDULE_POLL_MINUTES),
+    10
+  );
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_GAME_SCHEDULE_POLL_MINUTES;
+  }
+  return clamp(parsed, 1, 60);
+}
+
+function getIdleRecheckHours() {
+  const parsed = Number.parseInt(
+    process.env.FUN_VIDEO_IDLE_RECHECK_HOURS || String(DEFAULT_IDLE_RECHECK_HOURS),
+    10
+  );
+  if (!Number.isFinite(parsed)) {
+    return DEFAULT_IDLE_RECHECK_HOURS;
+  }
+  return clamp(parsed, 1, 48);
+}
+
+function getTimeZoneOffsetMinutes(date = new Date(), timeZone = DEFAULT_TIMEZONE) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'shortOffset',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const parts = formatter.formatToParts(date);
+  const offsetText = parts.find((part) => part.type === 'timeZoneName')?.value || 'GMT';
+  if (offsetText === 'GMT' || offsetText === 'UTC') {
+    return 0;
+  }
+
+  const match = /^GMT([+-])(\d{1,2})(?::?(\d{2}))?$/i.exec(offsetText);
+  if (!match) {
+    return 0;
+  }
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const hours = Number.parseInt(match[2] || '0', 10);
+  const minutes = Number.parseInt(match[3] || '0', 10);
+  return sign * ((hours * 60) + minutes);
+}
+
+function getLocalDateParts(date = new Date(), timeZone = DEFAULT_TIMEZONE) {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+
+  const parts = Object.fromEntries(
+    formatter.formatToParts(date)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value])
+  );
+
+  return {
+    year: Number.parseInt(parts.year, 10),
+    month: Number.parseInt(parts.month, 10),
+    day: Number.parseInt(parts.day, 10),
+  };
+}
+
+function addDaysToDateParts(dateParts, days) {
+  const date = new Date(Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth() + 1,
+    day: date.getUTCDate(),
+  };
+}
+
+function zonedDateTimeToUtcTimestamp(dateParts, hour, minute = 0, second = 0, timeZone = DEFAULT_TIMEZONE) {
+  let timestamp = Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day, hour, minute, second);
+
+  for (let i = 0; i < 3; i += 1) {
+    const offsetMinutes = getTimeZoneOffsetMinutes(new Date(timestamp), timeZone);
+    const adjusted = Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day, hour, minute, second)
+      - (offsetMinutes * 60 * 1000);
+    if (adjusted === timestamp) {
+      break;
+    }
+    timestamp = adjusted;
+  }
+
+  return timestamp;
+}
+
+function getNextDailyRefreshDelayMs(
+  now = new Date(),
+  hour = getRefreshHour(),
+  minute = DEFAULT_DAILY_REFRESH_MINUTE,
+  second = 0,
+  timeZone = DEFAULT_TIMEZONE
+) {
+  const today = getLocalDateParts(now, timeZone);
+  let nextTimestamp = zonedDateTimeToUtcTimestamp(today, hour, minute, second, timeZone);
+
+  if (nextTimestamp <= now.getTime()) {
+    nextTimestamp = zonedDateTimeToUtcTimestamp(addDaysToDateParts(today, 1), hour, minute, second, timeZone);
+  }
+
+  return Math.max(nextTimestamp - now.getTime(), 0);
+}
+
+function parseTimestampMs(value) {
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getScheduleStatus(event) {
+  return event?.competitions?.[0]?.status?.type || {};
+}
+
+function isCompletedScheduleEvent(event) {
+  return getScheduleStatus(event).completed === true;
+}
+
+function isInProgressScheduleEvent(event) {
+  return getScheduleStatus(event).state === 'in';
+}
+
+function isUpcomingScheduleEvent(event) {
+  return getScheduleStatus(event).state === 'pre';
+}
+
+function getExpectedGameRefreshAt(
+  event,
+  expectedGameDurationMinutes = getExpectedGameDurationMinutes(),
+  refreshDelayMinutes = getGameRefreshDelayMinutes()
+) {
+  const startMs = parseTimestampMs(event?.date);
+  if (!Number.isFinite(startMs)) {
+    return null;
+  }
+
+  return new Date(startMs + ((expectedGameDurationMinutes + refreshDelayMinutes) * 60 * 1000));
+}
+
+function getObservedCompletionRefreshAt(
+  gameId,
+  observedCompletedAtMsByGameId,
+  refreshDelayMinutes = getGameRefreshDelayMinutes()
+) {
+  if (!(observedCompletedAtMsByGameId instanceof Map) || !gameId) {
+    return null;
+  }
+
+  const observedCompletedAtMs = observedCompletedAtMsByGameId.get(String(gameId));
+  if (!Number.isFinite(observedCompletedAtMs)) {
+    return null;
+  }
+
+  return new Date(observedCompletedAtMs + (refreshDelayMinutes * 60 * 1000));
+}
+
+function feedIncludesGame(feed, gameId) {
+  if (!feed || !Array.isArray(feed.items) || !gameId) {
+    return false;
+  }
+
+  return feed.items.some((item) => String(item?.game?.gameId || '') === String(gameId));
+}
+
+function getGameRecapRefreshPlan(options = {}) {
+  const now = options.now instanceof Date ? options.now : new Date();
+  const currentFeed = options.currentFeed || null;
+  const scheduleEvents = Array.isArray(options.scheduleEvents) ? options.scheduleEvents : [];
+  const expectedGameDurationMinutes = Number.isFinite(options.expectedGameDurationMinutes)
+    ? options.expectedGameDurationMinutes
+    : getExpectedGameDurationMinutes();
+  const refreshDelayMinutes = Number.isFinite(options.refreshDelayMinutes)
+    ? options.refreshDelayMinutes
+    : getGameRefreshDelayMinutes();
+  const observedCompletedAtMsByGameId = options.observedCompletedAtMsByGameId instanceof Map
+    ? options.observedCompletedAtMsByGameId
+    : null;
+  const pollMinutes = Number.isFinite(options.pollMinutes)
+    ? options.pollMinutes
+    : getGameSchedulePollMinutes();
+  const idleRecheckHours = Number.isFinite(options.idleRecheckHours)
+    ? options.idleRecheckHours
+    : getIdleRecheckHours();
+
+  const normalizedEvents = scheduleEvents
+    .filter((event) => event?.id)
+    .filter((event) => (
+      isCompletedScheduleEvent(event)
+      || isInProgressScheduleEvent(event)
+      || isUpcomingScheduleEvent(event)
+    ));
+
+  const completedGames = normalizedEvents
+    .filter((event) => isCompletedScheduleEvent(event))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+  const activeGames = normalizedEvents
+    .filter((event) => isInProgressScheduleEvent(event))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+  const upcomingGames = normalizedEvents
+    .filter((event) => isUpcomingScheduleEvent(event))
+    .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  const latestCompletedGame = completedGames[0] || null;
+  const activeGame = activeGames[0] || null;
+  const nextUpcomingGame = upcomingGames[0] || null;
+  const feedFetchedAtMs = parseTimestampMs(currentFeed?.fetchedAt);
+  const latestCompletedGameId = latestCompletedGame ? String(latestCompletedGame.id) : null;
+  const latestCompletedRefreshAt = latestCompletedGame
+    ? (
+      getObservedCompletionRefreshAt(latestCompletedGameId, observedCompletedAtMsByGameId, refreshDelayMinutes)
+      || getExpectedGameRefreshAt(latestCompletedGame, expectedGameDurationMinutes, refreshDelayMinutes)
+    )
+    : null;
+  const latestGameIsInFeed = latestCompletedGameId ? feedIncludesGame(currentFeed, latestCompletedGameId) : false;
+  const latestGameIsFresh = Boolean(
+    latestCompletedGame
+    && latestGameIsInFeed
+    && Number.isFinite(feedFetchedAtMs)
+    && latestCompletedRefreshAt
+    && feedFetchedAtMs >= latestCompletedRefreshAt.getTime()
+  );
+
+  if (
+    latestCompletedGame
+    && latestCompletedRefreshAt
+    && now.getTime() >= latestCompletedRefreshAt.getTime()
+    && !latestGameIsFresh
+  ) {
+    return {
+      shouldRefreshNow: true,
+      reason: 'postgame_refresh_due',
+      nextCheckAt: now,
+      targetGameId: latestCompletedGameId,
+      targetRefreshAt: latestCompletedRefreshAt,
+    };
+  }
+
+  if (latestCompletedGame && latestCompletedRefreshAt && now.getTime() < latestCompletedRefreshAt.getTime()) {
+    return {
+      shouldRefreshNow: false,
+      reason: 'awaiting_postgame_window',
+      nextCheckAt: latestCompletedRefreshAt,
+      targetGameId: latestCompletedGameId,
+      targetRefreshAt: latestCompletedRefreshAt,
+    };
+  }
+
+  if (activeGame) {
+    const activeRefreshAt = getExpectedGameRefreshAt(activeGame, expectedGameDurationMinutes, refreshDelayMinutes);
+    const fallbackCheckAt = new Date(now.getTime() + (pollMinutes * 60 * 1000));
+    return {
+      shouldRefreshNow: false,
+      reason: 'game_in_progress',
+      nextCheckAt: activeRefreshAt && activeRefreshAt.getTime() > now.getTime() ? activeRefreshAt : fallbackCheckAt,
+      targetGameId: String(activeGame.id),
+      targetRefreshAt: activeRefreshAt,
+    };
+  }
+
+  if (nextUpcomingGame) {
+    const nextRefreshAt = getExpectedGameRefreshAt(nextUpcomingGame, expectedGameDurationMinutes, refreshDelayMinutes);
+    const fallbackCheckAt = new Date(now.getTime() + (idleRecheckHours * 60 * 60 * 1000));
+    return {
+      shouldRefreshNow: false,
+      reason: 'awaiting_next_game',
+      nextCheckAt: nextRefreshAt && nextRefreshAt.getTime() > now.getTime() ? nextRefreshAt : fallbackCheckAt,
+      targetGameId: String(nextUpcomingGame.id),
+      targetRefreshAt: nextRefreshAt,
+    };
+  }
+
+  return {
+    shouldRefreshNow: false,
+    reason: 'idle_recheck',
+    nextCheckAt: new Date(now.getTime() + (idleRecheckHours * 60 * 60 * 1000)),
+    targetGameId: latestCompletedGameId,
+    targetRefreshAt: latestCompletedRefreshAt,
+  };
 }
 
 function normalizeChannelText(value) {
@@ -234,6 +560,12 @@ function normalizeVideoItem(item) {
 }
 
 class FunVideoService {
+  constructor() {
+    this.dailyRefreshTimeout = null;
+    this.pendingGameIds = new Set();
+    this.observedCompletedAtMsByGameId = new Map();
+  }
+
   async ensureDataDir() {
     await fs.mkdir(DATA_DIR, { recursive: true });
   }
@@ -574,6 +906,177 @@ class FunVideoService {
       return this.buildUnavailableFeed('Game highlights are temporarily unavailable');
     }
   }
+
+  setNextScheduleTimeout(delayMs, run) {
+    const safeDelayMs = Math.max(delayMs, MIN_SCHEDULE_DELAY_MS);
+    this.dailyRefreshTimeout = setTimeout(() => {
+      run().catch((error) => {
+        logger.warn('Game highlights refresh scheduler tick failed', { error: error.message });
+        this.setNextScheduleTimeout(getGameSchedulePollMinutes() * 60 * 1000, run);
+      });
+    }, safeDelayMs);
+
+    if (typeof this.dailyRefreshTimeout?.unref === 'function') {
+      this.dailyRefreshTimeout.unref();
+    }
+  }
+
+  observeGameScheduleTransitions(scheduleEvents, observedAt = new Date()) {
+    const nextPendingGameIds = new Set();
+
+    for (const event of Array.isArray(scheduleEvents) ? scheduleEvents : []) {
+      const gameId = String(event?.id || '');
+      if (!gameId) {
+        continue;
+      }
+
+      if (isUpcomingScheduleEvent(event) || isInProgressScheduleEvent(event)) {
+        nextPendingGameIds.add(gameId);
+        continue;
+      }
+
+      if (
+        isCompletedScheduleEvent(event)
+        && this.pendingGameIds.has(gameId)
+        && !this.observedCompletedAtMsByGameId.has(gameId)
+      ) {
+        this.observedCompletedAtMsByGameId.set(gameId, observedAt.getTime());
+      }
+    }
+
+    const knownGameIds = new Set(
+      (Array.isArray(scheduleEvents) ? scheduleEvents : [])
+        .map((event) => String(event?.id || ''))
+        .filter(Boolean)
+    );
+
+    for (const gameId of this.observedCompletedAtMsByGameId.keys()) {
+      if (!knownGameIds.has(gameId)) {
+        this.observedCompletedAtMsByGameId.delete(gameId);
+      }
+    }
+
+    this.pendingGameIds = nextPendingGameIds;
+  }
+
+  startDailyRefreshSchedule(options = {}) {
+    const refreshHour = Number.isFinite(options.hour) ? clamp(options.hour, 0, 23) : getRefreshHour();
+    const refreshMinute = Number.isFinite(options.minute)
+      ? clamp(options.minute, 0, 59)
+      : DEFAULT_DAILY_REFRESH_MINUTE;
+    const timeZone = String(options.timeZone || DEFAULT_TIMEZONE).trim() || DEFAULT_TIMEZONE;
+    const onRefresh = typeof options.onRefresh === 'function' ? options.onRefresh : null;
+
+    this.stopDailyRefreshSchedule();
+
+    const scheduleNextRun = async () => {
+      const mode = this.getFeedMode();
+
+      if (mode === 'game_recap') {
+        const now = new Date();
+        let currentFeed = await this.getLatestCachedFeed();
+        const scheduleEvents = await gameRecap.fetchScheduleEvents();
+        this.observeGameScheduleTransitions(scheduleEvents, now);
+        let plan = getGameRecapRefreshPlan({
+          now,
+          currentFeed,
+          scheduleEvents,
+          observedCompletedAtMsByGameId: this.observedCompletedAtMsByGameId,
+        });
+
+        if (plan.shouldRefreshNow) {
+          currentFeed = await this.getCurrentFeed({ forceRefresh: true });
+          logger.info('Postgame highlights refresh completed', {
+            mode: currentFeed?.mode || null,
+            items: Array.isArray(currentFeed?.items) ? currentFeed.items.length : 0,
+            stale: currentFeed?.stale === true,
+            unavailable: currentFeed?.unavailable === true,
+            fetchedAt: currentFeed?.fetchedAt || null,
+            targetGameId: plan.targetGameId,
+            targetRefreshAt: plan.targetRefreshAt?.toISOString() || null,
+          });
+
+          if (onRefresh) {
+            await onRefresh(currentFeed);
+          }
+
+          plan = getGameRecapRefreshPlan({
+            now: new Date(),
+            currentFeed,
+            scheduleEvents,
+            observedCompletedAtMsByGameId: this.observedCompletedAtMsByGameId,
+          });
+        }
+
+        const nextCheckAt = plan.nextCheckAt instanceof Date ? plan.nextCheckAt : new Date(Date.now() + (getGameSchedulePollMinutes() * 60 * 1000));
+        const delayMs = Math.max(nextCheckAt.getTime() - Date.now(), MIN_SCHEDULE_DELAY_MS);
+
+        logger.info('Scheduled game highlights refresh check', {
+          mode,
+          reason: plan.reason,
+          targetGameId: plan.targetGameId || null,
+          targetRefreshAt: plan.targetRefreshAt?.toISOString() || null,
+          nextCheckAt: nextCheckAt.toISOString(),
+          delayMs,
+        });
+
+        this.setNextScheduleTimeout(delayMs, scheduleNextRun);
+        return;
+      }
+
+      const now = new Date();
+      const delayMs = getNextDailyRefreshDelayMs(now, refreshHour, refreshMinute, 0, timeZone);
+      const nextRunAt = new Date(now.getTime() + delayMs);
+
+      logger.info('Scheduled daily game highlights refresh', {
+        refreshHour,
+        refreshMinute,
+        timeZone,
+        nextRunAt: nextRunAt.toISOString(),
+        delayMs,
+      });
+
+      this.setNextScheduleTimeout(delayMs, async () => {
+        const feed = await this.getCurrentFeed({ forceRefresh: true });
+        logger.info('Daily game highlights refresh completed', {
+          timeZone,
+          refreshHour,
+          refreshMinute,
+          mode: feed?.mode || null,
+          items: Array.isArray(feed?.items) ? feed.items.length : 0,
+          stale: feed?.stale === true,
+          unavailable: feed?.unavailable === true,
+          fetchedAt: feed?.fetchedAt || null,
+        });
+
+        if (onRefresh) {
+          await onRefresh(feed);
+        }
+
+        await scheduleNextRun();
+      });
+    };
+
+    scheduleNextRun().catch((error) => {
+      logger.warn('Failed to initialize game highlights refresh schedule', { error: error.message });
+      this.setNextScheduleTimeout(getGameSchedulePollMinutes() * 60 * 1000, scheduleNextRun);
+    });
+  }
+
+  stopDailyRefreshSchedule() {
+    if (!this.dailyRefreshTimeout) {
+      return;
+    }
+
+    clearTimeout(this.dailyRefreshTimeout);
+    this.dailyRefreshTimeout = null;
+    this.pendingGameIds = new Set();
+    this.observedCompletedAtMsByGameId.clear();
+  }
 }
 
-module.exports = new FunVideoService();
+const funVideoService = new FunVideoService();
+
+module.exports = funVideoService;
+module.exports.getNextDailyRefreshDelayMs = getNextDailyRefreshDelayMs;
+module.exports.getGameRecapRefreshPlan = getGameRecapRefreshPlan;

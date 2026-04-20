@@ -13,7 +13,7 @@ const settingsService = require('../services/settings');
 const weatherService = require('../services/weather');
 const { redactSensitive } = require('../utils/redaction');
 
-const ALLOWED_SYNC_PAGES = new Set(['home', 'fun', 'spotify']);
+const ALLOWED_SYNC_PAGES = new Set(['home', 'weather', 'sports', 'spotify']);
 
 class WebSocketServer {
   constructor() {
@@ -374,8 +374,8 @@ class WebSocketServer {
           return;
         }
         consoleService.openPage(data.page, 'display_sync')
-          .then(() => {
-            this.broadcastPageChange(data.page, { source: 'display_sync' });
+          .then((state) => {
+            this.broadcastPageChange(state?.activePageId || data.page, { source: 'display_sync' });
           })
           .catch((error) => {
             logger.error('Failed to sync console page from display', {

@@ -348,7 +348,7 @@ export default function Photos() {
               onClick={() => openModal(photo)}
             >
               <img
-                  src={`${API_BASE}/api/photos/image/${photo.filename}`}
+                src={`${API_BASE}${photo.thumbnailUrl || `/api/photos/image/${photo.filename}`}`}
                 alt="Photo"
                 loading="lazy"
                 decoding="async"

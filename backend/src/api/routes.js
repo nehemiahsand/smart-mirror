@@ -428,9 +428,10 @@ router.post('/display/page', adminAuth, async (req, res) => {
     if (settingsService.get('display.standbyMode') === true) {
       await sceneEngine.applyStandbyMode(false, `display_page:${page}`);
     }
-    await consoleService.openPage(page, 'admin_route');
-    websocketServer.broadcastPageChange(page, { source: 'admin_route' });
-    res.json({ success: true, page });
+    const state = await consoleService.openPage(page, 'admin_route');
+    const activePageId = state?.activePageId || page;
+    websocketServer.broadcastPageChange(activePageId, { source: 'admin_route' });
+    res.json({ success: true, page: activePageId });
   } catch (error) {
     const status = /Invalid page change request|Unknown or disabled console page/.test(error.message)
       ? 400
@@ -776,10 +777,26 @@ router.get('/photos', async (req, res) => {
 router.get('/photos/image/:filename', async (req, res) => {
   try {
     const photoPath = photosService.getPhotoPath(req.params.filename);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     res.sendFile(photoPath);
   } catch (error) {
     logger.error('Failed to serve photo', { error: error.message });
     res.status(404).json({ error: 'Photo not found' });
+  }
+});
+
+router.get('/photos/thumb/:filename', async (req, res) => {
+  try {
+    const thumbnailPath = await photosService.ensureThumbnail(req.params.filename);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.type('image/jpeg');
+    res.sendFile(thumbnailPath);
+  } catch (error) {
+    logger.error('Failed to serve photo thumbnail', {
+      filename: req.params.filename,
+      error: error.message,
+    });
+    res.status(404).json({ error: 'Photo thumbnail not found' });
   }
 });
 

@@ -18,6 +18,7 @@ const powerService = require('./services/power');
 const cameraService = require('./services/camera');
 const climateService = require('./services/climate');
 const consoleService = require('./services/console');
+const funVideoService = require('./services/funVideo');
 const sceneEngine = require('./services/sceneEngine');
 const esp32InputService = require('./services/esp32Input');
 const websocketServer = require('./api/websocket');
@@ -282,6 +283,17 @@ async function start() {
     esp32InputService.initialize();
     logger.info('ESP32 input integration initialized');
 
+    funVideoService.startDailyRefreshSchedule({
+      onRefresh: async () => {
+        try {
+          await consoleService.broadcastPageData('sports');
+        } catch (error) {
+          logger.warn('Failed to broadcast refreshed sports page data', { error: error.message });
+        }
+      },
+    });
+    logger.info('Daily game highlights refresh schedule initialized');
+
     // Start periodic weather updates
     const weatherUpdateInterval = settingsService.get('weather.updateInterval') || 600000;
     setInterval(async () => {
@@ -328,6 +340,7 @@ function shutdown() {
   websocketServer.close();
   sceneEngine.close();
   consoleService.close();
+  funVideoService.stopDailyRefreshSchedule();
   esp32InputService.close();
   
   server.close(() => {

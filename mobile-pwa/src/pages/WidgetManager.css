@@ -13,6 +13,19 @@
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid #2d2d44;
   border-radius: 12px;
+  cursor: grab;
+  transition: transform 0.2s, border-color 0.2s, background 0.2s, opacity 0.2s;
+  touch-action: none;
+}
+
+.widget-item.dragging,
+.widget-item:active {
+  cursor: grabbing;
+  transform: scale(0.985);
+  border-color: rgba(99, 102, 241, 0.45);
+  background: rgba(99, 102, 241, 0.08);
+  opacity: 0.9;
+  z-index: 2;
 }
 
 .widget-left {
@@ -20,6 +33,14 @@
   align-items: center;
   gap: 12px;
   flex: 1;
+}
+
+.widget-drag-handle {
+  font-size: 18px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.42);
+  letter-spacing: -1px;
+  user-select: none;
 }
 
 .order-controls {
@@ -115,4 +136,11 @@
 .save-btn:active:not(:disabled) {
   transform: scale(0.98);
   background: #5558e3;
+}
+
+.widget-manager-hint {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: #9ca3af;
+  text-align: center;
 }

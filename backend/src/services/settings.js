@@ -70,7 +70,8 @@ const DEFAULT_SETTINGS = {
     enabled: true,
     standbyOnIdle: true,
     idleTimeoutSeconds: 300,
-    wakeOnMotion: true
+    wakeOnMotion: true,
+    wakeSuppressionSeconds: 8
   },
   console: {
     inactivityTimeoutSeconds: 300
@@ -79,6 +80,9 @@ const DEFAULT_SETTINGS = {
     climatePrimary: 'esp32',
     compareMode: false
   },
+  widgetOrder: ['timedate', 'googlecalendar', 'weathertemp', 'photos'],
+  weatherWidgetOrder: ['timedate', 'sunmoon', 'temps', 'hourly'],
+  sportsWidgetOrder: ['timedate', 'highlights'],
   current_scene: 'day',
   current_page: 'home'
 };

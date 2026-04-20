@@ -12,12 +12,16 @@ import StatusIndicator from './components/StatusIndicator';
 import PageIndicator from './components/PageIndicator';
 import StandbyMode from './components/StandbyMode';
 import SpotifyPlayer from './components/SpotifyPlayer';
-import FunPage from './components/FunPage';
+import WeatherPage from './components/WeatherPage';
+import SportsPage from './components/SportsPage';
 
-const DISPLAY_PAGES = ['home', 'fun', 'spotify'];
+const DISPLAY_PAGES = ['home', 'weather', 'sports', 'spotify'];
 const DEFAULT_PAGE = 'home';
 
 function normalizePage(page) {
+    if (page === 'fun') {
+        return 'sports';
+    }
     return DISPLAY_PAGES.includes(page) ? page : DEFAULT_PAGE;
 }
 
@@ -164,10 +168,19 @@ function App() {
         );
     }
 
-    if (currentPage === 'fun') {
+    if (currentPage === 'weather') {
         return (
             <>
-                <FunPage pageData={consolePageData.fun} settings={settings} />
+                <WeatherPage pageData={consolePageData.weather} settings={settings} />
+                <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
+            </>
+        );
+    }
+
+    if (currentPage === 'sports') {
+        return (
+            <>
+                <SportsPage pageData={consolePageData.sports} settings={settings} />
                 <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
             </>
         );

@@ -14,13 +14,14 @@ const weatherService = require('./weather');
 
 const DEFAULT_PAGES = {
   dynamic: { id: 'dynamic', name: 'Main Page', title: 'Main Page', enabled: true },
-  fun: { id: 'fun', name: 'Fun', title: 'Fun', enabled: true },
+  weather: { id: 'weather', name: 'Weather', title: 'Weather', enabled: true },
+  sports: { id: 'sports', name: 'Sports', title: 'Sports', enabled: true },
   media: { id: 'media', name: 'Spotify', title: 'Spotify', enabled: true },
 };
 
-const PAGE_ORDER = ['dynamic', 'fun', 'media'];
-const OLED_PAGE_ORDER = ['dynamic', 'fun', 'media'];
-const MIRROR_PAGE_ORDER = ['dynamic', 'fun', 'media'];
+const PAGE_ORDER = ['dynamic', 'weather', 'sports', 'media'];
+const OLED_PAGE_ORDER = ['dynamic', 'weather', 'sports', 'media'];
+const MIRROR_PAGE_ORDER = ['dynamic', 'weather', 'sports', 'media'];
 // Legacy interactive pages still have handlers below, but are no longer presented by default.
 const WEATHER_TABS = ['current', 'hourly', 'daily', 'alerts'];
 const TIMER_FOCUS_MODES = ['timer', 'focus'];
@@ -29,10 +30,16 @@ const PAGE_ID_ALIASES = {
   home: 'dynamic',
   main: 'dynamic',
   apps: 'dynamic',
-  fun: 'fun',
-  comic: 'fun',
-  comics: 'fun',
-  daily: 'fun',
+  weather: 'weather',
+  forecast: 'weather',
+  sunmoon: 'weather',
+  daily: 'weather',
+  sports: 'sports',
+  warriors: 'sports',
+  fun: 'sports',
+  comic: 'sports',
+  comics: 'sports',
+  highlights: 'sports',
   spotify: 'media',
   music: 'media',
 };
@@ -89,6 +96,69 @@ function formatUptime(seconds) {
   return `${minutes}m`;
 }
 
+function formatWeatherHour(timestampSeconds) {
+  if (!Number.isFinite(timestampSeconds)) {
+    return '--';
+  }
+
+  return new Date(timestampSeconds * 1000).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    hour12: true,
+  });
+}
+
+function formatWeatherDay(timestampSeconds) {
+  if (!Number.isFinite(timestampSeconds)) {
+    return '--';
+  }
+
+  return new Date(timestampSeconds * 1000).toLocaleDateString('en-US', {
+    weekday: 'short',
+  });
+}
+
+function formatSunTime(timestampSeconds) {
+  if (!Number.isFinite(timestampSeconds)) {
+    return '--';
+  }
+
+  return new Date(timestampSeconds * 1000).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+}
+
+function buildSunWidget(weather) {
+  if (!weather || !Number.isFinite(weather.sunrise) || !Number.isFinite(weather.sunset)) {
+    return null;
+  }
+
+  const nowTs = Math.floor(Date.now() / 1000);
+  let statusName = 'Daylight';
+  let emoji = '☀️';
+  if (nowTs < weather.sunrise) {
+    statusName = 'Before Sunrise';
+    emoji = '🌅';
+  } else if (nowTs > weather.sunset) {
+    statusName = 'After Sunset';
+    emoji = '🌇';
+  }
+
+  const diffHours = (weather.sunset - weather.sunrise) / 3600;
+
+  return {
+    type: 'sun',
+    title: 'Sun',
+    status: 'ready',
+    emoji,
+    statusName,
+    sunriseTime: formatSunTime(weather.sunrise),
+    sunsetTime: formatSunTime(weather.sunset),
+    daylightDuration: diffHours > 0 ? diffHours.toFixed(1) : '--',
+  };
+}
+
 function readCpuTempC() {
   try {
     const raw = fs.readFileSync('/sys/class/thermal/thermal_zone0/temp', 'utf8').trim();
@@ -137,8 +207,11 @@ function getPresentedPageId(pageId) {
   if (normalizedPageId === 'dynamic') {
     return 'home';
   }
-  if (normalizedPageId === 'fun') {
-    return 'fun';
+  if (normalizedPageId === 'weather') {
+    return 'weather';
+  }
+  if (normalizedPageId === 'sports') {
+    return 'sports';
   }
   if (normalizedPageId === 'media') {
     return 'spotify';
@@ -151,8 +224,11 @@ function getPresentedPageMeta(pageId) {
   if (normalizedPageId === 'dynamic') {
     return { id: 'home', name: 'Main Page', title: 'Main Page' };
   }
-  if (normalizedPageId === 'fun') {
-    return { id: 'fun', name: 'Fun', title: 'Fun' };
+  if (normalizedPageId === 'weather') {
+    return { id: 'weather', name: 'Weather', title: 'Weather' };
+  }
+  if (normalizedPageId === 'sports') {
+    return { id: 'sports', name: 'Sports', title: 'Sports' };
   }
   if (normalizedPageId === 'media') {
     return { id: 'spotify', name: 'Spotify', title: 'Spotify' };
@@ -271,7 +347,8 @@ class ConsoleService {
     const configuredPages = settingsService.get('interactivePages') || {};
     const pageOverrides = {
       dynamic: configuredPages.dynamic || configuredPages.home || configuredPages.main || {},
-      fun: configuredPages.fun || configuredPages.daily || {},
+      weather: configuredPages.weather || {},
+      sports: configuredPages.sports || configuredPages.fun || {},
       media: configuredPages.media || configuredPages.music || configuredPages.spotify || {},
     };
 
@@ -493,12 +570,12 @@ class ConsoleService {
       case 'weather':
         return {
           button1: pageToggleTarget.name,
-          button2: 'Prev',
-          button3: 'Next',
+          button2: '',
+          button3: '',
           button4: 'Refresh',
-          button5: '',
+          button5: 'Stats',
         };
-      case 'fun':
+      case 'sports':
         return {
           button1: pageToggleTarget.name,
           button2: 'Prev',
@@ -921,7 +998,7 @@ class ConsoleService {
 
   async handleFunAction(action) {
     if (['back', 'close'].includes(action)) {
-      return this.openStatsOverlay('fun:stats');
+      return this.openStatsOverlay('sports:stats');
     }
 
     const videoFeed = await funVideoService.getCurrentFeed();
@@ -941,23 +1018,18 @@ class ConsoleService {
       this.runtime.funViewMode = 'video';
     }
 
-    this.touchInteraction(`fun:${action}`);
+    this.touchInteraction(`sports:${action}`);
     this.broadcastState();
-    await this.broadcastPageData('fun');
+    await this.broadcastPageData('sports');
     return this.getState();
   }
 
   async handleWeatherAction(action) {
-    const currentIndex = WEATHER_TABS.indexOf(this.state.weatherTabId);
-    if (action === 'previous') {
-      this.state.weatherTabId = WEATHER_TABS[cycleIndex(currentIndex, WEATHER_TABS.length, -1)];
-    } else if (action === 'next') {
-      this.state.weatherTabId = WEATHER_TABS[cycleIndex(currentIndex, WEATHER_TABS.length, 1)];
-    } else if (['primary', 'refresh', 'confirm'].includes(action)) {
+    if (['primary', 'refresh', 'confirm'].includes(action)) {
       weatherService.clearCache();
-    } else if (['back', 'alerts'].includes(action)) {
-      this.state.weatherTabId = this.state.weatherTabId === 'alerts' ? 'current' : 'alerts';
-    } else if (['home', 'close'].includes(action)) {
+    } else if (['back', 'close'].includes(action)) {
+      return this.openStatsOverlay('weather:stats');
+    } else if (['home'].includes(action)) {
       return this.goHome('weather_home');
     }
 
@@ -1058,7 +1130,7 @@ class ConsoleService {
     }
 
     switch (pageId) {
-      case 'fun':
+      case 'sports':
         return this.handleFunAction(normalizedAction);
       case 'weather':
         return this.handleWeatherAction(normalizedAction);
@@ -1139,49 +1211,10 @@ class ConsoleService {
     };
   }
 
-  async getFunPageData(options = {}) {
-    const clockFormat = settingsService.get('display.clockFormat') === '12h' ? '12h' : '24h';
-    const settings = settingsService.getAll();
-    const [videoFeed, weather, widgets] = await Promise.all([
+  async getSportsPageData() {
+    const [videoFeed] = await Promise.all([
       funVideoService.getCurrentFeed(),
-      weatherService.getCurrentWeather(settings.weather.city, settings.weather.units).catch(() => null),
-      Promise.all([
-        Promise.resolve(moonPhaseService.getCurrentWidget()),
-        bibleVerseClockService.getCurrentWidget({ clockFormat, targetDate: options.targetDate }),
-      ]),
     ]);
-
-    let sunWidget = null;
-    if (weather && weather.sunrise && weather.sunset) {
-      const formatSunTime = (ts) => {
-        const d = new Date(ts * 1000);
-        return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-      };
-      
-      const nowTs = Math.floor(Date.now() / 1000);
-      let statusName = 'Daylight';
-      let emoji = '☀️';
-      if (nowTs < weather.sunrise) {
-        statusName = 'Before Sunrise';
-        emoji = '🌅';
-      } else if (nowTs > weather.sunset) {
-        statusName = 'After Sunset';
-        emoji = '🌇';
-      }
-      
-      const diffHours = (weather.sunset - weather.sunrise) / 3600;
-      
-      sunWidget = {
-        type: 'sun',
-        title: 'Sun',
-        status: 'ready',
-        emoji: emoji,
-        statusName: statusName,
-        sunriseTime: formatSunTime(weather.sunrise),
-        sunsetTime: formatSunTime(weather.sunset),
-        daylightDuration: diffHours > 0 ? diffHours.toFixed(1) : '--'
-      };
-    }
 
     const totalClips = Array.isArray(videoFeed?.items) ? videoFeed.items.length : 0;
     const selectedClipIndex = this.getFunClipIndex(totalClips);
@@ -1195,40 +1228,78 @@ class ConsoleService {
     };
 
     return {
-      pageId: 'fun',
-      canonicalPageId: 'fun',
-      title: this.getPages().fun?.title || 'Fun',
+      pageId: 'sports',
+      canonicalPageId: 'sports',
+      title: this.getPages().sports?.title || 'Sports',
       videoFeed: videoFeedWithSelection,
-      widgets: {
-        sun: sunWidget,
-        moon: widgets[0],
-        left: widgets[0], // fallback for old UI
-        right: widgets[1],
-      },
       item: null,
       items: [],
       selectedClipIndex,
-      selectedDateKey: this.getFunDateKey(),
       summary: videoFeed.unavailable ? 'Video highlights unavailable'
         : videoFeed.mode === 'game_recap' ? 'Game highlights ready'
           : 'Stephen Curry highlights ready',
-      softButtons: this.getSoftButtons('fun'),
+      softButtons: this.getSoftButtons('sports'),
     };
   }
 
   async getWeatherPageData() {
     const settings = settingsService.getAll();
-    const weather = await weatherService.getDetailedWeather(settings.weather.city, settings.weather.units);
+    const [weather, moon, climate] = await Promise.all([
+      weatherService.getDetailedWeather(settings.weather.city, settings.weather.units),
+      Promise.resolve(moonPhaseService.getCurrentWidget()),
+      climateService.getCurrentReading().catch(() => null),
+    ]);
+
+    const currentWeather = weather?.current || null;
+    const firstDaily = Array.isArray(weather?.daily) && weather.daily.length > 0 ? weather.daily[0] : null;
+    const dailySummary = firstDaily ? {
+      ...firstDaily,
+      label: 'Today',
+      current: currentWeather?.temperature ?? null,
+      high: firstDaily.max,
+      low: firstDaily.min,
+    } : (currentWeather ? {
+      label: 'Today',
+      timestamp: currentWeather.timestamp ? Math.floor(currentWeather.timestamp / 1000) : null,
+      current: currentWeather.temperature,
+      high: currentWeather.tempMax,
+      low: currentWeather.tempMin,
+      description: currentWeather.description,
+      icon: currentWeather.icon,
+    } : null);
+
+    const hourly = Array.isArray(weather?.hourly)
+      ? weather.hourly.slice(0, 24).map((item) => ({
+        ...item,
+        timeLabel: formatWeatherHour(item.timestamp),
+      }))
+      : [];
+    const hourlyTimeline = Array.isArray(weather?.hourlyTimeline)
+      ? weather.hourlyTimeline.map((item) => ({
+        ...item,
+        timeLabel: formatWeatherHour(item.timestamp),
+      }))
+      : hourly;
+
     return {
       pageId: 'weather',
+      canonicalPageId: 'weather',
       title: this.getPages().weather?.title || 'Weather',
-      activeTabId: this.state.weatherTabId,
-      tabs: WEATHER_TABS.map((tabId) => ({
-        id: tabId,
-        label: tabId.charAt(0).toUpperCase() + tabId.slice(1),
-        active: tabId === this.state.weatherTabId,
-      })),
-      ...weather,
+      city: weather?.city || settings.weather.city,
+      country: weather?.country || null,
+      units: weather?.units || settings.weather.units,
+      currentWeather,
+      indoorClimate: climate && !climate.error ? climate : null,
+      dailySummary,
+      hourly,
+      hourlyTimeline,
+      daily: Array.isArray(weather?.daily) ? weather.daily.map((item) => ({
+        ...item,
+        dayLabel: formatWeatherDay(item.timestamp),
+      })) : [],
+      sun: buildSunWidget(currentWeather),
+      moon,
+      summary: weather?.error ? 'Weather unavailable' : 'Hourly forecast ready',
       softButtons: this.getSoftButtons('weather'),
     };
   }
@@ -1299,8 +1370,8 @@ class ConsoleService {
     }
 
     switch (normalizedPageId) {
-      case 'fun':
-        return this.getFunPageData(options);
+      case 'sports':
+        return this.getSportsPageData(options);
       case 'weather':
         return this.getWeatherPageData();
       case 'media':
@@ -1328,7 +1399,6 @@ class ConsoleService {
     if (!WEATHER_TABS.includes(this.state.weatherTabId)) {
       this.state.weatherTabId = 'current';
     }
-    this.setFunDateKey(this.runtime.funDateKey);
     this.runtime.funClipIndex = Number.isFinite(this.runtime.funClipIndex)
       ? Math.max(0, Math.floor(this.runtime.funClipIndex))
       : 0;
@@ -1347,7 +1417,7 @@ class ConsoleService {
     let pageChangeSource = null;
 
     if (this.isManualPage() && Number.isFinite(this.state.expiresAt) && this.state.expiresAt <= now) {
-      if (normalizePageId(this.state.activePageId) === 'fun') {
+      if (['weather', 'sports'].includes(normalizePageId(this.state.activePageId))) {
         this.state.expiresAt = null;
       } else {
         this.state.activePageId = this.getDefaultPageId();

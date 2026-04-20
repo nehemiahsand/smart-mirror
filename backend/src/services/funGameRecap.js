@@ -5,6 +5,7 @@ const ESPN_BASE = 'https://site.api.espn.com/apis/site/v2/sports/basketball/nba'
 const ESPN_TIMEOUT_MS = 12000;
 const DEFAULT_TEAM_ID = '9'; // Golden State Warriors
 const DEFAULT_GAME_COUNT = 10;
+const DEFAULT_SEASON_TYPES = ['2', '3', '5']; // Regular season, playoffs, play-in
 
 function getTeamId() {
   return String(process.env.FUN_VIDEO_TEAM_ID || DEFAULT_TEAM_ID).trim();
@@ -20,6 +21,42 @@ function getNbaSeason() {
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   return month >= 10 ? year + 1 : year;
+}
+
+function getSeasonTypes() {
+  const configured = String(process.env.FUN_VIDEO_SEASON_TYPES || '')
+    .split(',')
+    .map((value) => String(value).trim())
+    .filter(Boolean);
+
+  return configured.length > 0 ? configured : DEFAULT_SEASON_TYPES;
+}
+
+async function fetchScheduleEvents(options = {}) {
+  const teamId = String(options.teamId || getTeamId()).trim();
+  const season = Number.isFinite(options.season) ? options.season : getNbaSeason();
+  const seasonTypes = Array.isArray(options.seasonTypes) && options.seasonTypes.length > 0
+    ? options.seasonTypes.map((value) => String(value).trim()).filter(Boolean)
+    : getSeasonTypes();
+
+  logger.info('Fetching team schedules from ESPN', { teamId, season, seasonTypes });
+
+  const responses = await Promise.all(
+    seasonTypes.map(async (seasonType) => {
+      const url = `${ESPN_BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${encodeURIComponent(seasonType)}`;
+      const response = await axios.get(url, { timeout: ESPN_TIMEOUT_MS });
+      return response.data?.events || [];
+    })
+  );
+
+  return Array.from(
+    new Map(
+      responses
+        .flat()
+        .filter((event) => event?.id)
+        .map((event) => [String(event.id), event])
+    ).values()
+  );
 }
 
 function extractScore(scoreVal) {
@@ -94,13 +131,7 @@ function parseBoxScore(boxData) {
 async function fetchRecentGames() {
   const teamId = getTeamId();
   const count = getGameCount();
-  const season = getNbaSeason();
-
-  const url = `${ESPN_BASE}/teams/${teamId}/schedule?season=${season}&seasontype=2`;
-  logger.info('Fetching team schedule from ESPN', { teamId, season, url });
-
-  const response = await axios.get(url, { timeout: ESPN_TIMEOUT_MS });
-  const events = response.data?.events || [];
+  const events = await fetchScheduleEvents({ teamId });
 
   const completed = events
     .filter((e) => {
@@ -196,4 +227,10 @@ async function fetchGameRecaps() {
   return recaps;
 }
 
-module.exports = { fetchGameRecaps, fetchRecentGames, fetchBoxScore, getTeamId };
+module.exports = {
+  fetchGameRecaps,
+  fetchRecentGames,
+  fetchBoxScore,
+  fetchScheduleEvents,
+  getTeamId,
+};

@@ -5,11 +5,16 @@
 
 const fs = require('fs').promises;
 const path = require('path');
+const sharp = require('sharp');
 const logger = require('../utils/logger');
+
+const THUMBNAIL_SIZE = 320;
+const THUMBNAIL_QUALITY = 45;
 
 class PhotosService {
   constructor() {
     this.photosDir = process.env.PHOTOS_DIR || path.join(__dirname, '../../data/photos');
+    this.thumbnailsDir = process.env.PHOTOS_THUMBNAILS_DIR || path.join(__dirname, '../../data/photos-thumbnails');
     this.metadataFile = path.join(__dirname, '../../data/photos-metadata.json');
     this.photoCache = [];
     this.metadata = [];
@@ -24,6 +29,7 @@ class PhotosService {
 
     try {
       await fs.mkdir(this.photosDir, { recursive: true });
+      await fs.mkdir(this.thumbnailsDir, { recursive: true });
 
       try {
         const data = await fs.readFile(this.metadataFile, 'utf8');
@@ -92,6 +98,7 @@ class PhotosService {
         id: m.id,
         filename: m.filename,
         url: `/api/photos/image/${m.filename}`,
+        thumbnailUrl: `/api/photos/thumb/${m.filename}`,
         caption: m.caption,
         uploadedAt: m.uploadedAt,
         size: m.size,
@@ -106,6 +113,15 @@ class PhotosService {
     // Sanitize filename to prevent directory traversal
     const sanitized = path.basename(filename);
     return path.join(this.photosDir, sanitized);
+  }
+
+  getThumbnailFilename(filename) {
+    const sanitized = path.basename(filename);
+    return `${sanitized}.jpg`;
+  }
+
+  getThumbnailPath(filename) {
+    return path.join(this.thumbnailsDir, this.getThumbnailFilename(filename));
   }
 
   /**
@@ -151,6 +167,7 @@ class PhotosService {
     try {
       const filepath = path.join(this.photosDir, filename);
       await fs.writeFile(filepath, buffer);
+      await this.generateThumbnail(filename, buffer);
 
       const stats = await fs.stat(filepath);
       const photo = {
@@ -175,7 +192,8 @@ class PhotosService {
         uploadedAt: photo.uploadedAt,
         size: photo.size,
         order: photo.order,
-        url: `/api/photos/image/${photo.filename}`
+        url: `/api/photos/image/${photo.filename}`,
+        thumbnailUrl: `/api/photos/thumb/${photo.filename}`
       };
     } catch (error) {
       logger.error('Failed to add photo', { filename, error: error.message });
@@ -210,7 +228,8 @@ class PhotosService {
       uploadedAt: photo.uploadedAt,
       size: photo.size,
       order: photo.order,
-      url: `/api/photos/image/${photo.filename}`
+      url: `/api/photos/image/${photo.filename}`,
+      thumbnailUrl: `/api/photos/thumb/${photo.filename}`
     };
   }
 
@@ -225,6 +244,7 @@ class PhotosService {
     try {
       const filepath = path.join(this.photosDir, photo.filename);
       await fs.unlink(filepath);
+      await fs.unlink(this.getThumbnailPath(photo.filename)).catch(() => {});
       
       this.metadata = this.metadata.filter(m => m.id !== id);
       await this.saveMetadata();
@@ -250,6 +270,43 @@ class PhotosService {
     await this.saveMetadata();
     this.lastFetch = null;
     logger.info('Photos reordered', { count: photoIds.length });
+  }
+
+  async generateThumbnail(filename, sourceBuffer = null) {
+    await this.initialize();
+
+    const photoPath = this.getPhotoPath(filename);
+    const thumbnailPath = this.getThumbnailPath(filename);
+    const source = sourceBuffer || photoPath;
+
+    await sharp(source)
+      .rotate()
+      .resize(THUMBNAIL_SIZE, THUMBNAIL_SIZE, { fit: 'cover', position: 'attention' })
+      .jpeg({
+        quality: THUMBNAIL_QUALITY,
+        mozjpeg: true,
+      })
+      .toFile(thumbnailPath);
+
+    return thumbnailPath;
+  }
+
+  async ensureThumbnail(filename) {
+    await this.initialize();
+
+    const photoPath = this.getPhotoPath(filename);
+    const thumbnailPath = this.getThumbnailPath(filename);
+
+    const [photoStats, thumbnailStats] = await Promise.all([
+      fs.stat(photoPath),
+      fs.stat(thumbnailPath).catch(() => null),
+    ]);
+
+    if (!thumbnailStats || thumbnailStats.mtimeMs < photoStats.mtimeMs) {
+      await this.generateThumbnail(filename);
+    }
+
+    return thumbnailPath;
   }
 }
 

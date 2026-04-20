@@ -2,7 +2,7 @@ const logger = require('../utils/logger');
 const consoleService = require('./console');
 const settingsService = require('./settings');
 
-const DISPLAY_PAGE_ORDER = ['home', 'fun', 'spotify'];
+const DISPLAY_PAGE_ORDER = ['home', 'weather', 'sports', 'spotify'];
 
 function parseClockValue(value) {
   if (typeof value !== 'string' || !value.includes(':')) {
@@ -359,7 +359,7 @@ class SceneEngine {
   }
 
   async handlePageRequest(page, context = {}) {
-    if (page === 'spotify' || page === 'fun') {
+    if (['weather', 'sports', 'spotify', 'fun'].includes(page)) {
       return this.getState();
     }
     if (page === 'home') {

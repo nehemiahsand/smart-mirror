@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './WidgetManager.css';
 import AlertModal from '../components/AlertModal';
 import { apiFetch } from '../api/apiClient';
 
 const PAGES = [
-  { id: 'home', name: 'Home Page' },
-  { id: 'fun', name: 'Fun Page' }
+  { id: 'home', name: 'Main Page' },
+  { id: 'weather', name: 'Weather Page' },
+  { id: 'sports', name: 'Sports Page' }
 ];
 
 const WIDGETS_BY_PAGE = {
@@ -15,20 +16,25 @@ const WIDGETS_BY_PAGE = {
     { id: 'googlecalendar', name: 'Calendar & Sports', icon: '📅' },
     { id: 'photos', name: 'Photos Slideshow', icon: '📸' },
   ],
-  fun: [
+  weather: [
     { id: 'timedate', name: 'Time & Date', icon: '🕐' },
-    { id: 'sunmoon', name: 'Sun/Moon Phase', icon: '🌞' },
-    { id: 'bibleclock', name: 'Bible Clock', icon: '📖' },
-    { id: 'comics', name: 'Highlights', icon: '🏀' },
-  ]
+    { id: 'sunmoon', name: 'Sun & Moon', icon: '🌙' },
+    { id: 'temps', name: 'Outdoor & Indoor Temp', icon: '🌡️' },
+    { id: 'hourly', name: 'Hourly Forecast', icon: '🕒' },
+  ],
+  sports: [
+    { id: 'timedate', name: 'Time & Date', icon: '🕐' },
+    { id: 'highlights', name: 'Warriors Highlights', icon: '🏀' },
+  ],
 };
 
 export default function WidgetManager() {
   const [activePage, setActivePage] = useState('home');
-  const [pageWidgets, setPageWidgets] = useState({ home: [], fun: [] });
+  const [pageWidgets, setPageWidgets] = useState({ home: [], weather: [], sports: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [alertModal, setAlertModal] = useState(null);
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   useEffect(() => {
     loadWidgets();
@@ -40,8 +46,8 @@ export default function WidgetManager() {
       const settings = await response.json();
 
       const homeOrder = settings.widgetOrder || [];
-      const funOrder = settings.funWidgetOrder || [];
-
+      const weatherOrder = settings.weatherWidgetOrder || [];
+      const sportsOrder = settings.sportsWidgetOrder || [];
       const buildList = (pageId, savedOrder) => {
         const list = [...WIDGETS_BY_PAGE[pageId]];
         if (savedOrder.length > 0) {
@@ -58,7 +64,8 @@ export default function WidgetManager() {
 
       setPageWidgets({
         home: buildList('home', homeOrder),
-        fun: buildList('fun', funOrder)
+        weather: buildList('weather', weatherOrder),
+        sports: buildList('sports', sportsOrder)
       });
       setLoading(false);
     } catch (error) {
@@ -76,12 +83,80 @@ export default function WidgetManager() {
     setPageWidgets(prev => ({ ...prev, [activePage]: list }));
   };
 
+  const reorderWidgets = useCallback((fromIndex, toIndex) => {
+    if (fromIndex === null || fromIndex === toIndex || toIndex < 0) {
+      return;
+    }
+
+    setPageWidgets(prev => {
+      const current = [...prev[activePage]];
+      if (toIndex >= current.length) {
+        return prev;
+      }
+
+      const [movedWidget] = current.splice(fromIndex, 1);
+      current.splice(toIndex, 0, movedWidget);
+      return { ...prev, [activePage]: current };
+    });
+  }, [activePage]);
+
+  const handleDragStart = useCallback((e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleDragOver = useCallback((e, index) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    if (draggedIndex === null || draggedIndex === index) {
+      return;
+    }
+
+    reorderWidgets(draggedIndex, index);
+    setDraggedIndex(index);
+  }, [draggedIndex, reorderWidgets]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggedIndex(null);
+  }, []);
+
+  const handleTouchStart = useCallback((e, index) => {
+    setDraggedIndex(index);
+    e.currentTarget.classList.add('dragging');
+  }, []);
+
+  const handleTouchMove = useCallback((e) => {
+    if (draggedIndex === null) {
+      return;
+    }
+
+    const touch = e.touches[0];
+    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+    const target = element?.closest('.widget-item');
+    if (!target?.parentNode) {
+      return;
+    }
+
+    const nextIndex = Array.from(target.parentNode.children).indexOf(target);
+    if (nextIndex !== -1 && nextIndex !== draggedIndex) {
+      reorderWidgets(draggedIndex, nextIndex);
+      setDraggedIndex(nextIndex);
+    }
+  }, [draggedIndex, reorderWidgets]);
+
+  const handleTouchEnd = useCallback((e) => {
+    e.currentTarget.classList.remove('dragging');
+    setDraggedIndex(null);
+  }, []);
+
   const saveChanges = async () => {
     setSaving(true);
     try {
       const updatedSettings = {
         widgetOrder: pageWidgets.home.map(w => w.id),
-        funWidgetOrder: pageWidgets.fun.map(w => w.id)
+        weatherWidgetOrder: pageWidgets.weather.map(w => w.id),
+        sportsWidgetOrder: pageWidgets.sports.map(w => w.id)
       };
 
       await apiFetch('/api/settings', {
@@ -146,8 +221,19 @@ export default function WidgetManager() {
 
         <div className="widgets-list">
           {currentWidgets.map((widget, index) => (
-            <div key={widget.id} className="widget-item">
+            <div
+              key={widget.id}
+              className={`widget-item ${draggedIndex === index ? 'dragging' : ''}`}
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              onTouchStart={(e) => handleTouchStart(e, index)}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
               <div className="widget-left">
+                <div className="widget-drag-handle" aria-hidden="true">⋮⋮</div>
                 <div className="order-controls">
                   <button
                     className="order-btn"
@@ -170,6 +256,8 @@ export default function WidgetManager() {
             </div>
           ))}
         </div>
+
+        <p className="widget-manager-hint">Drag widgets to reorder them, then save.</p>
 
         <button
           className="save-btn"

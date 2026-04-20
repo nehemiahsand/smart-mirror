@@ -10,9 +10,12 @@ function getDefaultWsUrl() {
 }
 
 const BASE_WS_URL = import.meta.env.VITE_WS_URL || getDefaultWsUrl();
-const ALLOWED_PAGES = new Set(['home', 'fun', 'spotify']);
+const ALLOWED_PAGES = new Set(['home', 'weather', 'sports', 'spotify']);
 
 function normalizePage(page) {
+  if (page === 'fun') {
+    return 'sports';
+  }
   return ALLOWED_PAGES.has(page) ? page : 'home';
 }
 

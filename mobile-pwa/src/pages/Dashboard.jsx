@@ -6,8 +6,9 @@ import { apiFetch } from '../api/apiClient';
 
 export default function Dashboard() {
   const pageLabels = {
-    home: 'Home',
-    fun: 'Fun',
+    home: 'Main',
+    weather: 'Weather',
+    sports: 'Sports',
     spotify: 'Spotify',
   };
   const [sensorData, setSensorData] = useState(null);
@@ -263,11 +264,15 @@ export default function Dashboard() {
           <div className="quick-actions">
             <button className="action-btn" disabled={busy} onClick={() => changePage('home')}>
               <span>🏠</span>
-              Home Page
+              Main Page
             </button>
-            <button className="action-btn" disabled={busy} onClick={() => changePage('fun')}>
-              <span>🎉</span>
-              Fun Page
+            <button className="action-btn" disabled={busy} onClick={() => changePage('weather')}>
+              <span>🌤️</span>
+              Weather Page
+            </button>
+            <button className="action-btn" disabled={busy} onClick={() => changePage('sports')}>
+              <span>🏀</span>
+              Sports Page
             </button>
             <button className="action-btn" disabled={busy} onClick={() => changePage('spotify')}>
               <span>🎵</span>
