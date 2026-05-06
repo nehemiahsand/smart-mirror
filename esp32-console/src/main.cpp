@@ -647,6 +647,15 @@ void renderStatsScreen() {
   const String tempValue = extractStatValue(gMirrorState.statsLine3, "T");
   const int16_t contentTop = getHeaderHeight() + 1;
 
+  if (isCompactScreen()) {
+    renderHeader(String("Stats ") +
+                 String(statsPageCount == 0 ? 0 : gStatsPageIndex + 1) + "/" +
+                 String(statsPageCount == 0 ? 0 : statsPageCount));
+    drawMessageCard(0, getHeaderHeight() + 1, Config::SCREEN_WIDTH,
+                    Config::SCREEN_HEIGHT - (getHeaderHeight() + 1), statsLine, 20);
+    return;
+  }
+
   if (gStatsPageIndex == 0 && !diskValue.isEmpty()) {
     renderHeader("Disk / Ping");
     gDisplay.setCursor(8, contentTop);
