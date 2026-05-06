@@ -8,10 +8,81 @@ const logger = require('../utils/logger');
 
 class TrafficService {
   constructor() {
-    this.lastUpdate = null;
-    this.cachedData = null;
     this.updateInterval = 10 * 60 * 1000; // Update every 10 minutes
     this.geocodeCache = new Map(); // Cache TomTom geocoded coordinates
+    this.routeCache = new Map(); // Cache routing responses keyed by origin->destination
+    // Legacy single-result cache (kept for backwards compatibility with callers
+    // that don't pass a structured config). Delegates to routeCache internally.
+    this.lastUpdate = null;
+    this.cachedData = null;
+  }
+
+  cacheKey(origin, destination) {
+    return `${origin}=>${destination}`;
+  }
+
+  getCachedRoute(origin, destination) {
+    const entry = this.routeCache.get(this.cacheKey(origin, destination));
+    if (!entry) return null;
+    if ((Date.now() - entry.timestamp) > this.updateInterval) return null;
+    return entry.data;
+  }
+
+  setCachedRoute(origin, destination, data) {
+    this.routeCache.set(this.cacheKey(origin, destination), {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Fetch commute data for multiple destinations sharing one origin / API key.
+   * Returns one entry per destination, using cached results where fresh.
+   * @param {Object} config { origin, destinations: [{label, address}], tomtomApiKey, googleMapsApiKey }
+   */
+  async getCommutes(config) {
+    const {
+      origin,
+      destinations = [],
+      tomtomApiKey,
+      googleMapsApiKey
+    } = config || {};
+
+    if (!origin) {
+      throw new Error('Origin is required');
+    }
+    if (!Array.isArray(destinations) || destinations.length === 0) {
+      throw new Error('At least one destination is required');
+    }
+    if (!tomtomApiKey && !googleMapsApiKey) {
+      throw new Error('Traffic API key not configured');
+    }
+
+    const results = await Promise.all(destinations.map(async (dest) => {
+      const address = typeof dest === 'string' ? dest : dest?.address;
+      const label = typeof dest === 'string' ? dest : (dest?.label || address);
+      if (!address) {
+        return { label: label || 'Destination', error: 'Destination address is empty' };
+      }
+
+      try {
+        const data = await this.getCommuteData({
+          origin,
+          destination: address,
+          tomtomApiKey,
+          googleMapsApiKey
+        });
+        return { label, ...data };
+      } catch (error) {
+        return { label, error: error.message };
+      }
+    }));
+
+    return {
+      origin,
+      commutes: results,
+      lastUpdated: new Date().toISOString()
+    };
   }
 
   /**
@@ -37,9 +108,10 @@ class TrafficService {
         throw new Error('Origin and destination are required');
       }
 
-      if (this.cachedData && this.lastUpdate && (Date.now() - this.lastUpdate) < this.updateInterval) {
-        logger.info('Returning cached traffic data');
-        return this.cachedData;
+      const cached = this.getCachedRoute(origin, destination);
+      if (cached) {
+        logger.debug('Returning cached traffic data', { origin, destination });
+        return cached;
       }
 
       let data;
@@ -51,6 +123,7 @@ class TrafficService {
         throw new Error('Traffic API key not configured');
       }
 
+      this.setCachedRoute(origin, destination, data);
       this.cachedData = data;
       this.lastUpdate = Date.now();
 
@@ -65,9 +138,14 @@ class TrafficService {
     } catch (error) {
       logger.error('Failed to fetch traffic data', { error: error.message });
 
-      if (this.cachedData) {
+      // Try stale cache for this specific route first
+      const config = typeof configOrOrigin === 'object' && configOrOrigin !== null
+        ? configOrOrigin
+        : { origin: configOrOrigin, destination: destinationArg };
+      const staleEntry = this.routeCache.get(this.cacheKey(config.origin, config.destination));
+      if (staleEntry?.data) {
         logger.info('Returning stale cached data due to error');
-        return { ...this.cachedData, stale: true };
+        return { ...staleEntry.data, stale: true };
       }
 
       throw error;
@@ -209,6 +287,17 @@ class TrafficService {
       return this.geocodeCache.get(address);
     }
 
+    // If the input already looks like "lat,lng" (decimal coordinates), skip
+    // the geocoding API entirely. TomTom routing accepts raw coordinates and
+    // this avoids extra API calls / quota and brittle text-based lookups.
+    const coordMatch = String(address).trim().match(/^(-?\d{1,3}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/);
+    if (coordMatch) {
+      const [, lat, lon] = coordMatch;
+      const coords = `${lat},${lon}`;
+      this.geocodeCache.set(address, coords);
+      return coords;
+    }
+
     const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(address)}.json`;
     const response = await axios.get(url, {
       params: { key: apiKey },
@@ -254,6 +343,7 @@ class TrafficService {
   clearCache() {
     this.cachedData = null;
     this.lastUpdate = null;
+    this.routeCache.clear();
     logger.info('Traffic cache cleared');
   }
 }

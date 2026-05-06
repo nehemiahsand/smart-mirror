@@ -33,6 +33,10 @@ The mirror and OLED are synchronized around three pages:
 Display behavior:
 
 - home: widgets (time/date, weather+traffic, calendar, sports, photos)
+  - widget pages stay mounted while another page is active so navigating back
+    to home does not refetch external data
+  - traffic widget renders one row per `traffic.destinations[]` entry (label +
+    minutes + live ETA), sharing one origin and per-route caching
 - fun: fun page content from backend (/api/console/page/fun)
 - spotify: full Spotify player page
 - standby: display-only standby screen when display.standbyMode is true
@@ -103,6 +107,19 @@ Important backend env values:
 
 Runtime settings are stored in backend/data/settings.json.
 
+Traffic widget settings (under the `traffic` key):
+
+- `enabled`: boolean
+- `origin`: address or `"lat,lng"` string (lat,lng skips geocoding entirely)
+- `destinations`: array of `{ label, address }` (preferred; widget renders one
+  row per entry)
+- `destination`: legacy single-destination string, used only when
+  `destinations` is empty
+- `tomtomApiKey` / `googleMapsApiKey`: provider key (TomTom preferred)
+
+Backend caches each origin→destination route for 10 minutes, so N destinations
+cost ~N routing calls per refresh.
+
 ## Start, Check, and Verify
 
 Start the core services manually:
@@ -165,7 +182,25 @@ curl 'http://localhost/api/console/state?device=esp32'
 
 ## OAuth Helper
 
-Spotify local auth helper:
+Google Calendar token persistence: the backend always merges new tokens with
+existing ones so the long-lived `refresh_token` survives subsequent
+authorizations, and re-auth requests force a consent prompt to recover when
+Google has revoked the refresh token.
+
+Spotify local auth helper (run on a machine that has a browser, no SSH tunnel
+required — uses the loopback callback `http://127.0.0.1:8888/callback`):
+
+```bash
+MIRROR_URL=http://<pi-ip> ADMIN_PASSWORD=<password> \
+  node scripts/spotify-auth.mjs
+```
+
+The script logs into the mirror admin API, opens the Spotify auth URL in your
+browser, captures the code on `127.0.0.1:8888`, and posts the resulting tokens
+back to the mirror via `POST /api/spotify/authorize`. Status and a disconnect
+button live on the PWA Settings page.
+
+The older in-repo helper still works on the Pi itself:
 
 ```bash
 cd backend

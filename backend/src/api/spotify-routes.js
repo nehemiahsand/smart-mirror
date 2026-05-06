@@ -21,15 +21,61 @@ function sendSpotifyAuthNeeded(res) {
     });
 }
 
-// Get Spotify authentication URL
+// Only loopback redirect URIs may be supplied by admin clients to avoid
+// turning the auth flow into an open redirect.
+function isLoopbackRedirectUri(uri) {
+    try {
+        const parsed = new URL(uri);
+        if (parsed.protocol !== 'http:') return false;
+        const host = parsed.hostname.toLowerCase();
+        return host === '127.0.0.1' || host === 'localhost';
+    } catch {
+        return false;
+    }
+}
+
+// Get Spotify authentication URL.
+// Admin clients may pass ?redirect_uri=http://127.0.0.1:<port>/<path> to
+// drive the OAuth flow from a helper running on a trusted local machine
+// (e.g. the user's laptop). The redirect_uri is bound to the issued state
+// and reused during code exchange.
 router.get('/auth-url', adminAuth, (req, res) => {
     try {
-        const state = issueOAuthState('spotify');
-        const authUrl = spotifyService.getAuthUrl(state);
-        res.json({ authUrl, state });
+        const overrideRedirectUri = typeof req.query.redirect_uri === 'string' && req.query.redirect_uri.trim()
+            ? req.query.redirect_uri.trim()
+            : null;
+        if (overrideRedirectUri && !isLoopbackRedirectUri(overrideRedirectUri)) {
+            return res.status(400).json({ error: 'redirect_uri must be a loopback http URL' });
+        }
+
+        const state = issueOAuthState('spotify', overrideRedirectUri ? { redirectUri: overrideRedirectUri } : {});
+        const authUrl = spotifyService.getAuthUrl(state, overrideRedirectUri);
+        res.json({ authUrl, state, redirectUri: overrideRedirectUri || spotifyService.redirectUri });
     } catch (error) {
         logger.error('Error getting Spotify auth URL:', error);
         res.status(500).json({ error: 'Failed to get authentication URL' });
+    }
+});
+
+// Admin-driven code exchange (used by the local helper script). The state
+// proves the request originated from this server's auth-url issuance.
+router.post('/authorize', adminAuth, async (req, res) => {
+    const { code, state } = req.body || {};
+    if (!code || !state) {
+        return res.status(400).json({ error: 'code and state are required' });
+    }
+
+    const metadata = consumeOAuthState('spotify', state);
+    if (!metadata) {
+        return res.status(400).json({ error: 'invalid or expired state' });
+    }
+
+    try {
+        await spotifyService.exchangeCode(code, metadata.redirectUri || null);
+        res.json({ success: true, authenticated: spotifyService.isAuthenticated() });
+    } catch (error) {
+        logger.error('Error exchanging Spotify code via admin authorize:', error?.response?.data || error.message);
+        res.status(500).json({ error: 'Failed to exchange code', details: error.message });
     }
 });
 
@@ -46,13 +92,14 @@ router.get('/callback', async (req, res) => {
         return res.redirect('/settings?spotify=error&reason=no_code');
     }
 
-    if (!consumeOAuthState('spotify', state)) {
+    const metadata = consumeOAuthState('spotify', state);
+    if (!metadata) {
         logger.warn('Spotify callback rejected due to invalid OAuth state');
         return res.redirect('/settings?spotify=error&reason=invalid_state');
     }
 
     try {
-        await spotifyService.exchangeCode(code);
+        await spotifyService.exchangeCode(code, metadata.redirectUri || null);
         res.redirect('/settings?spotify=connected');
     } catch (error) {
         logger.error('Error exchanging Spotify code:', error);

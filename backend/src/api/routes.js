@@ -1258,25 +1258,38 @@ router.get('/traffic/commute', async (req, res) => {
     }
 
     const origin = trafficSettings.origin || process.env.TRAFFIC_ORIGIN || '';
-    const destination = trafficSettings.destination || process.env.TRAFFIC_DESTINATION || '';
     const tomtomApiKey = trafficSettings.tomtomApiKey || process.env.TOMTOM_API_KEY || '';
     const googleMapsApiKey = trafficSettings.googleMapsApiKey || process.env.GOOGLE_MAPS_API_KEY || '';
-    
-    if (!origin || !destination) {
-      return res.status(400).json({ error: 'Origin and destination must be configured in settings' });
+
+    // Build destinations list: prefer the new `destinations` array, fall back
+    // to legacy single `destination` string for backwards compatibility.
+    let destinations = Array.isArray(trafficSettings.destinations)
+      ? trafficSettings.destinations.filter((d) => d && (typeof d === 'string' ? d.trim() : d.address))
+      : [];
+
+    if (destinations.length === 0 && trafficSettings.destination) {
+      destinations = [{ label: 'Destination', address: trafficSettings.destination }];
+    }
+
+    if (!origin || destinations.length === 0) {
+      return res.status(400).json({ error: 'Origin and at least one destination must be configured in settings' });
     }
 
     if (!tomtomApiKey && !googleMapsApiKey) {
       return res.status(400).json({ error: 'Traffic API key not configured' });
     }
 
-    const data = await trafficService.getCommuteData({
+    const data = await trafficService.getCommutes({
       origin,
-      destination,
+      destinations,
       tomtomApiKey,
       googleMapsApiKey
     });
-    res.json(data);
+
+    // Backwards compatibility: surface the first commute's fields at the top
+    // level so older clients keep working.
+    const primary = data.commutes.find((c) => !c.error) || data.commutes[0] || {};
+    res.json({ ...primary, ...data });
   } catch (error) {
     logger.error('Failed to get traffic data', { error: error.message });
     res.status(500).json({ error: error.message });

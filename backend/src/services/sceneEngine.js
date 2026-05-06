@@ -76,6 +76,40 @@ class SceneEngine {
       lastInputEvent: null,
       updatedAt: Date.now(),
     };
+    this.lastDisplayToggleHandledAt = 0;
+    this.lastDisplayToggleEventTimestamp = 0;
+  }
+
+  shouldIgnoreDisplayToggle(event = {}) {
+    const now = Date.now();
+    const eventTimestamp = Number(event.timestamp);
+    const hasEventTimestamp = Number.isFinite(eventTimestamp) && eventTimestamp > 0;
+
+    if (hasEventTimestamp && this.lastDisplayToggleEventTimestamp > 0 && eventTimestamp <= this.lastDisplayToggleEventTimestamp) {
+      logger.info('Ignoring stale display toggle (duplicate or out-of-order timestamp)', {
+        eventTimestamp,
+        lastDisplayToggleEventTimestamp: this.lastDisplayToggleEventTimestamp,
+      });
+      return true;
+    }
+
+    // Protect against delayed duplicate MQTT button events.
+    const toggleCooldownMs = 600;
+    if (this.lastDisplayToggleHandledAt > 0 && (now - this.lastDisplayToggleHandledAt) < toggleCooldownMs) {
+      logger.info('Ignoring rapid display toggle during cooldown window', {
+        cooldownMs: toggleCooldownMs,
+        elapsedMs: now - this.lastDisplayToggleHandledAt,
+      });
+      return true;
+    }
+
+    this.lastDisplayToggleHandledAt = now;
+    if (hasEventTimestamp) {
+      this.lastDisplayToggleEventTimestamp = eventTimestamp;
+    } else {
+      this.lastDisplayToggleEventTimestamp = now;
+    }
+    return false;
   }
 
   initialize() {
@@ -431,6 +465,9 @@ class SceneEngine {
     });
 
     if (eventType === 'display.page.toggle') {
+      if (this.shouldIgnoreDisplayToggle(event)) {
+        return this.refreshState({ source: 'esp32', reason: 'display.page.toggle:ignored_duplicate', broadcast: true, persist: false });
+      }
       const isHeldToggle = payload.hold === true;
       if (isStandby) {
         logger.info('Waking display from standby via page toggle button', {

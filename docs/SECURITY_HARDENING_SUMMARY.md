@@ -27,7 +27,7 @@ This repo currently runs with a hardened-by-default local deployment model. The 
 - local secrets live in `backend/.env` and untracked ESP32 local config
 - tracked frontend env files and browser API-key usage have been removed
 - `backend/data/settings.json` remains local runtime state and is not intended for public exposure
-- traffic origin/destination are treated as sensitive and redacted from settings responses
+- traffic origin/destination/destinations are treated as sensitive and redacted from settings responses
 
 ## Container Hardening
 

@@ -52,7 +52,7 @@ class SpotifyService {
         }
     }
 
-    getAuthUrl(state) {
+    getAuthUrl(state, redirectUriOverride = null) {
         const scopes = [
             'user-read-playback-state',
             'user-modify-playback-state',
@@ -66,21 +66,21 @@ class SpotifyService {
             response_type: 'code',
             client_id: this.clientId,
             scope: scopes.join(' '),
-            redirect_uri: this.redirectUri,
+            redirect_uri: redirectUriOverride || this.redirectUri,
             state
         });
 
         return `${SPOTIFY_ACCOUNTS_BASE}/authorize?${params.toString()}`;
     }
 
-    async exchangeCode(code) {
+    async exchangeCode(code, redirectUriOverride = null) {
         try {
             const response = await axios.post(
                 `${SPOTIFY_ACCOUNTS_BASE}/api/token`,
                 new URLSearchParams({
                     grant_type: 'authorization_code',
                     code: code,
-                    redirect_uri: this.redirectUri
+                    redirect_uri: redirectUriOverride || this.redirectUri
                 }),
                 {
                     headers: {

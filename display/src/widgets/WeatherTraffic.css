@@ -83,6 +83,61 @@
   opacity: 1;
 }
 
+/* Multi-destination commute layout */
+.wt-commutes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  margin-top: 0.2rem;
+}
+
+.wt-commute-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.wt-commute-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #ffffff;
+  text-transform: capitalize;
+  letter-spacing: 0.02em;
+}
+
+.wt-commute-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.wt-commute-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.05;
+}
+
+.wt-commute-duration {
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: #ffffff;
+}
+
+.wt-commute-eta {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: #ffffff;
+  opacity: 0.75;
+}
+
 /* Section dividers */
 .wt-section:not(:last-child) {
   border-right: 1px solid rgba(255, 255, 255, 0.2);

@@ -9,6 +9,8 @@ export default function Settings({ authenticated = false, onAuthChange = () => {
   const [alertModal, setAlertModal] = useState(null);
   const [loginPassword, setLoginPassword] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
+  const [spotifyStatus, setSpotifyStatus] = useState(null);
+  const [spotifyBusy, setSpotifyBusy] = useState(false);
 
   const formatUptime = (seconds) => {
     if (!seconds || Number.isNaN(Number(seconds))) return 'Unknown';
@@ -43,6 +45,35 @@ export default function Settings({ authenticated = false, onAuthChange = () => {
       console.error('Failed to load data:', error);
     } finally {
       setLoading(false);
+    }
+    refreshSpotifyStatus();
+  };
+
+  const refreshSpotifyStatus = async () => {
+    try {
+      const status = await apiFetch('/api/spotify/status').then(r => r.json());
+      setSpotifyStatus(status);
+    } catch (error) {
+      console.error('Failed to load Spotify status:', error);
+      setSpotifyStatus({ configured: false, authenticated: false });
+    }
+  };
+
+  const handleSpotifyDisconnect = async () => {
+    if (!authenticated) {
+      setAlertModal({ type: 'error', message: 'Log in as admin first' });
+      return;
+    }
+    setSpotifyBusy(true);
+    try {
+      const res = await apiFetch('/api/spotify/logout', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setAlertModal({ type: 'success', message: 'Spotify disconnected' });
+      await refreshSpotifyStatus();
+    } catch (e) {
+      setAlertModal({ type: 'error', message: `Disconnect failed: ${e.message}` });
+    } finally {
+      setSpotifyBusy(false);
     }
   };
 
@@ -182,6 +213,62 @@ export default function Settings({ authenticated = false, onAuthChange = () => {
             </div>
           </form>
         )}
+      </div>
+
+      {/* Spotify Connection */}
+      <div className="card">
+        <div className="card-header">
+          <span className="card-icon">🎵</span>
+          <h2>Spotify Connection</h2>
+        </div>
+        <div className="settings-list">
+          <div className="setting-item">
+            <span className="setting-label">Status</span>
+            <span className="setting-value">
+              {spotifyStatus == null
+                ? 'Loading...'
+                : !spotifyStatus.configured
+                  ? 'Client credentials missing'
+                  : spotifyStatus.authenticated
+                    ? 'Connected'
+                    : 'Not connected'}
+            </span>
+          </div>
+          {spotifyStatus?.authenticated ? (
+            <div className="actions-list">
+              <button
+                className="action-button"
+                onClick={handleSpotifyDisconnect}
+                disabled={spotifyBusy || !authenticated}
+              >
+                <span>{spotifyBusy ? '⏳' : '🚪'}</span>
+                <span>{spotifyBusy ? 'Disconnecting...' : 'Disconnect Spotify'}</span>
+              </button>
+              <button className="action-button" onClick={refreshSpotifyStatus}>
+                <span>🔄</span>
+                <span>Refresh Status</span>
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="setting-item" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                <span className="setting-label">Connect from your laptop</span>
+                <span className="setting-value" style={{ fontFamily: 'monospace', fontSize: '0.85rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                  {`MIRROR_URL=${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001'} ADMIN_PASSWORD=*** node scripts/spotify-auth.mjs`}
+                </span>
+                <span className="setting-value" style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                  In Spotify dashboard add Redirect URI: <code>http://127.0.0.1:8888/callback</code>
+                </span>
+              </div>
+              <div className="actions-list">
+                <button className="action-button" onClick={refreshSpotifyStatus}>
+                  <span>🔄</span>
+                  <span>Refresh Status</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
       {alertModal && (

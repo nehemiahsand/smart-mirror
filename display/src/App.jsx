@@ -158,93 +158,79 @@ function App() {
         return <StandbyMode />;
     }
 
-    // Render Spotify page
-    if (currentPage === 'spotify') {
-        return (
-            <>
-                <SpotifyPlayer />
-                <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
-            </>
-        );
-    }
-
-    if (currentPage === 'weather') {
-        return (
-            <>
-                <WeatherPage pageData={consolePageData.weather} settings={settings} />
-                <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
-            </>
-        );
-    }
-
-    if (currentPage === 'sports') {
-        return (
-            <>
-                <SportsPage pageData={consolePageData.sports} settings={settings} />
-                <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
-            </>
-        );
-    }
-
-    // Render Home page
+    // Keep pages mounted so background widget state/fetch intervals survive page switches.
     return (
-        <div className="mirror">
-            {/* Jarvis listening glow effect */}
-            {isJarvisListening && <div className="jarvis-glow"></div>}
+        <>
+            <div style={{ display: currentPage === 'home' ? 'block' : 'none' }}>
+                <div className="mirror">
+                    {/* Jarvis listening glow effect */}
+                    {isJarvisListening && <div className="jarvis-glow"></div>}
 
-            <div className={`mirror-content vertical-layout ${isAnimating ? 'animating' : ''}`}>
-                {/* Dynamic Layout - Combined widgets for better organization */}
+                    <div className={`mirror-content vertical-layout ${isAnimating ? 'animating' : ''}`}>
+                        {/* Dynamic Layout - Combined widgets for better organization */}
 
-                {/* Time & Date - Top */}
-                {(isWidgetEnabled('clock') || isWidgetEnabled('date') || isWidgetEnabled('timedate')) && (
-                    <div className="widget-section top" style={{ order: getWidgetOrder('timedate') }}>
-                        <TimeDateWidget />
-                    </div>
-                )}
-
-                {/* Google Calendar - Below Time/Date */}
-                {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar') || isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
-                    <div className="widget-section middle calendar-nba-row" style={{ order: getWidgetOrder('googlecalendar') }}>
-                        {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar')) && (
-                            <div className="calendar-widget">
-                                <GoogleCalendarWidget />
+                        {/* Time & Date - Top */}
+                        {(isWidgetEnabled('clock') || isWidgetEnabled('date') || isWidgetEnabled('timedate')) && (
+                            <div className="widget-section top" style={{ order: getWidgetOrder('timedate') }}>
+                                <TimeDateWidget />
                             </div>
                         )}
-                        {(isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
-                            <div className="nba-widget">
-                                <SportsScores
-                                    sport={settings?.sports?.sport || 'nba'}
-                                    teams={settings?.sports?.teams || settings?.nba?.teams || []}
-                                />
+
+                        {/* Google Calendar - Below Time/Date */}
+                        {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar') || isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
+                            <div className="widget-section middle calendar-nba-row" style={{ order: getWidgetOrder('googlecalendar') }}>
+                                {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar')) && (
+                                    <div className="calendar-widget">
+                                        <GoogleCalendarWidget />
+                                    </div>
+                                )}
+                                {(isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
+                                    <div className="nba-widget">
+                                        <SportsScores
+                                            sport={settings?.sports?.sport || 'nba'}
+                                            teams={settings?.sports?.teams || settings?.nba?.teams || []}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Weather & Temperature & Traffic - Middle (Combined) */}
+                        {(isWidgetEnabled('weathertemp') || isWidgetEnabled('traffic')) && (
+                            <div className="widget-section middle" style={{ order: getWidgetOrder('weathertemp') }}>
+                                <WeatherTrafficWidget weatherData={weatherData} sensorData={sensorData} />
+                            </div>
+                        )}
+
+                        {/* Photos - Bottom */}
+                        {isWidgetEnabled('photos') && (
+                            <div className="widget-section photos" style={{ order: getWidgetOrder('photos'), flex: 1 }}>
+                                <PhotosWidget rotationInterval={(settings?.photos?.interval || 10) * 1000} />
                             </div>
                         )}
                     </div>
-                )}
 
-                {/* Weather & Temperature & Traffic - Middle (Combined) */}
-                {(isWidgetEnabled('weathertemp') || isWidgetEnabled('traffic')) && (
-                    <div className="widget-section middle" style={{ order: getWidgetOrder('weathertemp') }}>
-                        <WeatherTrafficWidget weatherData={weatherData} sensorData={sensorData} />
-                    </div>
-                )}
+                    {/* Message Overlay */}
+                    <MessageOverlay message={message} />
 
-                {/* Photos - Bottom */}
-                {isWidgetEnabled('photos') && (
-                    <div className="widget-section photos" style={{ order: getWidgetOrder('photos'), flex: 1 }}>
-                        <PhotosWidget rotationInterval={(settings?.photos?.interval || 10) * 1000} />
-                    </div>
-                )}
+                    {/* Connection Status */}
+                    <StatusIndicator isConnected={isConnected} />
+                </div>
             </div>
 
-            {/* Message Overlay */}
-            <MessageOverlay message={message} />
-
-            {/* Connection Status */}
-            <StatusIndicator isConnected={isConnected} />
+            <div style={{ display: currentPage === 'weather' ? 'block' : 'none' }}>
+                <WeatherPage pageData={consolePageData.weather} settings={settings} />
+            </div>
+            <div style={{ display: currentPage === 'sports' ? 'block' : 'none' }}>
+                <SportsPage pageData={consolePageData.sports} settings={settings} />
+            </div>
+            <div style={{ display: currentPage === 'spotify' ? 'block' : 'none' }}>
+                <SpotifyPlayer />
+            </div>
 
             {/* Page Indicator */}
             <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
-        </div>
+        </>
     );
 }
 

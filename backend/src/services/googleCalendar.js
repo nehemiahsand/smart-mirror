@@ -15,6 +15,26 @@ class GoogleCalendarService {
         this.oAuth2Client = null;
     }
 
+    async saveTokens(tokens = {}) {
+        let existingTokens = {};
+        try {
+            const existingContent = await fs.readFile(TOKEN_PATH, 'utf8');
+            existingTokens = JSON.parse(existingContent);
+        } catch (err) {
+            // Ignore missing/unreadable token file; we'll create it below.
+        }
+
+        const updatedTokens = {
+            ...existingTokens,
+            ...tokens,
+            // Google often omits refresh_token on subsequent exchanges.
+            refresh_token: tokens.refresh_token || existingTokens.refresh_token
+        };
+
+        await fs.writeFile(TOKEN_PATH, JSON.stringify(updatedTokens, null, 2));
+        return updatedTokens;
+    }
+
     async initialize() {
         try {
             // Check if credentials exist
@@ -45,24 +65,7 @@ class GoogleCalendarService {
             this.oAuth2Client.on('tokens', async (tokens) => {
                 try {
                     logger.info('Google Calendar tokens refreshed');
-                    // Read the existing token file to preserve refresh_token if not included
-                    let existingTokens = {};
-                    try {
-                        const existingContent = await fs.readFile(TOKEN_PATH, 'utf8');
-                        existingTokens = JSON.parse(existingContent);
-                    } catch (err) {
-                        // Ignore if file doesn't exist
-                    }
-                    
-                    // Merge new tokens with existing, preserving refresh_token
-                    const updatedTokens = {
-                        ...existingTokens,
-                        ...tokens,
-                        // Keep the old refresh_token if new one isn't provided
-                        refresh_token: tokens.refresh_token || existingTokens.refresh_token
-                    };
-                    
-                    await fs.writeFile(TOKEN_PATH, JSON.stringify(updatedTokens, null, 2));
+                    await this.saveTokens(tokens);
                 } catch (error) {
                     logger.error('Failed to save refreshed tokens:', error);
                 }
@@ -118,6 +121,8 @@ class GoogleCalendarService {
             const state = issueOAuthState('google_calendar');
             const authUrl = oAuth2Client.generateAuthUrl({
                 access_type: 'offline',
+                prompt: 'consent',
+                include_granted_scopes: true,
                 scope: SCOPES,
                 state,
             });
@@ -149,31 +154,15 @@ class GoogleCalendarService {
             this.oAuth2Client.on('tokens', async (tokens) => {
                 try {
                     logger.info('Google Calendar tokens refreshed');
-                    let existingTokens = {};
-                    try {
-                        const existingContent = await fs.readFile(TOKEN_PATH, 'utf8');
-                        existingTokens = JSON.parse(existingContent);
-                    } catch (err) {
-                        // Ignore if file doesn't exist
-                    }
-                    
-                    const updatedTokens = {
-                        ...existingTokens,
-                        ...tokens,
-                        refresh_token: tokens.refresh_token || existingTokens.refresh_token
-                    };
-                    
-                    await fs.writeFile(TOKEN_PATH, JSON.stringify(updatedTokens, null, 2));
+                    await this.saveTokens(tokens);
                 } catch (error) {
                     logger.error('Failed to save refreshed tokens:', error);
                 }
             });
 
             const { tokens } = await this.oAuth2Client.getToken(code);
-            this.oAuth2Client.setCredentials(tokens);
-
-            // Save token for future use
-            await fs.writeFile(TOKEN_PATH, JSON.stringify(tokens, null, 2));
+            const persistedTokens = await this.saveTokens(tokens);
+            this.oAuth2Client.setCredentials(persistedTokens);
             
             this.calendar = google.calendar({ version: 'v3', auth: this.oAuth2Client });
             this.initialized = true;
@@ -305,20 +294,8 @@ class GoogleCalendarService {
                     this.oAuth2Client.setCredentials(credentials);
                     
                     // Save the new tokens
-                    let existingTokens = {};
-                    try {
-                        const existingContent = await fs.readFile(TOKEN_PATH, 'utf8');
-                        existingTokens = JSON.parse(existingContent);
-                    } catch (err) {
-                        // Ignore
-                    }
-                    
-                    const updatedTokens = {
-                        ...existingTokens,
-                        ...credentials,
-                        refresh_token: credentials.refresh_token || existingTokens.refresh_token
-                    };
-                    await fs.writeFile(TOKEN_PATH, JSON.stringify(updatedTokens, null, 2));
+                    const updatedTokens = await this.saveTokens(credentials);
+                    this.oAuth2Client.setCredentials(updatedTokens);
                     
                     logger.info('Token refreshed successfully after 401, retrying request');
                     

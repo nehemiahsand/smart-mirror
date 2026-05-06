@@ -11,7 +11,8 @@ const SETTINGS_FILE = path.join(SETTINGS_DIR, 'settings.json');
 const SENSITIVE_KEY_PATTERNS = [/token/i, /secret/i, /password/i, /api.?key/i, /authorization/i];
 const SENSITIVE_PATHS = new Set([
   'traffic.origin',
-  'traffic.destination'
+  'traffic.destination',
+  'traffic.destinations'
 ]);
 
 function isSensitiveKey(key) {
@@ -44,6 +45,7 @@ const DEFAULT_SETTINGS = {
     enabled: false,
     origin: '',
     destination: '',
+    destinations: [],
     googleMapsApiKey: '',
     tomtomApiKey: ''
   },

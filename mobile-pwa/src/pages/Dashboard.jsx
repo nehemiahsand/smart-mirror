@@ -242,15 +242,22 @@ export default function Dashboard() {
               </div>
             ) : null}
 
-            {/* Traffic */}
+            {/* Traffic - one tile per destination */}
             {trafficData && !trafficData.error ? (
-              <div className="info-item">
-                <div className="info-icon">🚗</div>
-                <div className="info-content">
-                  <div className="info-value">{trafficData.durationMinutes} min</div>
-                  <div className="info-label">To School</div>
-                </div>
-              </div>
+              (Array.isArray(trafficData.commutes) && trafficData.commutes.length > 0
+                ? trafficData.commutes
+                : (trafficData.durationMinutes ? [{ label: 'Commute', ...trafficData }] : [])
+              )
+                .filter((c) => !c.error && c.durationMinutes)
+                .map((c, idx) => (
+                  <div key={`${c.label}-${idx}`} className="info-item">
+                    <div className="info-icon">🚗</div>
+                    <div className="info-content">
+                      <div className="info-value">{c.durationMinutes} min</div>
+                      <div className="info-label">To {c.label}</div>
+                    </div>
+                  </div>
+                ))
             ) : null}
           </div>
         </div>
