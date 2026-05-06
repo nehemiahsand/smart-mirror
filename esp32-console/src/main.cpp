@@ -82,6 +82,9 @@ String gStatusTopic;
 String gLastEvent = "Booting";
 
 bool gDisplayReady = false;
+bool gDisplayAsleep = false;
+unsigned long gLastButtonActivityMs = 0;
+constexpr unsigned long DISPLAY_SLEEP_TIMEOUT_MS = 5UL * 60UL * 1000UL;
 uint8_t gStatsPageIndex = 0;
 
 unsigned long gLastWifiAttemptMs = 0;
@@ -725,8 +728,40 @@ void renderPageScreen() {
   }
 }
 
-void renderDisplay() {
+void sleepDisplay() {
+  if (!gDisplayReady || gDisplayAsleep) {
+    return;
+  }
+  gDisplay.ssd1306_command(SSD1306_DISPLAYOFF);
+  gDisplayAsleep = true;
+  Serial.println("[oled] sleep (inactivity)");
+}
+
+void wakeDisplay() {
   if (!gDisplayReady) {
+    return;
+  }
+  gLastButtonActivityMs = millis();
+  if (!gDisplayAsleep) {
+    return;
+  }
+  gDisplay.ssd1306_command(SSD1306_DISPLAYON);
+  gDisplayAsleep = false;
+  gLastOledRenderMs = 0;
+  Serial.println("[oled] wake (button press)");
+}
+
+void updateDisplaySleep() {
+  if (!gDisplayReady || gDisplayAsleep) {
+    return;
+  }
+  if ((millis() - gLastButtonActivityMs) >= DISPLAY_SLEEP_TIMEOUT_MS) {
+    sleepDisplay();
+  }
+}
+
+void renderDisplay() {
+  if (!gDisplayReady || gDisplayAsleep) {
     return;
   }
 
@@ -760,6 +795,18 @@ void pollButtons() {
     if (rawPressed != button.lastRawPressed) {
       button.lastRawPressed = rawPressed;
       button.lastChangeMs = nowMs;
+      if (rawPressed && gDisplayAsleep) {
+        wakeDisplay();
+        // Consume this press so it only wakes the display without firing an action.
+        button.stablePressed = true;
+        button.pressedAtMs = nowMs;
+        button.longSent = true;
+        continue;
+      }
+    }
+
+    if (rawPressed) {
+      gLastButtonActivityMs = nowMs;
     }
 
     if ((nowMs - button.lastChangeMs) < Config::BUTTON_DEBOUNCE_MS) {
@@ -845,6 +892,7 @@ void setup() {
   initializeButtons();
   initializeDisplay();
   resetMirrorState();
+  gLastButtonActivityMs = millis();
 
   gMqttClient.setServer(Config::MQTT_HOST, Config::MQTT_PORT);
   gMqttClient.setBufferSize(512);
@@ -866,5 +914,6 @@ void loop() {
   pollConsoleState();
   pollButtons();
   pollClimate();
+  updateDisplaySleep();
   renderDisplay();
 }
