@@ -156,7 +156,7 @@ class CameraService {
         standby_active: settingsService.get('display.standbyMode') === true,
         standby_start_time: this.standbyStartTime,
         time_until_shutdown: null,
-        standby_hint: 'Standby only turns the display off. Camera streaming stays available in the dashboard unless Camera Input is disabled.',
+        standby_hint: 'In standby, onboard USB power is off (LEDs + camera). Opening the Camera page turns USB back on until you leave the preview.',
       };
     } catch (error) {
       return {

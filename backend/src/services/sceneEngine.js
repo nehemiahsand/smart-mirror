@@ -344,10 +344,32 @@ class SceneEngine {
         if (typeof cameraService.startShutdownTimer === 'function') {
           cameraService.startShutdownTimer();
         }
+        try {
+          const usbStandbyCamera = require('./usbStandbyCamera');
+          usbStandbyCamera.resetForStandbyEntered();
+        } catch (usbScError) {
+          logger.debug('usbStandbyCamera reset skipped', { error: usbScError.message });
+        }
+        try {
+          const usbPowerService = require('./usbPower');
+          await usbPowerService.setPowerState(false, `standby:${reason || 'standby_on'}`);
+        } catch (usbError) {
+          logger.warn('USB power-off on standby failed', {
+            error: usbError.message,
+          });
+        }
       } else {
         await displayService.turnOn();
         if (typeof cameraService.cancelShutdownTimer === 'function') {
           cameraService.cancelShutdownTimer();
+        }
+        try {
+          const usbPowerService = require('./usbPower');
+          await usbPowerService.setPowerState(true, `wake:${reason || 'standby_off'}`);
+        } catch (usbError) {
+          logger.warn('USB power-on on wake failed', {
+            error: usbError.message,
+          });
         }
       }
     } catch (error) {
