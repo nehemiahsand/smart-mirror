@@ -25,6 +25,7 @@ const layoutRoutes = require('./layout-routes');
 const apiKeyMiddleware = require('../middleware/apiKey');
 const adminOrApiKey = require('../middleware/adminOrApiKey');
 const cameraStreamAuth = require('../middleware/cameraStreamAuth');
+const usbStandbyCamera = require('../services/usbStandbyCamera');
 const { isSensitiveKey, isSensitivePath, redactSensitive } = require('../utils/redaction');
 const { getLoginRateLimitStatus, recordFailedLoginAttempt, recordSuccessfulLogin } = require('../utils/loginRateLimit');
 const { ADMIN_SESSION_TTL_SECONDS, clearAdminSessionCookie, extractAdminToken, setAdminSessionCookie } = require('../utils/requestAuth');
@@ -453,51 +454,73 @@ router.get('/camera/status', async (req, res) => {
 });
 
 router.get('/camera/raw', cameraStreamAuth, async (req, res) => {
+  await usbStandbyCamera.acquireForRawStream();
+
+  let released = false;
+  const releaseOnce = () => {
+    if (!released) {
+      released = true;
+      usbStandbyCamera.releaseForRawStream().catch((err) => {
+        logger.warn('USB standby camera release failed', { error: err.message });
+      });
+    }
+  };
+
   try {
     const http = require('http');
     const CAMERA_URL = process.env.CAMERA_URL || 'http://127.0.0.1:5556';
-    
-    // Parse the URL
+
     const url = new URL(`${CAMERA_URL}/video/raw`);
-    
-    // Make HTTP request to camera service
+
     const options = {
       hostname: url.hostname,
       port: url.port || 5556,
       path: url.pathname,
       method: 'GET'
     };
-    
+
     const proxyReq = http.request(options, (proxyRes) => {
-      // Forward headers
       res.setHeader('Content-Type', proxyRes.headers['content-type'] || 'multipart/x-mixed-replace; boundary=frame');
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
       res.setHeader('Pragma', 'no-cache');
       res.setHeader('Expires', '0');
-      
-      // Pipe the camera stream to the response
+
       proxyRes.pipe(res);
-      
+
       proxyRes.on('error', (err) => {
         logger.error('Camera raw feed proxy error', { error: err.message });
-        res.end();
+        releaseOnce();
+        if (!res.writableEnded) {
+          res.end();
+        }
       });
     });
-    
+
     proxyReq.on('error', (err) => {
       logger.error('Failed to connect to camera service for raw feed', { error: err.message });
-      res.status(500).json({ error: 'Camera raw feed unavailable' });
+      releaseOnce();
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Camera raw feed unavailable' });
+      }
     });
-    
-    proxyReq.end();
-    
-    // Handle client disconnect
+
     req.on('close', () => {
       proxyReq.destroy();
+      releaseOnce();
     });
+
+    res.on('close', () => {
+      proxyReq.destroy();
+      releaseOnce();
+    });
+
+    proxyReq.end();
   } catch (error) {
+    releaseOnce();
     logger.error('Failed to get camera raw feed', { error: error.message });
-    res.status(500).json({ error: 'Camera raw feed unavailable' });
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Camera raw feed unavailable' });
+    }
   }
 });
 
@@ -558,6 +581,11 @@ router.put('/settings/:key', adminAuth, async (req, res) => {
     if (value === undefined) {
       return res.status(400).json({ error: 'Value is required' });
     }
+
+    if (req.params.key === 'display.standbyMode') {
+      await sceneEngine.applyStandbyMode(value === true, `setting:${req.params.key}`);
+      return res.json(settingsService.getAll());
+    }
     
     const settings = await settingsService.update(req.params.key, value);
     
@@ -581,40 +609,22 @@ router.post('/settings', adminAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid request body' });
     }
 
-    if (updates['display.standbyMode'] === true) {
-    } else if (updates['display.standbyMode'] === false) {
+    const standbyMode = updates['display.standbyMode'];
+    const hasStandbyModeUpdate = standbyMode !== undefined;
+    if (hasStandbyModeUpdate) {
+      delete updates['display.standbyMode'];
     }
     
-    const settings = await settingsService.updateMultiple(updates);
+    const settings = Object.keys(updates).length > 0
+      ? await settingsService.updateMultiple(updates)
+      : settingsService.getAll();
     
     // Broadcast settings update via WebSocket
     websocketServer.broadcastSettingsUpdate(settings);
     
-    // Handle standby mode changes - turn display on/off
-    if (updates['display.standbyMode'] !== undefined) {
-      const standbyMode = updates['display.standbyMode'];
-      
-      websocketServer.broadcast({
-        type: 'standby_change',
-        standby: standbyMode,
-        timestamp: Date.now()
-      });
-      
-      // Turn display on/off based on standby mode
-      try {
-        if (standbyMode) {
-          await displayService.turnOff();
-          // Start 30-minute auto-shutdown timer
-          cameraService.startShutdownTimer();
-        } else {
-          await displayService.turnOn();
-          // Cancel auto-shutdown timer when waking manually
-          cameraService.cancelShutdownTimer();
-        }
-      } catch (err) {
-        logger.error('Failed to change display state', { error: err.message });
-      }
-      
+    if (hasStandbyModeUpdate) {
+      await sceneEngine.applyStandbyMode(standbyMode === true, 'settings:post');
+
       // Restart sensor reading
       const restartSensorReading = req.app.get('restartSensorReading');
       if (restartSensorReading) {
@@ -625,7 +635,7 @@ router.post('/settings', adminAuth, async (req, res) => {
     await sceneEngine.handleSettingsChanged('settings:post');
     await consoleService.handleSettingsChanged('settings:post');
     
-    res.json(settings);
+    res.json(settingsService.getAll());
   } catch (error) {
     logger.error('Failed to update settings', { error: error.message });
     res.status(500).json({ error: 'Failed to update settings' });
@@ -640,40 +650,22 @@ router.put('/settings', adminAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid request body' });
     }
 
-    if (updates['display.standbyMode'] === true) {
-    } else if (updates['display.standbyMode'] === false) {
+    const standbyMode = updates['display.standbyMode'];
+    const hasStandbyModeUpdate = standbyMode !== undefined;
+    if (hasStandbyModeUpdate) {
+      delete updates['display.standbyMode'];
     }
     
-    const settings = await settingsService.updateMultiple(updates);
+    const settings = Object.keys(updates).length > 0
+      ? await settingsService.updateMultiple(updates)
+      : settingsService.getAll();
     
     // Broadcast settings update via WebSocket
     websocketServer.broadcastSettingsUpdate(settings);
     
-    // Handle standby mode changes - turn display on/off
-    if (updates['display.standbyMode'] !== undefined) {
-      const standbyMode = updates['display.standbyMode'];
-      
-      websocketServer.broadcast({
-        type: 'standby_change',
-        standby: standbyMode,
-        timestamp: Date.now()
-      });
-      
-      // Turn display on/off based on standby mode
-      try {
-        if (standbyMode) {
-          await displayService.turnOff();
-          // Start 30-minute auto-shutdown timer
-          cameraService.startShutdownTimer();
-        } else {
-          await displayService.turnOn();
-          // Cancel auto-shutdown timer when waking manually
-          cameraService.cancelShutdownTimer();
-        }
-      } catch (err) {
-        logger.error('Failed to change display state', { error: err.message });
-      }
-      
+    if (hasStandbyModeUpdate) {
+      await sceneEngine.applyStandbyMode(standbyMode === true, 'settings:put');
+
       // Restart sensor reading
       const restartSensorReading = req.app.get('restartSensorReading');
       if (restartSensorReading) {
@@ -684,7 +676,7 @@ router.put('/settings', adminAuth, async (req, res) => {
     await sceneEngine.handleSettingsChanged('settings:put');
     await consoleService.handleSettingsChanged('settings:put');
     
-    res.json(settings);
+    res.json(settingsService.getAll());
   } catch (error) {
     logger.error('Failed to update settings', { error: error.message });
     res.status(500).json({ error: 'Failed to update settings' });
