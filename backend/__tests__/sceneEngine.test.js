@@ -251,4 +251,68 @@ describe('SceneEngine button-driven standby handling', () => {
     expect(cameraService.setCameraEnabled).not.toHaveBeenCalled();
     expect(consoleService.openPage).not.toHaveBeenCalled();
   });
+
+  it('accepts page toggles after the ESP32 timestamp resets on reboot', async () => {
+    const { sceneEngine, consoleService, websocketServer } = createSceneEngineTestContext();
+
+    await sceneEngine.handleEsp32Event({
+      type: 'display.page.toggle',
+      deviceId: 'mirror-entry-1',
+      timestamp: 120000,
+      payload: {
+        hold: false,
+      },
+    });
+
+    jest.advanceTimersByTime(700);
+
+    consoleService.getState.mockReturnValue({
+      activePageId: 'weather',
+      pageId: 'weather',
+    });
+
+    await sceneEngine.handleEsp32Event({
+      type: 'display.page.toggle',
+      deviceId: 'mirror-entry-1',
+      timestamp: 1500,
+      payload: {
+        hold: false,
+      },
+    });
+
+    expect(consoleService.openPage).toHaveBeenNthCalledWith(1, 'weather', 'esp32_toggle');
+    expect(consoleService.openPage).toHaveBeenNthCalledWith(2, 'sports', 'esp32_toggle');
+    expect(websocketServer.broadcastPageChange).toHaveBeenNthCalledWith(2, 'sports', { source: 'esp32_toggle' });
+  });
+
+  it('tracks display toggle cooldown separately per ESP32 device', async () => {
+    const { sceneEngine, consoleService, websocketServer } = createSceneEngineTestContext();
+
+    await sceneEngine.handleEsp32Event({
+      type: 'display.page.toggle',
+      deviceId: 'mirror-entry-1',
+      timestamp: 1000,
+      payload: {
+        hold: false,
+      },
+    });
+
+    consoleService.getState.mockReturnValue({
+      activePageId: 'weather',
+      pageId: 'weather',
+    });
+
+    await sceneEngine.handleEsp32Event({
+      type: 'display.page.toggle',
+      deviceId: 'mirror-entry-2',
+      timestamp: 1000,
+      payload: {
+        hold: false,
+      },
+    });
+
+    expect(consoleService.openPage).toHaveBeenNthCalledWith(1, 'weather', 'esp32_toggle');
+    expect(consoleService.openPage).toHaveBeenNthCalledWith(2, 'sports', 'esp32_toggle');
+    expect(websocketServer.broadcastPageChange).toHaveBeenNthCalledWith(2, 'sports', { source: 'esp32_toggle' });
+  });
 });

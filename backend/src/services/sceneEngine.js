@@ -76,39 +76,66 @@ class SceneEngine {
       lastInputEvent: null,
       updatedAt: Date.now(),
     };
-    this.lastDisplayToggleHandledAt = 0;
-    this.lastDisplayToggleEventTimestamp = 0;
+    this.displayToggleStateByDevice = new Map();
   }
 
   shouldIgnoreDisplayToggle(event = {}) {
     const now = Date.now();
+    const deviceId = String(event.deviceId || 'unknown');
     const eventTimestamp = Number(event.timestamp);
     const hasEventTimestamp = Number.isFinite(eventTimestamp) && eventTimestamp > 0;
+    const toggleState = this.displayToggleStateByDevice.get(deviceId) || {
+      lastHandledAt: 0,
+      lastEventTimestamp: 0,
+    };
 
-    if (hasEventTimestamp && this.lastDisplayToggleEventTimestamp > 0 && eventTimestamp <= this.lastDisplayToggleEventTimestamp) {
-      logger.info('Ignoring stale display toggle (duplicate or out-of-order timestamp)', {
-        eventTimestamp,
-        lastDisplayToggleEventTimestamp: this.lastDisplayToggleEventTimestamp,
-      });
-      return true;
+    if (hasEventTimestamp && toggleState.lastEventTimestamp > 0) {
+      if (eventTimestamp === toggleState.lastEventTimestamp) {
+        logger.info('Ignoring stale display toggle (duplicate timestamp)', {
+          deviceId,
+          eventTimestamp,
+          lastDisplayToggleEventTimestamp: toggleState.lastEventTimestamp,
+        });
+        return true;
+      }
+
+      if (eventTimestamp < toggleState.lastEventTimestamp) {
+        const rebootResetThresholdMs = 30000;
+        const likelyDeviceRestart =
+          (toggleState.lastEventTimestamp - eventTimestamp) > rebootResetThresholdMs;
+
+        if (!likelyDeviceRestart) {
+          logger.info('Ignoring stale display toggle (out-of-order timestamp)', {
+            deviceId,
+            eventTimestamp,
+            lastDisplayToggleEventTimestamp: toggleState.lastEventTimestamp,
+          });
+          return true;
+        }
+
+        logger.info('Detected ESP32 toggle timestamp reset; accepting new toggle sequence', {
+          deviceId,
+          eventTimestamp,
+          lastDisplayToggleEventTimestamp: toggleState.lastEventTimestamp,
+        });
+      }
     }
 
     // Protect against delayed duplicate MQTT button events.
     const toggleCooldownMs = 600;
-    if (this.lastDisplayToggleHandledAt > 0 && (now - this.lastDisplayToggleHandledAt) < toggleCooldownMs) {
+    if (toggleState.lastHandledAt > 0 && (now - toggleState.lastHandledAt) < toggleCooldownMs) {
       logger.info('Ignoring rapid display toggle during cooldown window', {
+        deviceId,
         cooldownMs: toggleCooldownMs,
-        elapsedMs: now - this.lastDisplayToggleHandledAt,
+        elapsedMs: now - toggleState.lastHandledAt,
       });
       return true;
     }
 
-    this.lastDisplayToggleHandledAt = now;
-    if (hasEventTimestamp) {
-      this.lastDisplayToggleEventTimestamp = eventTimestamp;
-    } else {
-      this.lastDisplayToggleEventTimestamp = now;
-    }
+    this.displayToggleStateByDevice.set(deviceId, {
+      lastHandledAt: now,
+      lastEventTimestamp: hasEventTimestamp ? eventTimestamp : now,
+    });
     return false;
   }
 
