@@ -120,6 +120,13 @@ Traffic widget settings (under the `traffic` key):
 Backend caches each origin→destination route for 10 minutes, so N destinations
 cost ~N routing calls per refresh.
 
+If `traffic.enabled` is lost or set to false but the mirror UI still shows the
+traffic widget (`widgets.traffic`), commute still works when `backend/.env`
+defines `TOMTOM_API_KEY` (or Google Maps), `TRAFFIC_ORIGIN`, and either
+`TRAFFIC_DESTINATION` or `TRAFFIC_DESTINATIONS_JSON` (JSON array of
+`{ label, address }`). When settings omit destinations but env provides them,
+those env destinations are used as a fill-in.
+
 ## Start, Check, and Verify
 
 Start the core services manually:

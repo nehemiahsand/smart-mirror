@@ -49,6 +49,40 @@ const upload = multer({
 const router = express.Router();
 const adminAuth = require('../middleware/adminAuth');
 
+/** Parsed commute endpoints from env when settings reset but widget stays on */
+function parseTrafficDestinationsFromEnv() {
+  const raw = process.env.TRAFFIC_DESTINATIONS_JSON;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((d) => {
+            if (typeof d === 'string') {
+              const address = d.trim();
+              return address ? { label: 'Destination', address } : null;
+            }
+            if (!d || typeof d !== 'object') return null;
+            const address = String(d.address || '').trim();
+            if (!address) return null;
+            return {
+              label: String(d.label || 'Destination').trim() || 'Destination',
+              address
+            };
+          })
+          .filter(Boolean);
+      }
+    } catch (error) {
+      logger.warn('TRAFFIC_DESTINATIONS_JSON invalid', { error: error.message });
+    }
+  }
+  const single = String(process.env.TRAFFIC_DESTINATION || '').trim();
+  if (single) {
+    return [{ label: 'Destination', address: single }];
+  }
+  return [];
+}
+
 // Mount layout routes
 router.use(layoutRoutes);
 
@@ -1244,23 +1278,39 @@ router.get('/traffic/commute', async (req, res) => {
   try {
     const settings = settingsService.getAll();
     const trafficSettings = settings.traffic || {};
-    
-    if (!trafficSettings.enabled) {
+
+    const widgetOn = settings.widgets?.traffic !== false;
+    const envDestinations = parseTrafficDestinationsFromEnv();
+    const envOrigin = String(process.env.TRAFFIC_ORIGIN || '').trim();
+    const tomtomApiKey = trafficSettings.tomtomApiKey || process.env.TOMTOM_API_KEY || '';
+    const googleMapsApiKey = trafficSettings.googleMapsApiKey || process.env.GOOGLE_MAPS_API_KEY || '';
+    const hasProviderKey = Boolean(tomtomApiKey || googleMapsApiKey);
+
+    const useEnvFallback =
+      widgetOn &&
+      !trafficSettings.enabled &&
+      hasProviderKey &&
+      Boolean(envOrigin) &&
+      envDestinations.length > 0;
+
+    if (!trafficSettings.enabled && !useEnvFallback) {
       return res.status(400).json({ error: 'Traffic widget not configured' });
     }
 
-    const origin = trafficSettings.origin || process.env.TRAFFIC_ORIGIN || '';
-    const tomtomApiKey = trafficSettings.tomtomApiKey || process.env.TOMTOM_API_KEY || '';
-    const googleMapsApiKey = trafficSettings.googleMapsApiKey || process.env.GOOGLE_MAPS_API_KEY || '';
+    const origin = String(trafficSettings.origin || '').trim() || envOrigin;
 
-    // Build destinations list: prefer the new `destinations` array, fall back
-    // to legacy single `destination` string for backwards compatibility.
+    // Build destinations list: prefer settings array, then legacy single field,
+    // then env fallback (covers wiped settings.json while widget stays enabled).
     let destinations = Array.isArray(trafficSettings.destinations)
       ? trafficSettings.destinations.filter((d) => d && (typeof d === 'string' ? d.trim() : d.address))
       : [];
 
     if (destinations.length === 0 && trafficSettings.destination) {
       destinations = [{ label: 'Destination', address: trafficSettings.destination }];
+    }
+
+    if (destinations.length === 0 && envDestinations.length > 0) {
+      destinations = envDestinations;
     }
 
     if (!origin || destinations.length === 0) {
