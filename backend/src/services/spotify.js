@@ -182,6 +182,79 @@ class SpotifyService {
         }
     }
 
+    isNoActiveDeviceError(error) {
+        if (error.response?.status !== 404) {
+            return false;
+        }
+
+        const spotifyError = error.response?.data?.error || {};
+        const reason = String(spotifyError.reason || '').toUpperCase();
+        const message = String(spotifyError.message || error.message || '').toLowerCase();
+        return reason === 'NO_ACTIVE_DEVICE' || message.includes('no active device');
+    }
+
+    selectPlaybackDevice(devices = []) {
+        const availableDevices = Array.isArray(devices)
+            ? devices.filter((device) => device && device.id && device.is_restricted !== true)
+            : [];
+
+        const activeDevice = availableDevices.find((device) => device.is_active === true);
+        if (activeDevice) {
+            return activeDevice;
+        }
+
+        const settings = settingsService.get('spotify') || {};
+        const preferredDeviceId = settings.deviceId || settings.preferredDeviceId;
+        if (preferredDeviceId) {
+            const preferredDevice = availableDevices.find((device) => device.id === preferredDeviceId);
+            if (preferredDevice) {
+                return preferredDevice;
+            }
+        }
+
+        const preferredDeviceName = String(settings.deviceName || settings.preferredDeviceName || '').trim().toLowerCase();
+        if (preferredDeviceName) {
+            const preferredNamedDevice = availableDevices.find((device) => (
+                String(device.name || '').trim().toLowerCase() === preferredDeviceName
+            ));
+            if (preferredNamedDevice) {
+                return preferredNamedDevice;
+            }
+        }
+
+        return availableDevices[0] || null;
+    }
+
+    async getPlaybackDevice() {
+        const devicesResponse = await this.getDevices();
+        const device = this.selectPlaybackDevice(devicesResponse?.devices || []);
+        if (!device) {
+            throw new Error('No available Spotify playback devices');
+        }
+        return device;
+    }
+
+    async activatePlaybackDevice(play = false) {
+        const device = await this.getPlaybackDevice();
+        if (!device.is_active) {
+            await this.transferPlayback(device.id, play);
+            logger.info('Spotify playback transferred to available device', {
+                deviceName: device.name,
+                play,
+            });
+        }
+        return device;
+    }
+
+    async retryWithActiveDevice(error, retry, { play = false } = {}) {
+        if (!this.isNoActiveDeviceError(error)) {
+            throw error;
+        }
+
+        const device = await this.activatePlaybackDevice(play);
+        return retry(device);
+    }
+
     // Playback Control Methods
     async getCurrentPlayback() {
         return this.makeRequest('GET', '/me/player');
@@ -194,7 +267,14 @@ class SpotifyService {
     async play(deviceId = null, contextUri = null) {
         const endpoint = deviceId ? `/me/player/play?device_id=${deviceId}` : '/me/player/play';
         const data = contextUri ? { context_uri: contextUri } : undefined;
-        return this.makeRequest('PUT', endpoint, data);
+        try {
+            return await this.makeRequest('PUT', endpoint, data);
+        } catch (error) {
+            return this.retryWithActiveDevice(error, (device) => {
+                const retryEndpoint = `/me/player/play?device_id=${encodeURIComponent(device.id)}`;
+                return this.makeRequest('PUT', retryEndpoint, data);
+            }, { play: false });
+        }
     }
 
     async playLikedSongs() {
@@ -210,15 +290,35 @@ class SpotifyService {
     }
 
     async pause() {
-        return this.makeRequest('PUT', '/me/player/pause');
+        try {
+            return await this.makeRequest('PUT', '/me/player/pause');
+        } catch (error) {
+            if (this.isNoActiveDeviceError(error)) {
+                logger.info('Spotify pause skipped because no active playback device is available');
+                return null;
+            }
+            throw error;
+        }
     }
 
     async next() {
-        return this.makeRequest('POST', '/me/player/next');
+        try {
+            return await this.makeRequest('POST', '/me/player/next');
+        } catch (error) {
+            return this.retryWithActiveDevice(error, (device) => (
+                this.makeRequest('POST', `/me/player/next?device_id=${encodeURIComponent(device.id)}`)
+            ), { play: true });
+        }
     }
 
     async previous() {
-        return this.makeRequest('POST', '/me/player/previous');
+        try {
+            return await this.makeRequest('POST', '/me/player/previous');
+        } catch (error) {
+            return this.retryWithActiveDevice(error, (device) => (
+                this.makeRequest('POST', `/me/player/previous?device_id=${encodeURIComponent(device.id)}`)
+            ), { play: true });
+        }
     }
 
     async setVolume(volumePercent) {
