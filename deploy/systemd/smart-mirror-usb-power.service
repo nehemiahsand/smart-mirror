@@ -1,0 +1,9 @@
+[Unit]
+Description=Set Pi 5 USB 3 power for the mirror LED strip
+After=docker.service
+
+[Service]
+Type=oneshot
+User=root
+Environment=USB_POWER_PI5_STRATEGY=ganged
+ExecStart=/home/smartmirror/Downloads/smart-mirror/deploy/scripts/set-led-usb-power.sh

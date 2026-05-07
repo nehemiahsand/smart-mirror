@@ -64,6 +64,7 @@ services:
       - WAYLAND_DISPLAY=wayland-0
       - XDG_RUNTIME_DIR=/run/user/1000
       - MQTT_BROKER_URL=mqtt://mosquitto:1883
+      - USB_STANDBY_CAMERA_SETTLE_MS=2500
     ports:
       - "80:3001"
     user: "1000:1000"

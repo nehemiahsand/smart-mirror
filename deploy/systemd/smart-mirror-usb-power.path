@@ -1,0 +1,10 @@
+[Unit]
+Description=Smart Mirror USB power state watcher
+After=docker.service
+
+[Path]
+PathModified=/home/smartmirror/Downloads/smart-mirror/backend/data/usb-power-state
+Unit=smart-mirror-usb-power.service
+
+[Install]
+WantedBy=multi-user.target
