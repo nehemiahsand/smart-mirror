@@ -1118,7 +1118,7 @@ router.post('/display/message', adminAuth, async (req, res) => {
 // Get calendar events
 router.get('/calendar/events', async (req, res) => {
   try {
-    if (!googleCalendarService.isInitialized()) {
+    if (!(await googleCalendarService.ensureInitialized())) {
       return res.status(401).json({ error: 'AUTH_NEEDED' });
     }
 
@@ -1165,17 +1165,18 @@ router.post('/calendar/authorize', adminAuth, async (req, res) => {
 });
 
 // Get calendar status
-router.get('/calendar/status', (req, res) => {
-  res.json({ 
-    initialized: googleCalendarService.isInitialized(),
-    needsAuth: !googleCalendarService.isInitialized()
+router.get('/calendar/status', async (req, res) => {
+  const initialized = await googleCalendarService.ensureInitialized();
+  res.json({
+    initialized,
+    needsAuth: !initialized
   });
 });
 
 // Get list of all calendars
 router.get('/calendar/list', async (req, res) => {
   try {
-    if (!googleCalendarService.isInitialized()) {
+    if (!(await googleCalendarService.ensureInitialized())) {
       return res.status(401).json({ error: 'AUTH_NEEDED' });
     }
     const calendars = await googleCalendarService.getCalendarList();

@@ -7,12 +7,63 @@ const { consumeOAuthState, issueOAuthState } = require('../utils/oauthState');
 const CREDENTIALS_PATH = path.join(__dirname, '../../data/calendar-credentials.json');
 const TOKEN_PATH = path.join(__dirname, '../../data/calendar-token.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
+const TRANSIENT_REFRESH_RETRIES = 4;
+const TRANSIENT_REFRESH_DELAY_MS = 3000;
+
+function isTransientNetworkError(error) {
+    const code = error?.code || error?.errno || error?.cause?.code;
+    const transientCodes = new Set(['EAI_AGAIN', 'ENOTFOUND', 'ETIMEDOUT', 'ECONNRESET', 'ECONNREFUSED']);
+    return transientCodes.has(code);
+}
+
+function delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 class GoogleCalendarService {
     constructor() {
         this.calendar = null;
         this.initialized = false;
         this.oAuth2Client = null;
+    }
+
+    tokenNeedsRefresh(token) {
+        if (!token?.refresh_token) {
+            return false;
+        }
+        if (!token.expiry_date) {
+            return true;
+        }
+        return token.expiry_date <= (Date.now() + TOKEN_REFRESH_BUFFER_MS);
+    }
+
+    async refreshAccessTokenWithRetry(reason = 'refresh') {
+        let lastError;
+        for (let attempt = 1; attempt <= TRANSIENT_REFRESH_RETRIES; attempt += 1) {
+            try {
+                const { credentials } = await this.oAuth2Client.refreshAccessToken();
+                const updatedTokens = await this.saveTokens(credentials);
+                this.oAuth2Client.setCredentials(updatedTokens);
+                logger.info('Google Calendar access token refreshed', { reason, attempt });
+                return updatedTokens;
+            } catch (error) {
+                lastError = error;
+                const transient = isTransientNetworkError(error);
+                logger.warn('Google Calendar token refresh attempt failed', {
+                    reason,
+                    attempt,
+                    transient,
+                    error: error.message,
+                    code: error.code
+                });
+                if (!transient || attempt === TRANSIENT_REFRESH_RETRIES) {
+                    throw error;
+                }
+                await delay(TRANSIENT_REFRESH_DELAY_MS * attempt);
+            }
+        }
+        throw lastError;
     }
 
     async saveTokens(tokens = {}) {
@@ -75,35 +126,50 @@ class GoogleCalendarService {
             try {
                 const tokenContent = await fs.readFile(TOKEN_PATH, 'utf8');
                 const token = JSON.parse(tokenContent);
-                this.oAuth2Client.setCredentials(token);
-                
-                // Check if token is expired and refresh it proactively
-                const expiryDate = token.expiry_date;
-                if (expiryDate && expiryDate < Date.now()) {
-                    logger.info('Access token expired, refreshing...');
-                    try {
-                        // This will automatically trigger the 'tokens' event handler
-                        await this.oAuth2Client.getAccessToken();
-                        logger.info('Token refreshed successfully');
-                    } catch (refreshError) {
-                        logger.error('Failed to refresh token on initialization:', refreshError);
-                        // If refresh fails, mark as not initialized so user can re-auth
-                        this.initialized = false;
-                        return;
-                    }
+
+                if (!token.refresh_token) {
+                    logger.warn('Google Calendar token missing refresh_token; re-authorization required');
+                    this.initialized = false;
+                    return;
                 }
-                
+
+                this.oAuth2Client.setCredentials(token);
+
+                if (this.tokenNeedsRefresh(token)) {
+                    logger.info('Access token expired or near expiry, refreshing...');
+                    await this.refreshAccessTokenWithRetry('startup');
+                }
+
                 this.calendar = google.calendar({ version: 'v3', auth: this.oAuth2Client });
                 this.initialized = true;
                 logger.info('Google Calendar service initialized');
-            } catch {
-                logger.info('Google Calendar token not found. Authorization needed.');
+            } catch (tokenError) {
+                if (tokenError.code === 'ENOENT') {
+                    logger.info('Google Calendar token not found. Authorization needed.');
+                } else {
+                    logger.error('Failed to initialize Google Calendar from saved token', {
+                        error: tokenError.message,
+                        code: tokenError.code
+                    });
+                }
                 this.initialized = false;
             }
         } catch (error) {
             logger.error('Failed to initialize Google Calendar service:', error);
             this.initialized = false;
         }
+    }
+
+    /**
+     * Re-attempt initialization when startup refresh failed transiently (e.g. DNS).
+     * Safe to call from API routes before serving calendar data.
+     */
+    async ensureInitialized() {
+        if (this.initialized) {
+            return true;
+        }
+        await this.initialize();
+        return this.initialized;
     }
 
     async getAuthUrl() {
@@ -289,21 +355,16 @@ class GoogleCalendarService {
                 logger.warn('Authentication error detected, attempting to refresh token');
                 
                 try {
-                    // Force a token refresh
-                    const { credentials } = await this.oAuth2Client.refreshAccessToken();
-                    this.oAuth2Client.setCredentials(credentials);
-                    
-                    // Save the new tokens
-                    const updatedTokens = await this.saveTokens(credentials);
-                    this.oAuth2Client.setCredentials(updatedTokens);
-                    
-                    logger.info('Token refreshed successfully after 401, retrying request');
-                    
-                    // Retry the request once
+                    await this.refreshAccessTokenWithRetry('api_error');
+                    logger.info('Token refreshed successfully after auth error, retrying request');
                     return this.getEventsInternal(maxResults, daysAhead);
                 } catch (refreshError) {
                     logger.error('Failed to refresh token after auth error:', refreshError);
-                    this.initialized = false;
+                    const revoked = refreshError.message?.includes('invalid_grant')
+                        || refreshError.response?.data?.error === 'invalid_grant';
+                    if (revoked) {
+                        this.initialized = false;
+                    }
                     throw new Error('AUTH_NEEDED');
                 }
             }

@@ -269,9 +269,9 @@ async function start() {
     logger.info('Console service initialized');
 
     if (googleCalendarService.isInitialized()) {
-      logger.info('Google Calendar service initialized');
+      logger.info('Google Calendar service ready');
     } else {
-      logger.info('Google Calendar not configured - authorization needed');
+      logger.info('Google Calendar unavailable at startup (will retry on next calendar request)');
     }
 
     // Initialize WebSocket server
