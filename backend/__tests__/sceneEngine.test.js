@@ -91,6 +91,10 @@ function createSceneEngineTestContext(overrides = {}) {
       pageId: 'home',
     })),
     openPage: jest.fn(async () => ({})),
+    nextPage: jest.fn(async () => ({
+      activePageId: 'weather',
+      pageId: 'weather',
+    })),
     handleEsp32Event: jest.fn(async () => ({})),
     isStatsOverlayActive: jest.fn(() => false),
   };
@@ -154,8 +158,9 @@ describe('SceneEngine button-driven standby handling', () => {
       },
     });
 
-    expect(consoleService.openPage).toHaveBeenCalledWith('weather', 'esp32_toggle');
-    expect(websocketServer.broadcastPageChange).toHaveBeenCalledWith('weather', { source: 'esp32_toggle' });
+    expect(consoleService.nextPage).toHaveBeenCalledWith('esp32_toggle');
+    expect(consoleService.openPage).not.toHaveBeenCalled();
+    expect(websocketServer.broadcastPageChange).not.toHaveBeenCalled();
   });
 
   it('enters standby on a held display.page.toggle press while awake', async () => {
@@ -173,6 +178,7 @@ describe('SceneEngine button-driven standby handling', () => {
     expect(settingsData.display.standbyMode).toBe(true);
     expect(displayService.turnOff).toHaveBeenCalledTimes(1);
     expect(cameraService.setCameraEnabled).not.toHaveBeenCalled();
+    expect(consoleService.nextPage).not.toHaveBeenCalled();
     expect(consoleService.openPage).not.toHaveBeenCalled();
   });
 
@@ -230,6 +236,7 @@ describe('SceneEngine button-driven standby handling', () => {
     });
 
     expect(settingsData.display.standbyMode).toBe(false);
+    expect(consoleService.nextPage).not.toHaveBeenCalled();
     expect(consoleService.openPage).not.toHaveBeenCalled();
   });
 
@@ -249,6 +256,7 @@ describe('SceneEngine button-driven standby handling', () => {
     expect(settingsData.display.standbyMode).toBe(true);
     expect(displayService.turnOff).toHaveBeenCalledTimes(1);
     expect(cameraService.setCameraEnabled).not.toHaveBeenCalled();
+    expect(consoleService.nextPage).not.toHaveBeenCalled();
     expect(consoleService.openPage).not.toHaveBeenCalled();
   });
 
@@ -266,10 +274,9 @@ describe('SceneEngine button-driven standby handling', () => {
 
     jest.advanceTimersByTime(700);
 
-    consoleService.getState.mockReturnValue({
-      activePageId: 'weather',
-      pageId: 'weather',
-    });
+    consoleService.nextPage
+      .mockResolvedValueOnce({ activePageId: 'weather', pageId: 'weather' })
+      .mockResolvedValueOnce({ activePageId: 'sports', pageId: 'sports' });
 
     await sceneEngine.handleEsp32Event({
       type: 'display.page.toggle',
@@ -280,9 +287,10 @@ describe('SceneEngine button-driven standby handling', () => {
       },
     });
 
-    expect(consoleService.openPage).toHaveBeenNthCalledWith(1, 'weather', 'esp32_toggle');
-    expect(consoleService.openPage).toHaveBeenNthCalledWith(2, 'sports', 'esp32_toggle');
-    expect(websocketServer.broadcastPageChange).toHaveBeenNthCalledWith(2, 'sports', { source: 'esp32_toggle' });
+    expect(consoleService.nextPage).toHaveBeenNthCalledWith(1, 'esp32_toggle');
+    expect(consoleService.nextPage).toHaveBeenNthCalledWith(2, 'esp32_toggle');
+    expect(consoleService.openPage).not.toHaveBeenCalled();
+    expect(websocketServer.broadcastPageChange).not.toHaveBeenCalled();
   });
 
   it('tracks display toggle cooldown separately per ESP32 device', async () => {
@@ -297,10 +305,9 @@ describe('SceneEngine button-driven standby handling', () => {
       },
     });
 
-    consoleService.getState.mockReturnValue({
-      activePageId: 'weather',
-      pageId: 'weather',
-    });
+    consoleService.nextPage
+      .mockResolvedValueOnce({ activePageId: 'weather', pageId: 'weather' })
+      .mockResolvedValueOnce({ activePageId: 'sports', pageId: 'sports' });
 
     await sceneEngine.handleEsp32Event({
       type: 'display.page.toggle',
@@ -311,8 +318,9 @@ describe('SceneEngine button-driven standby handling', () => {
       },
     });
 
-    expect(consoleService.openPage).toHaveBeenNthCalledWith(1, 'weather', 'esp32_toggle');
-    expect(consoleService.openPage).toHaveBeenNthCalledWith(2, 'sports', 'esp32_toggle');
-    expect(websocketServer.broadcastPageChange).toHaveBeenNthCalledWith(2, 'sports', { source: 'esp32_toggle' });
+    expect(consoleService.nextPage).toHaveBeenNthCalledWith(1, 'esp32_toggle');
+    expect(consoleService.nextPage).toHaveBeenNthCalledWith(2, 'esp32_toggle');
+    expect(consoleService.openPage).not.toHaveBeenCalled();
+    expect(websocketServer.broadcastPageChange).not.toHaveBeenCalled();
   });
 });

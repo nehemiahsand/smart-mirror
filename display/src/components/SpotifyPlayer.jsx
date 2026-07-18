@@ -5,7 +5,7 @@ import { apiFetch } from '../api/apiClient';
 
 const API_BASE = '/api/spotify';
 
-export default function SpotifyPlayer() {
+export default function SpotifyPlayer({ isActive = false }) {
     const [currentTrack, setCurrentTrack] = useState(null);
     const [isPlaying, setIsPlaying] = useState(false);
     const [progress, setProgress] = useState(0);
@@ -23,12 +23,12 @@ export default function SpotifyPlayer() {
 
     // Poll for current playback
     useEffect(() => {
-        if (!isAuthenticated) return;
+        if (!isActive || !isAuthenticated) return undefined;
 
         fetchCurrentTrack();
         const interval = setInterval(fetchCurrentTrack, 2000);
         return () => clearInterval(interval);
-    }, [isAuthenticated]);
+    }, [isActive, isAuthenticated]);
 
     // Fetch playlist name when context changes
     useEffect(() => {

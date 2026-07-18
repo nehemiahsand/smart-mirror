@@ -286,7 +286,7 @@ function getSectionOrder(settings, sectionId) {
     return index === -1 ? 999 : index;
 }
 
-export default function SportsPage({ pageData, settings }) {
+export default function SportsPage({ pageData, settings, isActive = false }) {
     const [videoFeed, setVideoFeed] = useState(pageData?.videoFeed || null);
     const [loading, setLoading] = useState(!pageData);
 
@@ -304,6 +304,10 @@ export default function SportsPage({ pageData, settings }) {
     }, [pageData]);
 
     useEffect(() => {
+        if (!isActive) {
+            return undefined;
+        }
+
         let mounted = true;
 
         const fetchSportsPage = async () => {
@@ -327,10 +331,10 @@ export default function SportsPage({ pageData, settings }) {
         return () => {
             mounted = false;
         };
-    }, []);
+    }, [isActive]);
 
     useEffect(() => {
-        if (!videoFeed?.unavailable) {
+        if (!isActive || !videoFeed?.unavailable) {
             return undefined;
         }
 
@@ -351,7 +355,7 @@ export default function SportsPage({ pageData, settings }) {
             cancelled = true;
             clearTimeout(retryTimeoutId);
         };
-    }, [videoFeed]);
+    }, [isActive, videoFeed]);
 
     return (
         <div className="mirror sports-page">
@@ -385,5 +389,6 @@ SportsPage.propTypes = {
     }),
     settings: PropTypes.shape({
         sportsWidgetOrder: PropTypes.array
-    })
+    }),
+    isActive: PropTypes.bool
 };

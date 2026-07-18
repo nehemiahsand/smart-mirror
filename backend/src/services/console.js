@@ -743,11 +743,24 @@ class ConsoleService {
     }
 
     this.touchInteraction(`open:${normalizedPageId}:${source}`);
+    const presentedPageId = getPresentedPageId(normalizedPageId);
+    settingsService.update('current_page', presentedPageId).catch((error) => {
+      logger.error('Failed to persist current page', {
+        error: error.message,
+        page: presentedPageId,
+        source,
+      });
+    });
     this.broadcastState();
     if (this.isManualPage(normalizedPageId)) {
       await this.broadcastPageData(normalizedPageId);
     }
     return this.getState();
+  }
+
+  async nextPage(source = 'api') {
+    const nextPageId = this.getNextPageId(1);
+    return this.openPage(nextPageId, source);
   }
 
   async closeInteractive(source = 'api') {
