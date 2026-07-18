@@ -374,9 +374,6 @@ class WebSocketServer {
           return;
         }
         consoleService.openPage(data.page, 'display_sync')
-          .then((state) => {
-            this.broadcastPageChange(state?.activePageId || data.page, { source: 'display_sync' });
-          })
           .catch((error) => {
             logger.error('Failed to sync console page from display', {
               error: error.message,

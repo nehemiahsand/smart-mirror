@@ -2,8 +2,6 @@ const logger = require('../utils/logger');
 const consoleService = require('./console');
 const settingsService = require('./settings');
 
-const DISPLAY_PAGE_ORDER = ['home', 'weather', 'sports', 'spotify'];
-
 function parseClockValue(value) {
   if (typeof value !== 'string' || !value.includes(':')) {
     return null;
@@ -290,7 +288,6 @@ class SceneEngine {
   async persistIdentity(sceneState) {
     await settingsService.updateMultiple({
       current_scene: sceneState.activeSceneId,
-      current_page: sceneState.pageAlias,
     });
   }
 
@@ -540,15 +537,8 @@ class SceneEngine {
         return this.applyStandbyMode(true, 'button:standby_toggle');
       }
 
-      const websocketServer = require('../api/websocket');
-      const consoleState = consoleService.getState();
-      const displayedPage = String(consoleState.pageId || settingsService.get('current_page') || 'home');
-      const currentPage = DISPLAY_PAGE_ORDER.includes(displayedPage) ? displayedPage : 'home';
-      const currentIndex = DISPLAY_PAGE_ORDER.indexOf(currentPage);
-      const nextPage = DISPLAY_PAGE_ORDER[(currentIndex + 1) % DISPLAY_PAGE_ORDER.length];
-
-      await consoleService.openPage(nextPage, 'esp32_toggle');
-      websocketServer.broadcastPageChange(nextPage, { source: 'esp32_toggle' });
+      const state = await consoleService.nextPage('esp32_toggle');
+      const nextPage = state?.pageId || state?.activePageId || 'home';
       return this.refreshState({ source: 'esp32', reason: `display.page.toggle:${nextPage}`, broadcast: true, persist: true });
     }
 

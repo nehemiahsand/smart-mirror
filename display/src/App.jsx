@@ -219,13 +219,21 @@ function App() {
             </div>
 
             <div style={{ display: currentPage === 'weather' ? 'block' : 'none' }}>
-                <WeatherPage pageData={consolePageData.weather} settings={settings} />
+                <WeatherPage
+                    pageData={consolePageData.weather}
+                    settings={settings}
+                    isActive={currentPage === 'weather'}
+                />
             </div>
             <div style={{ display: currentPage === 'sports' ? 'block' : 'none' }}>
-                <SportsPage pageData={consolePageData.sports} settings={settings} />
+                <SportsPage
+                    pageData={consolePageData.sports}
+                    settings={settings}
+                    isActive={currentPage === 'sports'}
+                />
             </div>
             <div style={{ display: currentPage === 'spotify' ? 'block' : 'none' }}>
-                <SpotifyPlayer />
+                <SpotifyPlayer isActive={currentPage === 'spotify'} />
             </div>
 
             {/* Page Indicator */}

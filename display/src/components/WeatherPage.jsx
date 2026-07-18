@@ -463,7 +463,7 @@ HourlyWeather.propTypes = {
     })
 };
 
-export default function WeatherPage({ pageData, settings }) {
+export default function WeatherPage({ pageData, settings, isActive = false }) {
     const [data, setData] = useState(pageData || null);
 
     useEffect(() => {
@@ -473,6 +473,10 @@ export default function WeatherPage({ pageData, settings }) {
     }, [pageData]);
 
     useEffect(() => {
+        if (!isActive) {
+            return undefined;
+        }
+
         let mounted = true;
 
         const fetchWeatherPage = async () => {
@@ -494,7 +498,7 @@ export default function WeatherPage({ pageData, settings }) {
             mounted = false;
             clearInterval(intervalId);
         };
-    }, []);
+    }, [isActive]);
 
     return (
         <div className="mirror weather-page">
@@ -537,5 +541,6 @@ WeatherPage.propTypes = {
     }),
     settings: PropTypes.shape({
         weatherWidgetOrder: PropTypes.array
-    })
+    }),
+    isActive: PropTypes.bool
 };

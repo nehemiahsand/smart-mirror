@@ -465,7 +465,6 @@ router.post('/display/page', adminAuth, async (req, res) => {
     }
     const state = await consoleService.openPage(page, 'admin_route');
     const activePageId = state?.activePageId || page;
-    websocketServer.broadcastPageChange(activePageId, { source: 'admin_route' });
     res.json({ success: true, page: activePageId });
   } catch (error) {
     const status = /Invalid page change request|Unknown or disabled console page/.test(error.message)
