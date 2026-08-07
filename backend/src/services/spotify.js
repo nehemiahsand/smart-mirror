@@ -222,7 +222,8 @@ class SpotifyService {
             }
         }
 
-        return availableDevices[0] || null;
+        const volumeControllableDevice = availableDevices.find((device) => device.supports_volume === true);
+        return volumeControllableDevice || availableDevices[0] || null;
     }
 
     async getPlaybackDevice() {

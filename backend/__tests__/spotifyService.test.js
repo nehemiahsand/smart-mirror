@@ -137,6 +137,47 @@ describe('SpotifyService playback device recovery', () => {
         }));
     });
 
+    it('prefers a volume-controllable fallback device over the first listed device', async () => {
+        const { axios, spotifyService } = createSpotifyServiceTestContext();
+
+        axios
+            .mockRejectedValueOnce(noActiveDeviceError())
+            .mockResolvedValueOnce({
+                data: {
+                    devices: [
+                        {
+                            id: 'tv-device',
+                            is_active: false,
+                            is_restricted: false,
+                            name: 'Living Room TV',
+                            supports_volume: false,
+                        },
+                        {
+                            id: 'computer-device',
+                            is_active: false,
+                            is_restricted: false,
+                            name: 'Office Mac',
+                            supports_volume: true,
+                        },
+                    ],
+                },
+            })
+            .mockResolvedValueOnce({ data: {} })
+            .mockResolvedValueOnce({ data: {} });
+
+        await spotifyService.next();
+
+        expect(axios).toHaveBeenNthCalledWith(3, expect.objectContaining({
+            data: {
+                device_ids: ['computer-device'],
+                play: true,
+            },
+        }));
+        expect(axios).toHaveBeenNthCalledWith(4, expect.objectContaining({
+            url: 'https://api.spotify.com/v1/me/player/next?device_id=computer-device',
+        }));
+    });
+
     it('treats pause with no active device as already paused', async () => {
         const { axios, spotifyService } = createSpotifyServiceTestContext();
 

@@ -1,0 +1,16 @@
+{
+  "BraveRewardsDisabled": true,
+  "BraveWalletDisabled": true,
+  "BraveVPNDisabled": true,
+  "BraveNewsDisabled": true,
+  "BraveAIChatEnabled": 0,
+  "BraveTalkDisabled": true,
+  "BraveWebDiscoveryEnabled": 0,
+  "DefaultNotificationsSetting": 2,
+  "RestoreOnStartup": 5,
+  "PromotionalTabsEnabled": false,
+  "BrowserAddPersonEnabled": false,
+  "PasswordManagerEnabled": false,
+  "AutofillAddressEnabled": false,
+  "AutofillCreditCardEnabled": false
+}
