@@ -25,7 +25,6 @@ const layoutRoutes = require('./layout-routes');
 const apiKeyMiddleware = require('../middleware/apiKey');
 const adminOrApiKey = require('../middleware/adminOrApiKey');
 const cameraStreamAuth = require('../middleware/cameraStreamAuth');
-const usbStandbyCamera = require('../services/usbStandbyCamera');
 const { isSensitiveKey, isSensitivePath, redactSensitive } = require('../utils/redaction');
 const { getLoginRateLimitStatus, recordFailedLoginAttempt, recordSuccessfulLogin } = require('../utils/loginRateLimit');
 const { ADMIN_SESSION_TTL_SECONDS, clearAdminSessionCookie, extractAdminToken, setAdminSessionCookie } = require('../utils/requestAuth');
@@ -487,18 +486,6 @@ router.get('/camera/status', async (req, res) => {
 });
 
 router.get('/camera/raw', cameraStreamAuth, async (req, res) => {
-  await usbStandbyCamera.acquireForRawStream();
-
-  let released = false;
-  const releaseOnce = () => {
-    if (!released) {
-      released = true;
-      usbStandbyCamera.releaseForRawStream().catch((err) => {
-        logger.warn('USB standby camera release failed', { error: err.message });
-      });
-    }
-  };
-
   try {
     const http = require('http');
     const CAMERA_URL = process.env.CAMERA_URL || 'http://127.0.0.1:5556';
@@ -522,7 +509,6 @@ router.get('/camera/raw', cameraStreamAuth, async (req, res) => {
 
       proxyRes.on('error', (err) => {
         logger.error('Camera raw feed proxy error', { error: err.message });
-        releaseOnce();
         if (!res.writableEnded) {
           res.end();
         }
@@ -531,7 +517,6 @@ router.get('/camera/raw', cameraStreamAuth, async (req, res) => {
 
     proxyReq.on('error', (err) => {
       logger.error('Failed to connect to camera service for raw feed', { error: err.message });
-      releaseOnce();
       if (!res.headersSent) {
         res.status(500).json({ error: 'Camera raw feed unavailable' });
       }
@@ -539,17 +524,14 @@ router.get('/camera/raw', cameraStreamAuth, async (req, res) => {
 
     req.on('close', () => {
       proxyReq.destroy();
-      releaseOnce();
     });
 
     res.on('close', () => {
       proxyReq.destroy();
-      releaseOnce();
     });
 
     proxyReq.end();
   } catch (error) {
-    releaseOnce();
     logger.error('Failed to get camera raw feed', { error: error.message });
     if (!res.headersSent) {
       res.status(500).json({ error: 'Camera raw feed unavailable' });

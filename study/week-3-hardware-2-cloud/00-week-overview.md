@@ -25,7 +25,7 @@ This week finishes Hardware (motherboards, CPUs, power, printers) and then cover
 | --- | -------------------------------------------- | -------------------------------------------------------------------------------- |
 | 1   | ATX/mATX/ITX, PCIe, BIOS/UEFI, TPM           | Pi 5 board (no BIOS in the PC sense — great compare/contrast); ARM vs x86        |
 | 2   | 32/64-bit, ARM, cores, cooling               | Pi 5 CPU + thermal: `backend/src/services/console.js` reads `/sys/class/thermal` |
-| 3   | Power supplies, efficiency, printer types    | Pi 5 USB power (ganged VBUS): `deploy/systemd/README-usb-power.md`               |
+| 3   | Power supplies, efficiency, printer types    | Pi 5 power supply and the USB SSD/camera peripheral load                         |
 | 4   | Hypervisors type 1/2, containers, sandboxing | The whole `docker-compose.yml` = 4 containers; Dockerfiles = images              |
 | 5   | IaaS/PaaS/SaaS, public/private, elasticity   | External cloud APIs (weather/Spotify/calendar) in `backend/.env.example`         |
 
