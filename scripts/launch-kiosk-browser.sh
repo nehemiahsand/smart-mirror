@@ -10,14 +10,14 @@ export PASSWORD_STORE=basic
 unset GNOME_KEYRING_CONTROL GNOME_KEYRING_PID SSH_AUTH_SOCK 2>/dev/null || true
 KIOSK_PROFILE_DIR="/home/smartmirror/.config/brave-kiosk"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MIRROR_EXTENSION_DIR="${REPO_ROOT}/browser-extension"
-
-if [[ ! -f "${MIRROR_EXTENSION_DIR}/manifest.json" ]]; then
-  echo "[launch-kiosk-browser] Mirror browser extension is missing: ${MIRROR_EXTENSION_DIR}" >&2
-  exit 1
-fi
 
 mkdir -p "${KIOSK_PROFILE_DIR}"
+
+# Brave consumes Escape before page JavaScript can see it in browser fullscreen.
+# Install compositor-level shortcuts so desktop switching remains reliable.
+if [[ -x "${REPO_ROOT}/scripts/setup-browser-hotkeys.sh" ]]; then
+  "${REPO_ROOT}/scripts/setup-browser-hotkeys.sh"
+fi
 
 # Best-effort policy install (suppresses Rewards / notification / promo UI)
 if [[ -x "${REPO_ROOT}/scripts/setup-brave-kiosk-policies.sh" ]]; then
@@ -97,6 +97,5 @@ DISABLE_FEATURES="AutofillServerCommunication,TranslateUI,MediaRouter,PasswordLe
   --disable-sync \
   --disable-features="${DISABLE_FEATURES}" \
   --user-data-dir="${KIOSK_PROFILE_DIR}" \
-  --load-extension="${MIRROR_EXTENSION_DIR}" \
   --enable-features=OverlayScrollbar \
   "${URL}" &

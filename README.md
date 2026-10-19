@@ -146,10 +146,10 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now smart-mirror.service
 ```
 
-The display launcher uses a small local Brave extension in
-`browser-extension/` for desktop switching. Brave must be restarted after this
-feature is installed. If `Ctrl+Alt+M` conflicts with a desktop shortcut, change
-the extension shortcut at `brave://extensions/shortcuts`.
+The display launcher installs these shortcuts in the Raspberry Pi OS Labwc
+configuration. The previous `Ctrl+Alt+M` magnifier binding is intentionally
+replaced while the mirror is installed. The original user configuration is
+backed up once as `~/.config/labwc/rc.xml.pre-smart-mirror`.
 
 Network note:
 
