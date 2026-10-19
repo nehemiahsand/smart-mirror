@@ -40,6 +40,9 @@ Display behavior:
 - fun: fun page content from backend (/api/console/page/fun)
 - spotify: full Spotify player page
 - standby: display-only standby screen when display.standbyMode is true
+- desktop mode: press `Esc` on the mirror to leave fullscreen and open a normal
+  browser tab; press `Ctrl+Alt+M` from any browser tab to select the mirror tab
+  and restore fullscreen
 
 ESP32 OLED behavior:
 
@@ -142,6 +145,11 @@ sudo ln -s /home/smartmirror/Downloads/smart-mirror/deploy/systemd/smart-mirror.
 sudo systemctl daemon-reload
 sudo systemctl enable --now smart-mirror.service
 ```
+
+The display launcher uses a small local Brave extension in
+`browser-extension/` for desktop switching. Brave must be restarted after this
+feature is installed. If `Ctrl+Alt+M` conflicts with a desktop shortcut, change
+the extension shortcut at `brave://extensions/shortcuts`.
 
 Network note:
 

@@ -3,7 +3,7 @@
 # Wait for X server
 sleep 5
 
-# Start Brave in kiosk mode
+# Start Brave in fullscreen mirror mode with desktop switching shortcuts
 /home/smartmirror/Downloads/smart-mirror/scripts/launch-kiosk-browser.sh http://localhost:3000 || exit 1
 
 # Start unclutter to hide mouse cursor

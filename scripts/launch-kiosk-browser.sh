@@ -10,6 +10,12 @@ export PASSWORD_STORE=basic
 unset GNOME_KEYRING_CONTROL GNOME_KEYRING_PID SSH_AUTH_SOCK 2>/dev/null || true
 KIOSK_PROFILE_DIR="/home/smartmirror/.config/brave-kiosk"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+MIRROR_EXTENSION_DIR="${REPO_ROOT}/browser-extension"
+
+if [[ ! -f "${MIRROR_EXTENSION_DIR}/manifest.json" ]]; then
+  echo "[launch-kiosk-browser] Mirror browser extension is missing: ${MIRROR_EXTENSION_DIR}" >&2
+  exit 1
+fi
 
 mkdir -p "${KIOSK_PROFILE_DIR}"
 
@@ -44,7 +50,7 @@ for key in list(iph.get("snoozed_feature", {}).keys()):
 brave = prefs.setdefault("brave", {})
 brave.setdefault("rewards", {})["enabled"] = False
 
-# Do not restore tabs after crash — kiosk always opens the mirror URL from the launcher
+# Do not restore tabs after crash — the launcher always opens the mirror URL
 prefs.setdefault("session", {})
 prefs["session"]["restore_on_startup"] = 5
 
@@ -69,7 +75,6 @@ fi
 DISABLE_FEATURES="AutofillServerCommunication,TranslateUI,MediaRouter,PasswordLeakDetection"
 
 "${BROWSER_BIN}" \
-  --kiosk \
   --start-fullscreen \
   --no-first-run \
   --no-default-browser-check \
@@ -92,5 +97,6 @@ DISABLE_FEATURES="AutofillServerCommunication,TranslateUI,MediaRouter,PasswordLe
   --disable-sync \
   --disable-features="${DISABLE_FEATURES}" \
   --user-data-dir="${KIOSK_PROFILE_DIR}" \
+  --load-extension="${MIRROR_EXTENSION_DIR}" \
   --enable-features=OverlayScrollbar \
   "${URL}" &

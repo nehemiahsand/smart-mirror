@@ -32,7 +32,7 @@ fi
 # Start unclutter to hide cursor after 1 second of inactivity
 unclutter -idle 1 -root &
 
-# Start Brave in kiosk mode.
+# Start Brave in fullscreen mirror mode with desktop switching shortcuts.
 /home/smartmirror/Downloads/smart-mirror/scripts/launch-kiosk-browser.sh http://localhost:3000 || exit 1
 
 # Give Brave a moment to start, then move cursor to trigger auto-hide
