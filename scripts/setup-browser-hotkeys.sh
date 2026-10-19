@@ -60,4 +60,13 @@ PY
 # runs before the desktop session is ready; the config is read at login too.
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/1000}"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
-labwc --reconfigure 2>/dev/null || true
+if [[ -z "${LABWC_PID:-}" ]]; then
+  LABWC_PID="$(pgrep -xo labwc || true)"
+  export LABWC_PID
+fi
+
+if [[ -n "${LABWC_PID:-}" ]]; then
+  labwc --reconfigure
+else
+  echo "[setup-browser-hotkeys] Labwc is not running; shortcuts will load at next login." >&2
+fi
