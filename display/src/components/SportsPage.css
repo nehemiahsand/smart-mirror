@@ -30,3 +30,27 @@
 .sports-page-highlights .fun-empty-state {
     width: 100%;
 }
+
+.football-recap-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.football-recap-category { min-width: 0; }
+.football-recap-category h3 { margin: 6px 0; font-size: 16px; text-transform: capitalize; }
+.fun-recap-no-video { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 28px; text-align: center; }
+@media (max-width: 800px) { .football-recap-grid { grid-template-columns: 1fr; } }
+@media (max-height: 1100px) and (min-width: 900px) {
+    .sports-page-boxscore .sports-page-content { padding-top: 30px; padding-bottom: 40px; gap: 14px; }
+    .sports-page-boxscore .timedate-time { font-size: 3.5rem; }
+    .sports-page-boxscore .timedate-date { font-size: 1.3rem; }
+    .sports-page-boxscore .fun-game-score-bar { margin-top: 12px; padding: 8px; }
+    .sports-page-boxscore .fun-panel { padding: 20px; }
+}
+
+.page-indicator.page-indicator-compact { bottom: 20px; }
+@media (max-height: 1100px) and (min-width: 900px) {
+    .sports-page-boxscore .football-recap-box .fun-boxscore-table { font-size: 0.8rem; line-height: 1.2; }
+    .sports-page-boxscore .football-recap-box .fun-boxscore-table th,
+    .sports-page-boxscore .football-recap-box .fun-boxscore-table td { padding: 0.15rem 0.4rem; }
+}
+
+.fun-publisher-notice { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 0; font-size: 14px; color: #d2d6dc; }
+.fun-publisher-notice p { flex: 1 1 260px; margin: 0; }
+.fun-publisher-notice a { display: inline-flex; align-items: center; text-decoration: none; }

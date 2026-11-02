@@ -1,0 +1,8 @@
+# Explicit opt-in only; the production Compose file remains TLS-only.
+# docker compose -f docker-compose.yml -f deploy/staging/compose.mqtt-migration.yml ...
+services:
+  mosquitto:
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./deploy/staging/mosquitto.migration.conf:/mosquitto/config/mosquitto.conf:ro

@@ -9,6 +9,8 @@ function getDefaultWsUrl() {
   return `${protocol}//${window.location.hostname}`;
 }
 
+const reloadDisplay = () => window.location.reload();
+
 const BASE_WS_URL = import.meta.env.VITE_WS_URL || getDefaultWsUrl();
 const ALLOWED_PAGES = new Set(['home', 'weather', 'sports', 'spotify']);
 
@@ -19,7 +21,7 @@ function normalizePage(page) {
   return ALLOWED_PAGES.has(page) ? page : 'home';
 }
 
-export const useWebSocket = (onPageChange, onListeningChange) => {
+export const useWebSocket = (onPageChange, onListeningChange, onReload = reloadDisplay) => {
   const [isConnected, setIsConnected] = useState(false);
   const [time, setTime] = useState(null);
   const [sensorData, setSensorData] = useState(null);
@@ -51,6 +53,13 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
             return;
           }
           
+          // Release updates must work while the display is asleep. Waiting for
+          // wake would otherwise keep the old renderer with newer API payloads.
+          if (data.type === 'display_refresh') {
+            onReload();
+            return;
+          }
+
           // In standby mode, ignore all other messages to minimize CPU usage
           // We check settings here because it might be null on first load
           if (settingsRef.current?.display?.standbyMode === true) {
@@ -121,10 +130,6 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
                 setTimeout(() => setMessage(null), data.data.duration);
               }
               break;
-            case 'display_refresh':
-              console.log('Display refresh requested');
-              window.location.reload();
-              break;
             case 'connected':
               console.log('WebSocket connection established:', data.message);
               break;
@@ -155,7 +160,7 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
     }
-  }, []);
+  }, [onPageChange, onListeningChange, onReload]);
 
   useEffect(() => {
     connect();
@@ -165,6 +170,9 @@ export const useWebSocket = (onPageChange, onListeningChange) => {
         clearTimeout(reconnectTimeoutRef.current);
       }
       if (wsRef.current) {
+        wsRef.current.onclose = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.onerror = null;
         wsRef.current.close();
       }
     };

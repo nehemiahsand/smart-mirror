@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import './AlertModal.css';
+import { Modal } from './NexusUI';
 
 /**
  * AlertModal - Reusable alert/notification dialog
@@ -23,23 +23,15 @@ export default function AlertModal({
         }
     }, [autoClose, onClose]);
 
-    const icons = {
-        info: 'ℹ️',
-        success: '✅',
-        warning: '⚠️',
-        error: '❌'
-    };
-
     return (
-        <div className="modal-overlay" onClick={onClose}>
-            <div className={`alert-modal ${type}`} onClick={(e) => e.stopPropagation()}>
-                <div className="alert-icon">{icons[type] || icons.info}</div>
-                {title && <h3>{title}</h3>}
-                <p>{message}</p>
-                <button className="alert-btn" onClick={onClose}>
-                    OK
-                </button>
-            </div>
-        </div>
+        <Modal
+            title={title || (type === 'error' ? 'Action failed' : 'Nexus')}
+            onClose={onClose}
+        >
+            <p role={type === 'error' ? 'alert' : 'status'}>{message}</p>
+            <button className="primary" onClick={onClose}>
+                OK
+            </button>
+        </Modal>
     );
 }

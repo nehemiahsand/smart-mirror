@@ -4,8 +4,9 @@ const path = require('path');
 const logger = require('../utils/logger');
 const { consumeOAuthState, issueOAuthState } = require('../utils/oauthState');
 
-const CREDENTIALS_PATH = path.join(__dirname, '../../data/calendar-credentials.json');
-const TOKEN_PATH = path.join(__dirname, '../../data/calendar-token.json');
+const DATA_DIRECTORY = process.env.NEXUS_DATA_DIR || path.join(__dirname, '../../data');
+const CREDENTIALS_PATH = path.join(DATA_DIRECTORY, 'calendar-credentials.json');
+const TOKEN_PATH = path.join(DATA_DIRECTORY, 'calendar-token.json');
 const SCOPES = ['https://www.googleapis.com/auth/calendar.readonly'];
 const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 const TRANSIENT_REFRESH_RETRIES = 4;

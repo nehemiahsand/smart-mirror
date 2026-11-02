@@ -5,7 +5,7 @@ After=network-online.target
 
 [Service]
 Type=oneshot
-User=root
+User=smartmirror
 WorkingDirectory=/home/smartmirror/Downloads/smart-mirror
 ExecStart=/home/smartmirror/Downloads/smart-mirror/scripts/auto-update.sh
 StandardOutput=journal

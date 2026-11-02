@@ -14,6 +14,7 @@ import StandbyMode from './components/StandbyMode';
 import SpotifyPlayer from './components/SpotifyPlayer';
 import WeatherPage from './components/WeatherPage';
 import SportsPage from './components/SportsPage';
+import { isPageWidgetVisible } from './utils/pageVisibility';
 
 const DISPLAY_PAGES = ['home', 'weather', 'sports', 'spotify'];
 const DEFAULT_PAGE = 'home';
@@ -170,14 +171,14 @@ function App() {
                         {/* Dynamic Layout - Combined widgets for better organization */}
 
                         {/* Time & Date - Top */}
-                        {(isWidgetEnabled('clock') || isWidgetEnabled('date') || isWidgetEnabled('timedate')) && (
+                        {isPageWidgetVisible(settings, 'home', 'timedate') && (isWidgetEnabled('clock') || isWidgetEnabled('date') || isWidgetEnabled('timedate')) && (
                             <div className="widget-section top" style={{ order: getWidgetOrder('timedate') }}>
                                 <TimeDateWidget />
                             </div>
                         )}
 
                         {/* Google Calendar - Below Time/Date */}
-                        {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar') || isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
+                        {isPageWidgetVisible(settings, 'home', 'googlecalendar') && (isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar') || isWidgetEnabled('sports') || isWidgetEnabled('nba')) && (
                             <div className="widget-section middle calendar-nba-row" style={{ order: getWidgetOrder('googlecalendar') }}>
                                 {(isWidgetEnabled('calendar') || isWidgetEnabled('googlecalendar')) && (
                                     <div className="calendar-widget">
@@ -196,14 +197,14 @@ function App() {
                         )}
 
                         {/* Weather & Temperature & Traffic - Middle (Combined) */}
-                        {(isWidgetEnabled('weathertemp') || isWidgetEnabled('traffic')) && (
+                        {isPageWidgetVisible(settings, 'home', 'weathertemp') && (isWidgetEnabled('weathertemp') || isWidgetEnabled('traffic')) && (
                             <div className="widget-section middle" style={{ order: getWidgetOrder('weathertemp') }}>
                                 <WeatherTrafficWidget weatherData={weatherData} sensorData={sensorData} />
                             </div>
                         )}
 
                         {/* Photos - Bottom */}
-                        {isWidgetEnabled('photos') && (
+                        {isPageWidgetVisible(settings, 'home', 'photos') && isWidgetEnabled('photos') && (
                             <div className="widget-section photos" style={{ order: getWidgetOrder('photos'), flex: 1 }}>
                                 <PhotosWidget rotationInterval={(settings?.photos?.interval || 10) * 1000} />
                             </div>
@@ -237,7 +238,7 @@ function App() {
             </div>
 
             {/* Page Indicator */}
-            <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} />
+            <PageIndicator pages={DISPLAY_PAGES} currentPage={currentPage} compact={currentPage === 'sports'} />
         </>
     );
 }

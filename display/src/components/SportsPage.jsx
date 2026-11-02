@@ -4,8 +4,10 @@ import TimeDateWidget from '../widgets/TimeDate';
 import { apiFetch } from '../api/apiClient';
 import './FunPage.css';
 import './SportsPage.css';
+import GameTracker from './GameTracker';
+import YouTubeEmbed from './YouTubeEmbed';
+import FootballBoxScore from './FootballBoxScore';
 
-const VIDEO_LOAD_TIMEOUT_MS = 15000;
 
 function formatPublishedAt(value) {
     if (!value) {
@@ -28,24 +30,24 @@ function GameScoreBar({ game }) {
     if (!game) return null;
     const { home, away, result, homeAway } = game;
     const isHome = homeAway === 'home';
-    const resultClass = result === 'W' ? 'fun-game-result-win' : 'fun-game-result-loss';
+    const resultClass = result === 'W' ? 'fun-game-result-win' : result === 'L' ? 'fun-game-result-loss' : 'fun-game-result-neutral';
 
     return (
         <div className="fun-game-score-bar">
             <div className="fun-game-team">
                 {away.logo && <img src={away.logo} alt={away.abbrev} className="fun-game-team-logo" />}
                 <span className="fun-game-team-name">{away.abbrev}</span>
-                <span className="fun-game-team-score">{away.score}</span>
+                <span className="fun-game-team-score">{away.score ?? '—'}</span>
             </div>
             <div className="fun-game-center">
-                <span className={`fun-game-result ${resultClass}`}>{result}</span>
+                <span className={`fun-game-result ${resultClass}`}>{result || '—'}</span>
                 <span className="fun-game-date">{game.dateFormatted}</span>
                 <span className="fun-game-location">{isHome ? 'Home' : 'Away'}</span>
             </div>
             <div className="fun-game-team">
                 {home.logo && <img src={home.logo} alt={home.abbrev} className="fun-game-team-logo" />}
                 <span className="fun-game-team-name">{home.abbrev}</span>
-                <span className="fun-game-team-score">{home.score}</span>
+                <span className="fun-game-team-score">{home.score ?? '—'}</span>
             </div>
         </div>
     );
@@ -56,7 +58,8 @@ GameScoreBar.propTypes = {
 };
 
 function BoxScoreInline({ boxScore, game, clipLabel }) {
-    if (!boxScore?.team) return null;
+    if (!boxScore?.team) return <p className="fun-empty-message">Box-score statistics are unavailable for this game.</p>;
+    if (boxScore.sport === 'football') return <FootballBoxScore boxScore={boxScore} game={game} />;
 
     const { players, totals, labels } = boxScore.team;
     if (!players || players.length === 0) return null;
@@ -154,7 +157,7 @@ VideoUnavailablePanel.propTypes = {
     })
 };
 
-function YouTubeVideoPanel({ videoFeed }) {
+export function YouTubeVideoPanel({ videoFeed }) {
     const items = Array.isArray(videoFeed?.items) ? videoFeed.items : [];
     const selectedClipIndex = Number.isFinite(videoFeed?.selectedClipIndex)
         ? Number(videoFeed.selectedClipIndex)
@@ -162,84 +165,73 @@ function YouTubeVideoPanel({ videoFeed }) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [retryNonce, setRetryNonce] = useState(0);
     const [frameStatus, setFrameStatus] = useState('loading');
-    const hasLoadedRef = useRef(false);
+    const [playbackError, setPlaybackError] = useState('');
+    const [publisherBlock, setPublisherBlock] = useState(null);
+    const failedClips = useRef(new Set());
+    const feedIdentity = items.map((item) => item.game?.gameId || item.videoId).join('|');
 
     useEffect(() => {
-        setCurrentIndex(0);
-        setRetryNonce(0);
-        setFrameStatus('loading');
-    }, [videoFeed?.date, videoFeed?.fetchedAt, items.length]);
+        const index = items.length ? ((selectedClipIndex % items.length) + items.length) % items.length : 0;
+        setCurrentIndex(index); setRetryNonce(0); setFrameStatus('loading'); setPlaybackError('');
+        failedClips.current.clear(); setPublisherBlock(null);
+        // Polling the same feed must not restart playback or undo a skipped clip.
+    }, [feedIdentity, selectedClipIndex]);
 
-    useEffect(() => {
-        if (items.length === 0) {
-            return undefined;
+    function playbackFailed({ code, message }) {
+        const current = items[currentIndex] || items[0];
+        if ([101, 150].includes(code) && current?.game) {
+            setPublisherBlock({ gameId: current.game.gameId, message });
+            setPlaybackError(message); setFrameStatus('failed');
+            return;
         }
-        const normalizedIndex = ((selectedClipIndex % items.length) + items.length) % items.length;
-        setCurrentIndex(normalizedIndex);
-        setRetryNonce(0);
-        return undefined;
-    }, [items.length, selectedClipIndex]);
-
-    useEffect(() => {
-        if (items.length === 0) {
-            return undefined;
+        failedClips.current.add((items[currentIndex] || items[0])?.videoId);
+        const nextIndex = items.findIndex((item) => item.videoId && !failedClips.current.has(item.videoId));
+        if ([2, 5, 100, 101, 150].includes(code) && nextIndex !== -1) {
+            setCurrentIndex(nextIndex); setFrameStatus('loading');
+            setPlaybackError('Skipping a highlight that YouTube could not play.');
+        } else {
+            setFrameStatus('failed'); setPlaybackError(message);
         }
-
-        hasLoadedRef.current = false;
-        setFrameStatus('loading');
-
-        const timerId = setTimeout(() => {
-            if (!hasLoadedRef.current) {
-                setFrameStatus('retrying');
-                setRetryNonce((value) => value + 1);
-            }
-        }, VIDEO_LOAD_TIMEOUT_MS);
-
-        return () => clearTimeout(timerId);
-    }, [currentIndex, retryNonce, items.length]);
+    }
 
     if (items.length === 0) {
         return <VideoUnavailablePanel videoFeed={videoFeed} />;
     }
 
     const currentItem = items[currentIndex] || items[0];
-    const panelKey = `${currentItem.videoId}-${retryNonce}`;
+    const panelKey = `${currentItem.embedUrl || currentItem.videoId}-${retryNonce}`;
     const game = currentItem.game || null;
     const boxScore = game?.boxScore || null;
     const viewMode = videoFeed?.viewMode || 'video';
-    const showBoxScore = viewMode === 'boxscore' && boxScore;
+    const restricted = videoFeed?.playbackMode === 'external' || !!(game && publisherBlock?.gameId === game.gameId);
+    const showBoxScore = viewMode === 'boxscore' || restricted && !!game;
+    const watchUrl = currentItem.watchUrl || (currentItem.videoId ? `https://www.youtube.com/watch?v=${encodeURIComponent(currentItem.videoId)}` : null);
 
     return (
         <div className="fun-panel fun-video-frame">
             <div className="fun-panel-header">
                 <div className="fun-panel-title">{videoFeed?.query || 'Highlights'}</div>
+                {game && <span className="fun-stale-pill">Game {currentIndex + 1} of {items.length}</span>}
                 {videoFeed?.stale && <span className="fun-stale-pill">Cached</span>}
             </div>
 
+            {restricted && <div className="fun-publisher-notice" role="status">
+                <p>{videoFeed?.playbackMessage || publisherBlock?.message || 'The publisher restricts embedded playback.'} {game && 'Showing this game’s box score.'}</p>
+                {watchUrl && <a className="fun-player-action" href={watchUrl} target="_blank" rel="noopener noreferrer">Open highlights</a>}
+            </div>}
             {!showBoxScore && (
                 <>
                     <div className="fun-video-embed-shell">
                         <div className="fun-video-embed-frame">
-                            <iframe
-                                key={panelKey}
-                                src={currentItem.embedUrl}
-                                title={currentItem.title || 'Highlights'}
-                                className="fun-video-embed"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                allowFullScreen
-                                loading="eager"
-                                onLoad={() => {
-                                    hasLoadedRef.current = true;
-                                    setFrameStatus('ready');
-                                }}
-                            />
+                            {currentItem.videoId ? <YouTubeEmbed key={panelKey} videoId={currentItem.videoId} title={currentItem.title}
+                                onPlaying={() => { setFrameStatus('ready'); setPlaybackError(''); }} onFailure={playbackFailed} /> : <div className="fun-recap-no-video"><strong>Highlights unavailable</strong><p>{currentItem.message || 'This channel has not published highlights for this game.'}</p><small>Use Box to view the available game statistics.</small></div>}
                         </div>
                     </div>
 
                     <div className="fun-video-meta">
                         <div className="fun-video-title">{currentItem.title}</div>
                         <div className="fun-video-subtitle">
-                            <span>{currentItem.channelTitle || 'YouTube'}</span>
+                            <span>{currentItem.channelTitle || 'Highlights'}</span>
                             <span>{formatPublishedAt(currentItem.publishedAt)}</span>
                             <span>Clip {currentIndex + 1} of {items.length}</span>
                         </div>
@@ -253,11 +245,12 @@ function YouTubeVideoPanel({ videoFeed }) {
 
             {game && <GameScoreBar game={game} />}
 
-            {!showBoxScore && frameStatus === 'retrying' && (
-                <div className="fun-panel-footer">
-                    <span className="fun-stale-pill">Retrying embed</span>
-                </div>
-            )}
+            {!showBoxScore && currentItem.videoId && frameStatus !== 'ready' && <div className="fun-panel-footer" role="status">
+                <span>{playbackError || 'Connecting to highlights…'}</span>
+                {frameStatus === 'failed' && <button className="fun-player-action" onClick={() => {
+                    failedClips.current.clear(); setPlaybackError(''); setFrameStatus('loading'); setRetryNonce((n) => n + 1);
+                }}>Retry highlights</button>}
+            </div>}
         </div>
     );
 }
@@ -289,9 +282,17 @@ function getSectionOrder(settings, sectionId) {
 export default function SportsPage({ pageData, settings, isActive = false }) {
     const [videoFeed, setVideoFeed] = useState(pageData?.videoFeed || null);
     const [loading, setLoading] = useState(!pageData);
+    const [experience, setExperience] = useState(pageData?.experience || null);
+    const configuredTeam = settings?.sports?.highlightsTeam || 'gsw';
+    const teamRef = useRef(configuredTeam);
+    teamRef.current = configuredTeam;
+    const awaitingTeam = experience?.preferences?.team && experience.preferences.team !== configuredTeam;
 
     const applySportsData = (data) => {
+        if (data?.experience?.preferences?.team && data.experience.preferences.team !== teamRef.current) return false;
         setVideoFeed(data?.videoFeed || null);
+        setExperience(data?.experience || null);
+        return true;
     };
 
     useEffect(() => {
@@ -299,85 +300,61 @@ export default function SportsPage({ pageData, settings, isActive = false }) {
             return;
         }
 
-        applySportsData(pageData);
-        setLoading(false);
-    }, [pageData]);
+        if (applySportsData(pageData)) setLoading(false);
+    }, [pageData, configuredTeam]);
 
     useEffect(() => {
-        if (!isActive) {
-            return undefined;
-        }
-
-        let mounted = true;
-
-        const fetchSportsPage = async () => {
+        if (!isActive) return undefined;
+        let active = true;
+        let pending = false;
+        const controller = new AbortController();
+        const load = async () => {
+            if (pending || document.hidden) return;
+            pending = true;
             try {
-                const response = await apiFetch('/api/console/page/sports');
+                const response = await apiFetch('/api/console/page/sports', { signal: controller.signal });
+                if (!response.ok) throw new Error('Sports refresh failed');
                 const data = await response.json();
-                if (mounted) {
-                    applySportsData(data);
-                    setLoading(false);
-                }
-            } catch (error) {
-                console.error('Failed to fetch sports page data:', error);
-                if (mounted) {
-                    setLoading(false);
-                }
-            }
+                if (active && applySportsData(data)) setLoading(false);
+            } catch (_) {
+                if (active) setExperience((old) => old?.tracker ? { ...old, tracker: { ...old.tracker, stale: true } } : old);
+            } finally { pending = false; }
         };
-
-        fetchSportsPage();
-
-        return () => {
-            mounted = false;
-        };
-    }, [isActive]);
-
-    useEffect(() => {
-        if (!isActive || !videoFeed?.unavailable) {
-            return undefined;
-        }
-
-        let cancelled = false;
-        const retryTimeoutId = setTimeout(async () => {
-            try {
-                const response = await apiFetch('/api/console/page/sports');
-                const data = await response.json();
-                if (!cancelled) {
-                    applySportsData(data);
-                }
-            } catch (error) {
-                console.error('Failed to retry Warriors highlights:', error);
-            }
-        }, 30000);
-
-        return () => {
-            cancelled = true;
-            clearTimeout(retryTimeoutId);
-        };
-    }, [isActive, videoFeed]);
+        load();
+        const timer = setInterval(load, 15000);
+        document.addEventListener('visibilitychange', load);
+        return () => { active = false; controller.abort(); clearInterval(timer); document.removeEventListener('visibilitychange', load); };
+    }, [isActive, configuredTeam, settings?.sports?.liveGames]);
 
     return (
-        <div className="mirror sports-page">
+        <div className={`mirror sports-page ${experience?.tracker ? 'sports-page-live' : videoFeed?.viewMode === 'boxscore' ? 'sports-page-boxscore' : ''}`}>
             <div className="sports-page-content">
-                <div className="sports-page-time-section" style={{ order: getSectionOrder(settings, 'timedate') }}>
-                    <TimeDateWidget />
-                </div>
+                {settings?.pageVisibility?.sports?.timedate !== false && <div className="sports-page-time-section" style={{ order: getSectionOrder(settings, 'timedate') }}>
+                    <TimeDateWidget format={settings?.display?.clockFormat || '12h'} />
+                </div>}
 
-                <div className="sports-page-highlights" style={{ order: getSectionOrder(settings, 'highlights') }}>
-                    {loading && !videoFeed ? (
+                {settings?.pageVisibility?.sports?.highlights !== false && <div className="sports-page-highlights" style={{ order: getSectionOrder(settings, 'highlights') }}>
+                    {awaitingTeam || loading && !videoFeed ? (
                         <div className="fun-comic-frame fun-empty-state">
                             <div className="fun-empty-title">Loading sports content...</div>
                         </div>
-                    ) : (
+                    ) : experience?.tracker ? (
+                        <>
+                            <GameTracker game={experience.tracker} />
+                            {experience.tracker.stale && <p className="tracker-unavailable">Highlights can be selected from Nexus → Mirror → Edit → Sports while updates reconnect.</p>}
+                        </>
+                    ) : isActive ? (
+                        <>
+                        {experience?.failures?.length > 0 && <p className="tracker-stale-note">Some live feeds are unavailable. Highlights are shown while game status is unconfirmed.</p>}
                         <YouTubeVideoPanel
                             videoFeed={videoFeed || {
                                 unavailable: true,
                                 message: 'Unable to load sports content right now.'
                             }}
                         />
-                    )}
-                </div>
+                        </>
+                    ) : null}
+                </div>}
             </div>
         </div>
     );
@@ -385,7 +362,8 @@ export default function SportsPage({ pageData, settings, isActive = false }) {
 
 SportsPage.propTypes = {
     pageData: PropTypes.shape({
-        videoFeed: PropTypes.object
+        videoFeed: PropTypes.object,
+        experience: PropTypes.object
     }),
     settings: PropTypes.shape({
         sportsWidgetOrder: PropTypes.array

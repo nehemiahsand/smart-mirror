@@ -10,3 +10,12 @@ data
 display/.env
 mobile-pwa/.env
 mobile-pwa/dist
+**/.env
+**/config.local.json
+esp32-console/include/config.local.h
+mosquitto/certs
+mosquitto/credentials.json
+mosquitto/clients.local
+mosquitto/acl.local
+
+**/.env.*

@@ -65,7 +65,8 @@ class ClimateService {
       temperatureCelsius: roundToTenth(temperatureCelsius),
       temperatureFahrenheit: roundToTenth(temperatureFahrenheit),
       humidity: roundToTenth(humidity),
-      timestamp: new Date(payload.timestamp || meta.timestamp || Date.now()).toISOString(),
+      // ESP timestamps are uptime milliseconds, not wall-clock dates. Freshness uses receipt time.
+      timestamp: new Date().toISOString(),
       stale: false,
       source: 'esp32',
       sourceId: meta.deviceId || payload.sourceId || payload.deviceId || 'esp32',

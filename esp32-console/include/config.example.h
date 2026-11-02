@@ -8,8 +8,12 @@ constexpr char DEVICE_ID[] = "mirror-entry-1";
 constexpr char WIFI_SSID[] = "YOUR_WIFI_SSID";
 constexpr char WIFI_PASSWORD[] = "YOUR_WIFI_PASSWORD";
 
-constexpr char MQTT_HOST[] = "192.168.1.100";
-constexpr uint16_t MQTT_PORT = 1883;
+constexpr char MQTT_HOST[] = "nehemiah-pi5.local";
+constexpr uint16_t MQTT_PORT = 8883;
+constexpr char MQTT_CA_PEM[] = R"PEM(-----BEGIN CERTIFICATE-----
+REPLACE_WITH_YOUR_PUBLIC_LOCAL_CA
+-----END CERTIFICATE-----
+)PEM";
 constexpr char MQTT_USERNAME[] = "YOUR_MQTT_USERNAME";
 constexpr char MQTT_PASSWORD[] = "YOUR_MQTT_PASSWORD";
 constexpr bool MQTT_USE_AUTH = true;

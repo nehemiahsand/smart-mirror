@@ -21,6 +21,9 @@ const consoleService = require('./services/console');
 const funVideoService = require('./services/funVideo');
 const sceneEngine = require('./services/sceneEngine');
 const esp32InputService = require('./services/esp32Input');
+const clockService = require('./services/clock');
+const lightsService = require('./services/lights');
+const devicesService = require('./services/devices');
 const websocketServer = require('./api/websocket');
 const apiRoutes = require('./api/routes');
 const spotifyRoutes = require('./api/spotify-routes');
@@ -281,6 +284,9 @@ async function start() {
     app.set('websocket', websocketServer);
 
     esp32InputService.initialize();
+    devicesService.initialize();
+    clockService.initialize();
+    lightsService.initialize();
     logger.info('ESP32 input integration initialized');
 
     funVideoService.startDailyRefreshSchedule({
@@ -342,6 +348,9 @@ function shutdown() {
   consoleService.close();
   funVideoService.stopDailyRefreshSchedule();
   esp32InputService.close();
+  clockService.close();
+  lightsService.close();
+  devicesService.close();
   
   server.close(() => {
     logger.info('Server closed');

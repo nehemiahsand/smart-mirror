@@ -1,0 +1,11 @@
+{
+  "deviceId": "thinkpad",
+  "host": "nehemiah-pi5.local",
+  "port": 8883,
+  "username": "thinkpad",
+  "password": "PROVISION_LOCALLY",
+  "caFile": "/absolute/path/to/ca.pem",
+  "allowPower": false,
+  "services": {},
+  "diskPath": "/"
+}

@@ -6,7 +6,8 @@ jest.mock('fs', () => ({
   promises: {
     mkdir: jest.fn(),
     readFile: jest.fn(),
-    writeFile: jest.fn()
+    writeFile: jest.fn(),
+    rename: jest.fn()
   }
 }));
 jest.mock('../src/utils/logger', () => ({
@@ -116,5 +117,34 @@ describe('Settings Service (Frontend Backbone)', () => {
       await settingsService.reset();
       expect(settingsService.get('display.brightness')).toBe(100); // Back to default
     });
+  });
+
+  it('keeps acknowledged settings intact when a replacement write fails', async () => {
+    const original = settingsService.get('weather.city');
+    fs.writeFile.mockRejectedValueOnce(new Error('disk full'));
+    await expect(settingsService.update('weather.city', 'Unsaved')).rejects.toThrow('disk full');
+    expect(settingsService.get('weather.city')).toBe(original);
+  });
+
+  it('serializes simultaneous changes without dropping either update', async () => {
+    fs.writeFile.mockResolvedValue();
+    await Promise.all([settingsService.update('weather.city', 'Chicago,US'), settingsService.update('display.clockFormat', '12h')]);
+    expect(settingsService.get('weather.city')).toBe('Chicago,US');
+    expect(settingsService.get('display.clockFormat')).toBe('12h');
+    expect(fs.rename).toHaveBeenCalled();
+  });
+});
+
+describe('two-team sports migration', () => {
+  it.each([
+    ['broncos', ['auburn', 'gsw', 'broncos'], 'gsw', ['auburn', 'gsw']],
+    ['auburn', ['broncos', 'gsw', 'auburn'], 'auburn', ['gsw', 'auburn']],
+  ])('removes retired selections while preserving supported choices and ordering', async (team, priority, expectedTeam, expectedPriority) => {
+    fs.readFile.mockResolvedValue(JSON.stringify({ sports: { highlightsTeam: team, livePriority: priority, liveGames: false }, weather: { city: 'Birmingham,US' } }));
+    await settingsService.initialize();
+    expect(settingsService.get('sports.highlightsTeam')).toBe(expectedTeam);
+    expect(settingsService.get('sports.livePriority')).toEqual(expectedPriority);
+    expect(settingsService.get('sports.liveGames')).toBe(false);
+    expect(settingsService.get('weather.city')).toBe('Birmingham,US');
   });
 });

@@ -204,6 +204,7 @@ function getHourCardAccent(entry) {
     return '';
 }
 
+function isVisible(settings, sectionId) { return settings?.pageVisibility?.weather?.[sectionId] !== false; }
 function getSectionOrder(settings, sectionId) {
     const order = Array.isArray(settings?.weatherWidgetOrder) ? settings.weatherWidgetOrder : ['timedate', 'sunmoon', 'temps', 'hourly'];
     const index = order.indexOf(sectionId);
@@ -503,27 +504,27 @@ export default function WeatherPage({ pageData, settings, isActive = false }) {
     return (
         <div className="mirror weather-page">
             <div className="weather-page-content">
-                <div className="weather-page-time-section" style={{ order: getSectionOrder(settings, 'timedate') }}>
+                {isVisible(settings, 'timedate') && <div className="weather-page-time-section" style={{ order: getSectionOrder(settings, 'timedate') }}>
                     <TimeDateWidget />
-                </div>
+                </div>}
 
-                <div className="weather-page-sunmoon-row" style={{ order: getSectionOrder(settings, 'sunmoon') }}>
+                {isVisible(settings, 'sunmoon') && <div className="weather-page-sunmoon-row" style={{ order: getSectionOrder(settings, 'sunmoon') }}>
                     <SunWidget widget={data?.sun} />
                     <MoonWidget widget={data?.moon} />
-                </div>
+                </div>}
 
-                <div className="weather-page-daily-row" style={{ order: getSectionOrder(settings, 'temps') }}>
+                {isVisible(settings, 'temps') && <div className="weather-page-daily-row" style={{ order: getSectionOrder(settings, 'temps') }}>
                     <DailyWeatherCard city={data?.city} summary={data?.dailySummary} />
                     <IndoorWeatherCard climate={data?.indoorClimate} />
-                </div>
+                </div>}
 
-                <div className="weather-page-hourly-section" style={{ order: getSectionOrder(settings, 'hourly') }}>
+                {isVisible(settings, 'hourly') && <div className="weather-page-hourly-section" style={{ order: getSectionOrder(settings, 'hourly') }}>
                     <HourlyWeather
                         hourly={data?.hourly}
                         hourlyTimeline={data?.hourlyTimeline}
                         currentWeather={data?.currentWeather}
                     />
-                </div>
+                </div>}
             </div>
         </div>
     );

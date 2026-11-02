@@ -34,7 +34,8 @@ def env_bool(name, default):
 class CameraStreamer:
     def __init__(self, camera_index=0):
         self.camera_index = camera_index
-        self.enabled = True
+        # The backend restores the saved privacy choice after health checks.
+        self.enabled = False
 
         self.capture_width = env_int("CAMERA_CAPTURE_WIDTH", 1280)
         self.capture_height = env_int("CAMERA_CAPTURE_HEIGHT", 720)
@@ -188,11 +189,28 @@ class CameraStreamer:
         with self.stream_condition:
             self.stream_viewers += 1
             logger.info("Video stream connected (viewers=%s)", self.stream_viewers)
+            self.stream_condition.notify_all()
 
     def remove_stream_viewer(self):
         with self.stream_condition:
             self.stream_viewers = max(0, self.stream_viewers - 1)
             logger.info("Video stream disconnected (viewers=%s)", self.stream_viewers)
+
+    def wait_for_viewer(self, timeout=0.5):
+        # Wake immediately on a viewer/privacy change instead of sleeping for
+        # half a second before noticing the first viewer.
+        with self.stream_condition:
+            return self.stream_condition.wait_for(
+                lambda: self.enabled and self.stream_viewers > 0,
+                timeout=timeout,
+            )
+
+    def set_enabled(self, enabled):
+        with self.stream_condition:
+            self.enabled = enabled
+            self.stream_condition.notify_all()
+        if not enabled:
+            self.stop_capture()
 
     def wait_for_stream_frame(self, last_frame_id, timeout=2.0):
         deadline = time.time() + timeout
@@ -226,7 +244,7 @@ def capture_loop():
                         "camera disabled" if not streamer.enabled else "0 viewers - stopping capture to save power",
                     )
                     streamer.stop_capture()
-                time.sleep(0.5)
+                streamer.wait_for_viewer()
                 continue
 
             if not streamer.initialize_capture():
@@ -280,13 +298,12 @@ def detection_status():
 
 @app.route("/control/enable", methods=["POST"])
 def enable_camera():
-    streamer.enabled = True
+    streamer.set_enabled(True)
     return jsonify({"success": True, "enabled": True})
 
 @app.route("/control/disable", methods=["POST"])
 def disable_camera():
-    streamer.enabled = False
-    streamer.stop_capture()
+    streamer.set_enabled(False)
     return jsonify({"success": True, "enabled": False})
 
 @app.route("/video/raw")

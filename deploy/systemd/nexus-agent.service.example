@@ -1,0 +1,19 @@
+[Unit]
+Description=Nexus host telemetry agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=REPLACE_WITH_AGENT_USER
+ExecStart=/opt/nexus-agent/.venv/bin/python /opt/nexus-agent/nexus_agent.py --config /opt/nexus-agent/config.local.json
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/nexus-agent
+
+[Install]
+WantedBy=multi-user.target

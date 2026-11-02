@@ -36,6 +36,7 @@ class CameraService {
         if (response.data.status === 'ok') {
           this.isAvailable = true;
           logger.info('Camera service is available and responded ok');
+          await this.setCameraEnabled(settingsService.get('camera.enabled') !== false);
           this.startMonitoring();
           return;
         } else {

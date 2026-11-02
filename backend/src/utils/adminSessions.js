@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { createToken, generateTokenId, TOKEN_AUDIENCES, verifyToken } = require('./auth');
 
-const STORE_PATH = path.join(__dirname, '../../data/admin-sessions.json');
+const STORE_PATH = path.join(process.env.NEXUS_DATA_DIR || path.join(__dirname, '../../data'), 'admin-sessions.json');
 
 function createEmptyStore() {
   return {

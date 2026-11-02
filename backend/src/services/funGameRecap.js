@@ -35,23 +35,26 @@ function getSeasonTypes() {
 async function fetchScheduleEvents(options = {}) {
   const teamId = String(options.teamId || getTeamId()).trim();
   const season = Number.isFinite(options.season) ? options.season : getNbaSeason();
+  const base = options.league ? `https://site.api.espn.com/apis/site/v2/sports/${options.league}` : ESPN_BASE;
   const seasonTypes = Array.isArray(options.seasonTypes) && options.seasonTypes.length > 0
     ? options.seasonTypes.map((value) => String(value).trim()).filter(Boolean)
     : getSeasonTypes();
 
   logger.info('Fetching team schedules from ESPN', { teamId, season, seasonTypes });
 
-  const responses = await Promise.all(
+  const responses = await Promise.allSettled(
     seasonTypes.map(async (seasonType) => {
-      const url = `${ESPN_BASE}/teams/${teamId}/schedule?season=${season}&seasontype=${encodeURIComponent(seasonType)}`;
+      const url = `${base}/teams/${teamId}/schedule?season=${season}&seasontype=${encodeURIComponent(seasonType)}`;
       const response = await axios.get(url, { timeout: ESPN_TIMEOUT_MS });
       return response.data?.events || [];
     })
   );
 
+  const successful = responses.filter((response) => response.status === 'fulfilled');
+  if (!successful.length) throw new Error('Team schedules unavailable');
   return Array.from(
     new Map(
-      responses
+      successful.map((response) => response.value)
         .flat()
         .filter((event) => event?.id)
         .map((event) => [String(event.id), event])
@@ -60,11 +63,11 @@ async function fetchScheduleEvents(options = {}) {
 }
 
 function extractScore(scoreVal) {
-  if (scoreVal == null) return 0;
+  if (scoreVal == null || scoreVal === '') return null;
   if (typeof scoreVal === 'object') {
-    return Number(scoreVal.value ?? scoreVal.displayValue) || 0;
+    return extractScore(scoreVal.value ?? scoreVal.displayValue);
   }
-  return Number(scoreVal) || 0;
+  return Number.isFinite(Number(scoreVal)) ? Number(scoreVal) : null;
 }
 
 function formatGameDate(isoDate) {
@@ -128,15 +131,41 @@ function parseBoxScore(boxData) {
   return { players, totals, labels };
 }
 
-async function fetchRecentGames() {
-  const teamId = getTeamId();
-  const count = getGameCount();
-  const events = await fetchScheduleEvents({ teamId });
+function parseFootballBoxScore(boxscore, teamId) {
+  if (!boxscore) return null;
+  const ids = [...new Set([...(boxscore.players || []), ...(boxscore.teams || [])].map((entry) => String(entry.team?.id || '')).filter(Boolean))];
+  const parseTeam = (id) => {
+    const players = boxscore.players?.find((entry) => String(entry.team?.id) === id);
+    const team = boxscore.teams?.find((entry) => String(entry.team?.id) === id);
+    const categories = (players?.statistics || []).map((category) => ({
+      id: category.name, name: category.text || category.displayName || category.name,
+      labels: category.labels || [],
+      players: (category.athletes || []).map((row) => ({ name: row.athlete?.shortName || row.athlete?.displayName || 'Player', stats: (category.labels || []).map((_, index) => row.stats?.[index] ?? null) })),
+      totals: (category.labels || []).map((_, index) => category.totals?.[index] ?? null),
+    })).filter((category) => category.players.length);
+    const statistics = (team?.statistics || []).map((stat) => ({ id: stat.name, label: stat.label || stat.name, value: stat.displayValue ?? null }));
+    return categories.length || statistics.length ? { categories, statistics } : null;
+  };
+  return { sport: 'football', team: parseTeam(String(teamId)), opponent: parseTeam(ids.find((id) => id !== String(teamId))) };
+}
+
+async function fetchRecentGames(options = {}) {
+  const teamId = String(options.teamId || getTeamId());
+  const count = Math.min(options.count || getGameCount(), 10);
+  let events = await fetchScheduleEvents({ ...options, teamId });
+  const isCompleted = (event) => Number(event.seasonType?.type ?? event.seasonType?.id) !== 1
+    && (event.competitions?.[0]?.status || event.status)?.type?.completed === true
+    && event.competitions?.[0]?.competitors?.some((competitor) => String(competitor.team?.id) === teamId);
+  if (options.includePreviousSeason && events.filter(isCompleted).length < count) {
+    try {
+      const previous = await fetchScheduleEvents({ ...options, teamId, season: options.season - 1 });
+      events = [...new Map([...previous, ...events].map((event) => [String(event.id), event])).values()];
+    } catch (_) { logger.warn('Previous season unavailable; retaining current completed games', { teamId }); }
+  }
 
   const completed = events
     .filter((e) => {
-      const status = e.competitions?.[0]?.status;
-      return status?.type?.completed === true;
+      return isCompleted(e);
     })
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, count);
@@ -158,7 +187,7 @@ async function fetchRecentGames() {
       date: event.date,
       dateFormatted: formatGameDate(event.date),
       homeAway: isHome ? 'home' : 'away',
-      result: team.winner === true ? 'W' : 'L',
+      result: team.winner === true ? 'W' : opp.winner === true ? 'L' : extractScore(team.score) != null && extractScore(opp.score) != null && extractScore(team.score) === extractScore(opp.score) ? 'T' : null,
       score: {
         team: extractScore(team.score),
         opponent: extractScore(opp.score),
@@ -166,12 +195,14 @@ async function fetchRecentGames() {
       home: {
         abbrev: homeComp.team?.abbreviation || '???',
         displayName: homeComp.team?.displayName || 'Home',
+        location: homeComp.team?.location || null,
         logo: homeComp.team?.logos?.[0]?.href || homeComp.team?.logo || null,
         score: extractScore(homeComp.score),
       },
       away: {
         abbrev: awayComp.team?.abbreviation || '???',
         displayName: awayComp.team?.displayName || 'Away',
+        location: awayComp.team?.location || null,
         logo: awayComp.team?.logos?.[0]?.href || awayComp.team?.logo || null,
         score: extractScore(awayComp.score),
       },
@@ -184,11 +215,13 @@ async function fetchRecentGames() {
   });
 }
 
-async function fetchBoxScore(gameId, teamId) {
-  const url = `${ESPN_BASE}/summary?event=${gameId}`;
+async function fetchBoxScore(gameId, teamId, options = {}) {
+  const base = options.league ? `https://site.api.espn.com/apis/site/v2/sports/${options.league}` : ESPN_BASE;
+  const url = `${base}/summary?event=${gameId}`;
   try {
     const response = await axios.get(url, { timeout: ESPN_TIMEOUT_MS });
     const boxscore = response.data?.boxscore;
+    if (options.sport === 'football') return parseFootballBoxScore(boxscore, teamId);
     if (!boxscore?.players) {
       return null;
     }
@@ -233,4 +266,5 @@ module.exports = {
   fetchBoxScore,
   fetchScheduleEvents,
   getTeamId,
+  parseFootballBoxScore,
 };

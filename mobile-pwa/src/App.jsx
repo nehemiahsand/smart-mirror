@@ -1,130 +1,283 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import Dashboard from './pages/Dashboard';
-import WiFiSettings from './pages/WiFiSettings';
-import Camera from './pages/Camera';
-import WidgetManager from './pages/WidgetManager';
-import Photos from './pages/Photos';
-import Settings from './pages/Settings';
-import SportsSettings from './pages/SportsSettings';
-import MoreMenu from './pages/MoreMenu';
-import Login from './pages/Login';
-import './components/common.css';
-import './assets/styles/App.css';
+import React, { useEffect, useState, useId, lazy, Suspense } from 'react';
+import {
+    createBrowserRouter,
+    RouterProvider,
+    NavLink,
+    Navigate,
+    Route,
+    Routes,
+    useLocation
+} from 'react-router-dom';
+import {
+    Activity,
+    House,
+    AlarmClock,
+    LampDesk,
+    Network,
+    PanelsTopLeft,
+    Settings2
+} from 'lucide-react';
+import { NexusProvider, useNexus } from './state/NexusProvider';
 import { fetchAuthSession } from './api/apiClient';
+import Login from './pages/Login';
+const Home = lazy(() => import('./pages/Home'));
+const Mirror = lazy(() => import('./pages/Mirror'));
+const Alarms = lazy(() => import('./pages/Alarms'));
+const Lights = lazy(() => import('./pages/Lights'));
+const Monitor = lazy(() => import('./pages/Monitor'));
+const NexusSettings = lazy(() => import('./pages/NexusSettings'));
+import { Button, Notice } from './components/NexusUI';
+import { m, useReducedMotion } from 'motion/react';
+import './assets/styles/nexus.css';
 
-function App() {
-  return (
-    <Router>
-      <div className="app">
-        <AppContent />
-      </div>
-    </Router>
-  );
+const destinations = [
+    ['home', 'Home', House, '/home'],
+    ['mirror', 'Mirror', PanelsTopLeft, '/mirror/controls'],
+    ['alarms', 'Alarms', AlarmClock, '/alarms/alarms'],
+    ['lights', 'Lights', LampDesk, '/lights'],
+    ['monitor', 'Monitor', Activity, '/monitor/devices'],
+    ['settings', 'Settings', Settings2, '/settings']
+];
+function Navigation({ current }) {
+    const id = useId();
+    const reduced = useReducedMotion();
+    return (
+        <nav className="nexus-navigation" aria-label="Main navigation">
+            {destinations.map(([key, name, Icon, path]) => (
+                <NavLink
+                    key={key}
+                    to={path}
+                    aria-current={current === key ? 'page' : undefined}
+                    className={`nav-${key} ${current === key ? 'selected' : ''}`}
+                >
+                    {current === key && (
+                        <m.span
+                            className="nav-active-background"
+                            layoutId={`${id}-nav`}
+                            transition={{ duration: reduced ? 0 : 0.22 }}
+                        />
+                    )}
+                    <span className="nav-icon">
+                        <Icon />
+                    </span>
+                    <span>{name}</span>
+                </NavLink>
+            ))}
+        </nav>
+    );
 }
-
-function AppContent() {
-  const location = useLocation();
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [authState, setAuthState] = useState({ checked: false, authenticated: false });
-  const isLoginPage = location.pathname === '/login';
-
-  useEffect(() => {
-    const path = location.pathname.slice(1) || 'dashboard';
-    setActiveTab(path);
-  }, [location]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadSession = async () => {
-      try {
-        const session = await fetchAuthSession();
-        if (!active) return;
-        setAuthState({ checked: true, authenticated: session.authenticated === true });
-      } catch (_) {
-        if (!active) return;
-        setAuthState({ checked: true, authenticated: false });
-      }
-    };
-
-    loadSession();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const RequireAuth = ({ children }) => {
-    if (!authState.checked) {
-      return <div className="loading">Loading...</div>;
+function Shell({ onLogout }) {
+    const { data, connected, request, refresh } = useNexus();
+    const { pathname } = useLocation();
+    const reduced = useReducedMotion();
+    const current =
+        destinations.find(([key]) => pathname.startsWith(`/${key}`)) ||
+        destinations[0];
+    const [error, setError] = useState('');
+    const [dismissing, setDismissing] = useState(false);
+    async function dismiss() {
+        setDismissing(true);
+        setError('');
+        try {
+            await request('/api/clock/command', {
+                action: 'alarm.dismiss',
+                requestId: crypto.randomUUID()
+            });
+            await refresh('clock');
+        } catch (e) {
+            setError(e.message);
+        } finally {
+            setDismissing(false);
+        }
     }
-
-    if (!authState.authenticated) {
-      return <Navigate to="/login" replace />;
-    }
-    return children;
-  };
-
-  const handleAuthChange = (authenticated) => {
-    setAuthState({ checked: true, authenticated });
-  };
-
-  return (
-    <>
-      <main className="main-content">
-        <Routes>
-          <Route path="/login" element={<Login sessionChecked={authState.checked} authenticated={authState.authenticated} onAuthChange={handleAuthChange} />} />
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
-          <Route path="/wifi" element={<RequireAuth><WiFiSettings /></RequireAuth>} />
-          <Route path="/camera" element={<RequireAuth><Camera /></RequireAuth>} />
-          <Route path="/widgets" element={<RequireAuth><WidgetManager /></RequireAuth>} />
-          <Route path="/photos" element={<RequireAuth><Photos /></RequireAuth>} />
-          <Route path="/sports" element={<RequireAuth><SportsSettings /></RequireAuth>} />
-          <Route path="/settings" element={<RequireAuth><Settings authenticated={authState.authenticated} onAuthChange={handleAuthChange} /></RequireAuth>} />
-          <Route path="/more" element={<RequireAuth><MoreMenu /></RequireAuth>} />
-        </Routes>
-      </main>
-
-      {!isLoginPage && <nav className="bottom-nav">
-        <Link to="/dashboard" className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-          <span className="nav-label">Home</span>
-        </Link>
-
-        <Link to="/camera" className={`nav-item ${activeTab === 'camera' ? 'active' : ''}`}>
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <span className="nav-label">Camera</span>
-        </Link>
-
-        <Link to="/photos" className={`nav-item ${activeTab === 'photos' ? 'active' : ''}`}>
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          <span className="nav-label">Photos</span>
-        </Link>
-
-        <Link to="/widgets" className={`nav-item ${activeTab === 'widgets' ? 'active' : ''}`}>
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" />
-          </svg>
-          <span className="nav-label">Widgets</span>
-        </Link>
-
-        <Link to="/more" className={`nav-item ${activeTab === 'more' ? 'active' : ''}`}>
-          <svg className="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-          <span className="nav-label">More</span>
-        </Link>
-      </nav>}
-    </>
-  );
+    return (
+        <div className="nexus-app">
+            <aside className="nexus-sidebar">
+                <div className="nexus-brand">
+                    <span className="brand-mark">
+                        <Network />
+                    </span>
+                    Nexus
+                </div>
+                <p>Your connected setup.</p>
+                <Navigation current={current[0]} />
+            </aside>
+            <div className="nexus-workspace">
+                <header className="nexus-topbar">
+                    <div className="nexus-brand">
+                        <span className="brand-mark">
+                            <Network />
+                        </span>
+                        Nexus
+                    </div>
+                    <NavLink
+                        className="nexus-settings-shortcut"
+                        to="/settings"
+                        aria-label="Settings"
+                        aria-current={
+                            current[0] === 'settings' ? 'page' : undefined
+                        }
+                    >
+                        <Settings2 />
+                    </NavLink>
+                    <span className={`connection ${connected ? '' : 'muted'}`}>
+                        {connected ? 'Connected' : 'Reconnecting'}
+                    </span>
+                </header>
+                {data.clock?.state?.ringing && (
+                    <div className="ringing-banner" role="status">
+                        <AlarmClock />
+                        <div>
+                            <strong>Alarm ringing</strong>
+                            <small>
+                                {data.clock.state.ringingInferred
+                                    ? 'Inferred · Sharp clock'
+                                    : 'Sharp clock'}
+                            </small>
+                        </div>
+                        <Button
+                            onClick={dismiss}
+                            disabled={
+                                dismissing ||
+                                !data.clock.online ||
+                                !data.clock.fresh ||
+                                data.clock.state.sharpBusy
+                            }
+                        >
+                            Dismiss
+                        </Button>
+                    </div>
+                )}
+                <Notice error={error} />
+                <m.main
+                    key={pathname}
+                    id="main-content"
+                    className="nexus-main"
+                    initial={reduced ? false : { opacity: 0, y: 7 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: reduced ? 0 : 0.2 }}
+                >
+                    <Suspense
+                        fallback={
+                            <p className="hint" role="status">
+                                Opening view…
+                            </p>
+                        }
+                    >
+                        <Routes>
+                            <Route path="/home" element={<Home />} />
+                            <Route path="/mirror/:view" element={<Mirror />} />
+                            <Route path="/alarms/:view" element={<Alarms />} />
+                            <Route path="/lights" element={<Lights />} />
+                            <Route
+                                path="/monitor/:view"
+                                element={<Monitor />}
+                            />
+                            <Route
+                                path="/monitor/devices/:id"
+                                element={<Monitor />}
+                            />
+                            <Route
+                                path="/monitor/devices/:id/network"
+                                element={<Monitor />}
+                            />
+                            <Route
+                                path="/settings/*"
+                                element={<NexusSettings onLogout={onLogout} />}
+                            />
+                            {Object.entries({
+                                '/': '/home',
+                                '/dashboard': '/home',
+                                '/camera': '/mirror/camera',
+                                '/photos': '/mirror/photos',
+                                '/widgets': '/mirror/edit',
+                                '/sports': '/mirror/edit?section=sports',
+                                '/wifi': '/monitor/devices/mirror/network',
+                                '/more': '/settings',
+                                '/mirror': '/mirror/controls',
+                                '/alarms': '/alarms/alarms',
+                                '/monitor': '/monitor/devices'
+                            }).map(([from, to]) => (
+                                <Route
+                                    key={from}
+                                    path={from}
+                                    element={<Navigate to={to} replace />}
+                                />
+                            ))}
+                            <Route
+                                path="*"
+                                element={<Navigate to="/home" replace />}
+                            />
+                        </Routes>
+                    </Suspense>
+                </m.main>
+                <Navigation current={current[0]} />
+            </div>
+        </div>
+    );
 }
-
-export default App;
+function Session() {
+    const [session, setSession] = useState({
+        checked: false,
+        authenticated: false
+    });
+    const location = useLocation();
+    useEffect(() => {
+        let active = true;
+        fetchAuthSession()
+            .then((result) => {
+                if (active)
+                    setSession({
+                        checked: true,
+                        authenticated: result.authenticated === true
+                    });
+            })
+            .catch(() => {
+                if (active) setSession({ checked: true, authenticated: false });
+            });
+        return () => {
+            active = false;
+        };
+    }, []);
+    useEffect(() => {
+        const expire = () =>
+            setSession({ checked: true, authenticated: false });
+        window.addEventListener('nexus:unauthorized', expire);
+        return () => window.removeEventListener('nexus:unauthorized', expire);
+    }, []);
+    if (!session.checked)
+        return <div className="nexus-loading">Connecting to Nexus…</div>;
+    if (!session.authenticated || location.pathname === '/login')
+        return (
+            <Login
+                sessionChecked
+                authenticated={session.authenticated}
+                onAuthChange={(authenticated) =>
+                    setSession({ checked: true, authenticated })
+                }
+            />
+        );
+    return (
+        <NexusProvider>
+            <Shell
+                onLogout={() =>
+                    setSession({ checked: true, authenticated: false })
+                }
+            />
+        </NexusProvider>
+    );
+}
+const router = createBrowserRouter([{ path: '*', element: <Session /> }]);
+export default function App() {
+    return (
+        <>
+            {import.meta.env.VITE_NEXUS_PREVIEW === 'true' && (
+                <div className="preview-banner" role="status">
+                    Nexus preview · Simulated devices · Changes reset when
+                    restarted
+                </div>
+            )}
+            <RouterProvider router={router} />
+        </>
+    );
+}

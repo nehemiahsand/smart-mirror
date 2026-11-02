@@ -5,6 +5,7 @@ const cameraService = require('./camera');
 const climateService = require('./climate');
 const funContentService = require('./funContent');
 const funVideoService = require('./funVideo');
+const sportsExperience = require('./sportsExperience');
 const logger = require('../utils/logger');
 const moonPhaseService = require('./moonPhase');
 const settingsService = require('./settings');
@@ -436,6 +437,13 @@ class ConsoleService {
     return (parsedIndex % safeTotal + safeTotal) % safeTotal;
   }
 
+  ensureRecapTeam(teamId) {
+    if (this.runtime.funRecapTeam === teamId) return;
+    this.runtime.funRecapTeam = teamId;
+    this.runtime.funClipIndex = 0;
+    this.runtime.funViewMode = 'video';
+  }
+
   getFunClipIndex(totalClips) {
     this.runtime.funClipIndex = this.normalizeFunClipIndex(this.runtime.funClipIndex, totalClips);
     return this.runtime.funClipIndex;
@@ -575,14 +583,17 @@ class ConsoleService {
           button4: 'Refresh',
           button5: 'Stats',
         };
-      case 'sports':
+      case 'sports': {
+        const { tracker, games } = sportsExperience.selection();
+        const returnToLive = sportsExperience.override?.mode === 'highlights' && games.some((g) => !g.stale);
         return {
           button1: pageToggleTarget.name,
-          button2: 'Prev',
-          button3: 'Next',
-          button4: this.runtime.funViewMode === 'boxscore' ? 'Video' : 'Box',
+          button2: tracker ? 'Prev game' : 'Prev',
+          button3: tracker ? 'Next game' : 'Next',
+          button4: tracker ? 'Highlights' : returnToLive ? 'Live' : this.runtime.funViewMode === 'boxscore' ? 'Video' : 'Box',
           button5: 'Stats',
         };
+      }
       case 'media':
         return {
           button1: pageToggleTarget.name,
@@ -1014,7 +1025,21 @@ class ConsoleService {
       return this.openStatsOverlay('sports:stats');
     }
 
-    const videoFeed = await funVideoService.getCurrentFeed();
+    const live = await sportsExperience.getExperience({ includeHighlights: false });
+    if (live.tracker || live.override?.mode === 'highlights' && live.games.some((g) => !g.stale) && action === 'next') {
+      if (action === 'next') await sportsExperience.select({ mode: live.tracker ? 'highlights' : 'auto' });
+      else if (['primary', 'previous'].includes(action)) {
+        const games = sportsExperience.selection().games.filter((g) => !g.stale);
+        const index = games.findIndex((g) => g.id === live.tracker?.id);
+        if (games.length) await sportsExperience.select({ mode: 'game', gameId: games[cycleIndex(Math.max(index, 0), games.length, action === 'primary' ? -1 : 1)].id });
+      }
+      this.touchInteraction(`sports:${action}`);
+      this.broadcastState();
+      await this.broadcastPageData('sports');
+      return this.getState();
+    }
+    this.ensureRecapTeam(sportsExperience.preferences().team);
+    const videoFeed = await sportsExperience.getHighlights(sportsExperience.preferences().team);
     const totalClips = Array.isArray(videoFeed?.items) ? videoFeed.items.length : 0;
     const currentClipIndex = this.getFunClipIndex(totalClips);
 
@@ -1225,9 +1250,10 @@ class ConsoleService {
   }
 
   async getSportsPageData() {
-    const [videoFeed] = await Promise.all([
-      funVideoService.getCurrentFeed(),
-    ]);
+    const experience = await sportsExperience.getExperience();
+    this.broadcastState();
+    this.ensureRecapTeam(experience.preferences.team);
+    const videoFeed = experience.videoFeed || { items: [], unavailable: false };
 
     const totalClips = Array.isArray(videoFeed?.items) ? videoFeed.items.length : 0;
     const selectedClipIndex = this.getFunClipIndex(totalClips);
@@ -1245,12 +1271,13 @@ class ConsoleService {
       canonicalPageId: 'sports',
       title: this.getPages().sports?.title || 'Sports',
       videoFeed: videoFeedWithSelection,
+      experience: { ...experience, videoFeed: undefined },
       item: null,
       items: [],
       selectedClipIndex,
-      summary: videoFeed.unavailable ? 'Video highlights unavailable'
+      summary: experience.tracker ? `${experience.tracker.home.abbreviation} vs ${experience.tracker.away.abbreviation} live game` : videoFeed.unavailable ? 'Video highlights unavailable'
         : videoFeed.mode === 'game_recap' ? 'Game highlights ready'
-          : 'Stephen Curry highlights ready',
+          : 'Team highlights ready',
       softButtons: this.getSoftButtons('sports'),
     };
   }
@@ -1397,7 +1424,7 @@ class ConsoleService {
     }
   }
 
-  async handleSettingsChanged(reason = 'settings_changed') {
+  async handleSettingsChanged(reason = 'settings_changed', options = {}) {
     if (this.isStandbyActive()) {
       this.state.overlayMode = null;
     }
@@ -1419,7 +1446,9 @@ class ConsoleService {
     this.state.updatedAt = Date.now();
     this.broadcastState();
     if (this.isManualPage()) {
-      await this.broadcastPageData(this.state.activePageId);
+      const update = this.broadcastPageData(this.state.activePageId);
+      if (options.awaitPageData !== false) await update;
+      else update.catch(() => logger.warn('Mirror content refresh failed after saving preferences'));
     }
     return this.getState();
   }

@@ -6,6 +6,8 @@
 #include <HTTPClient.h>
 #include <PubSubClient.h>
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <time.h>
 #include <Wire.h>
 
 #include "config.h"
@@ -62,7 +64,7 @@ struct MirrorState {
 
 namespace {
 Adafruit_SSD1306 gDisplay(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, &Wire, -1);
-WiFiClient gWiFiClient;
+WiFiClientSecure gWiFiClient;
 PubSubClient gMqttClient(gWiFiClient);
 DHTesp gDht22;
 
@@ -408,6 +410,12 @@ void connectMqtt() {
   if (!wifiConnected() || gMqttClient.connected()) {
     return;
   }
+  // Certificate validity requires synchronized time. Never connect insecurely.
+  if (time(nullptr) < 1704067200 || Config::MQTT_PORT != 8883 ||
+      strlen(Config::MQTT_CA_PEM) < 64 || strlen(Config::MQTT_USERNAME) == 0 ||
+      strlen(Config::MQTT_PASSWORD) == 0) {
+    return;
+  }
 
   const unsigned long nowMs = millis();
   if ((nowMs - gLastMqttAttemptMs) < Config::MQTT_RECONNECT_INTERVAL_MS) {
@@ -417,13 +425,10 @@ void connectMqtt() {
   gLastMqttAttemptMs = nowMs;
   Serial.printf("[mqtt] connecting to %s:%u\n", Config::MQTT_HOST, Config::MQTT_PORT);
 
-  const bool connected = Config::MQTT_USE_AUTH
-                             ? gMqttClient.connect(
+  const bool connected = gMqttClient.connect(
                                    Config::DEVICE_ID, Config::MQTT_USERNAME,
                                    Config::MQTT_PASSWORD, gStatusTopic.c_str(), 0, true,
-                                   "offline")
-                             : gMqttClient.connect(Config::DEVICE_ID, gStatusTopic.c_str(), 0,
-                                                   true, "offline");
+                                   "offline");
 
   if (connected) {
     Serial.println("[mqtt] connected");
@@ -904,6 +909,9 @@ void setup() {
   gLastButtonActivityMs = millis();
 
   gMqttClient.setServer(Config::MQTT_HOST, Config::MQTT_PORT);
+  gWiFiClient.setCACert(Config::MQTT_CA_PEM);
+  gWiFiClient.setHandshakeTimeout(5);
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
   gMqttClient.setBufferSize(512);
 
   gDht22.setup(Pins::DHT22_DATA, DHTesp::DHT22);

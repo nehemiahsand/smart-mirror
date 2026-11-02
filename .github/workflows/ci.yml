@@ -12,7 +12,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: [18.x] # Ensure we test on Node 18 (what your Dockerfile uses)
+        node-version: [22.x] # Match the backend production runtime
 
     steps:
     # 1. Check out the code

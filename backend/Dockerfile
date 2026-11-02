@@ -1,4 +1,4 @@
-FROM node:18-slim AS pwa-builder
+FROM node:22-slim AS pwa-builder
 
 WORKDIR /build/mobile-pwa
 
@@ -9,7 +9,7 @@ COPY mobile-pwa/ ./
 
 RUN npm run build
 
-FROM node:18-slim
+FROM node:22-slim
 
 # Install Python, network tools, X11/Wayland utilities, and dependencies for DHT22 sensor
 RUN apt-get update && apt-get install -y \
@@ -43,7 +43,7 @@ WORKDIR /app
 COPY backend/package*.json ./
 
 # Install Node dependencies
-RUN npm install --omit=dev
+RUN npm ci --omit=dev
 
 # Copy application code
 COPY backend/ ./

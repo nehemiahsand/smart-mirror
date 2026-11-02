@@ -12,6 +12,9 @@ const sceneEngine = require('../services/sceneEngine');
 const settingsService = require('../services/settings');
 const weatherService = require('../services/weather');
 const { redactSensitive } = require('../utils/redaction');
+const { extractAdminToken } = require('../utils/requestAuth');
+const { verifyAdminSessionToken } = require('../utils/adminSessions');
+const nexusEvents = require('../services/nexusEvents');
 
 const ALLOWED_SYNC_PAGES = new Set(['home', 'weather', 'sports', 'spotify']);
 
@@ -33,6 +36,12 @@ class WebSocketServer {
       logger.info('WebSocket client connected', { ip: clientIp });
       
       this.clients.add(ws);
+      ws.adminToken = extractAdminToken(req);
+      if (this.isAdmin(ws)) {
+        this.send(ws, { type: 'clock_state', data: require('../services/clock').getState() });
+        this.send(ws, { type: 'lights_state', data: require('../services/lights').list() });
+        this.send(ws, { type: 'devices_state', data: require('../services/devices').list() });
+      }
 
       // Send initial connection message with current time
       this.send(ws, {
@@ -108,6 +117,11 @@ class WebSocketServer {
 
     // Start automatic broadcasts
     this.startAutoBroadcasts();
+    this.nexusHandlers = ['clock_state', 'clock_event', 'lights_state', 'devices_state', 'activity_event', 'nexus_config'].map(type => {
+      const handler = data => this.broadcastAdmin({ type, data, timestamp: Date.now() });
+      nexusEvents.on(type, handler);
+      return [type, handler];
+    });
 
     logger.info('WebSocket server initialized with auto-broadcasts');
     
@@ -409,6 +423,15 @@ class WebSocketServer {
     }
   }
 
+  isAdmin(ws) {
+    try { return !!ws.adminToken && verifyAdminSessionToken(ws.adminToken)?.role === 'admin'; }
+    catch (_) { return false; }
+  }
+
+  broadcastAdmin(data) {
+    for (const ws of this.clients) if (this.isAdmin(ws)) this.send(ws, data);
+  }
+
   broadcast(data) {
     const message = JSON.stringify(data);
     let sentCount = 0;
@@ -534,6 +557,7 @@ class WebSocketServer {
   }
 
   close() {
+    for (const [type, handler] of this.nexusHandlers || []) nexusEvents.off(type, handler);
     // Stop all broadcasts
     this.stopAutoBroadcasts();
     

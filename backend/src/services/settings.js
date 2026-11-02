@@ -5,8 +5,9 @@
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
+const { normalizeSportsPreferences } = require('../utils/sportsTeams');
 
-const SETTINGS_DIR = path.join(__dirname, '../../data');
+const SETTINGS_DIR = process.env.NEXUS_DATA_DIR || path.join(__dirname, '../../data');
 const SETTINGS_FILE = path.join(SETTINGS_DIR, 'settings.json');
 const SENSITIVE_KEY_PATTERNS = [/token/i, /secret/i, /password/i, /api.?key/i, /authorization/i];
 const SENSITIVE_PATHS = new Set([
@@ -36,6 +37,9 @@ const DEFAULT_SETTINGS = {
     updateInterval: 600000
   },
   sports: {
+    highlightsTeam: 'gsw',
+    liveGames: true,
+    livePriority: ['auburn', 'gsw'],
     enabled: false,
     sport: 'nba',
     defaultSport: 'nba',
@@ -142,6 +146,7 @@ class SettingsService {
         const data = await fs.readFile(SETTINGS_FILE, 'utf8');
         const loadedSettings = JSON.parse(data);
         this.settings = mergeSettings(cloneDefaultSettings(), loadedSettings);
+        this.settings.sports = normalizeSportsPreferences(this.settings.sports);
         logger.info('Settings loaded successfully');
 
         const normalizedSettings = JSON.stringify(this.settings);
@@ -162,9 +167,10 @@ class SettingsService {
     }
   }
 
-  async save() {
+  async save(snapshot = this.settings) {
     try {
-      await fs.writeFile(SETTINGS_FILE, JSON.stringify(this.settings, null, 2), 'utf8');
+      await fs.writeFile(`${SETTINGS_FILE}.tmp`, JSON.stringify(snapshot, null, 2), { encoding: 'utf8', mode: 0o600 });
+      await fs.rename(`${SETTINGS_FILE}.tmp`, SETTINGS_FILE);
       logger.debug('Settings saved to disk');
     } catch (error) {
       logger.error('Failed to save settings', { error: error.message });
@@ -192,56 +198,43 @@ class SettingsService {
   }
 
   async update(key, value) {
-    const keys = key.split('.');
-    let target = this.settings;
-    
-    for (let i = 0; i < keys.length - 1; i++) {
-      const k = keys[i];
-      if (!(k in target)) {
-        target[k] = {};
-      }
-      target = target[k];
-    }
-    
-    target[keys[keys.length - 1]] = value;
-    await this.save();
-    logger.info('Setting updated', {
-      key,
-      value: (isSensitiveKey(key) || isSensitivePath(key)) ? '[REDACTED]' : value
-    });
-    
-    return this.settings;
+    return this.updateMultiple({ [key]: value });
   }
 
   async updateMultiple(updates) {
-    for (const [key, value] of Object.entries(updates)) {
-      const keys = key.split('.');
-      let target = this.settings;
-      
-      for (let i = 0; i < keys.length - 1; i++) {
-        const k = keys[i];
-        if (!(k in target)) {
-          target[k] = {};
+    if (Object.keys(updates).some(key => key.split('.').some(part => ['__proto__', 'constructor', 'prototype'].includes(part)))) throw new Error('Invalid settings path');
+    this.updateQueue = (this.updateQueue || Promise.resolve()).catch(() => {}).then(async () => {
+      const next = JSON.parse(JSON.stringify(this.settings));
+      for (const [key, value] of Object.entries(updates)) {
+        const keys = key.split('.');
+        let target = next;
+        for (let i = 0; i < keys.length - 1; i++) {
+          const k = keys[i];
+          if (!target[k] || typeof target[k] !== 'object') target[k] = {};
+          target = target[k];
         }
-        target = target[k];
+        target[keys[keys.length - 1]] = value;
       }
-      
-      target[keys[keys.length - 1]] = value;
-    }
-    
-    await this.save();
-    const updatedKeys = Object.keys(updates).map((key) => ((isSensitiveKey(key) || isSensitivePath(key)) ? `${key}:[REDACTED]` : key));
-    logger.info('Multiple settings updated', { count: Object.keys(updates).length, keys: updatedKeys });
-    
-    return this.settings;
+      next.sports = normalizeSportsPreferences(next.sports);
+      await this.save(next);
+      this.settings = next;
+      const updatedKeys = Object.keys(updates).map(key => (isSensitiveKey(key) || isSensitivePath(key)) ? `${key}:[REDACTED]` : key);
+      logger.info('Multiple settings updated', { count: updatedKeys.length, keys: updatedKeys });
+      return this.settings;
+    });
+    return this.updateQueue;
   }
 
   async reset() {
-    this.settings = cloneDefaultSettings();
-    await this.save();
-    logger.info('Settings reset to defaults');
-    
-    return this.settings;
+    this.updateQueue = (this.updateQueue || Promise.resolve()).catch(() => {}).then(async () => {
+      const next = cloneDefaultSettings();
+      next.sports = normalizeSportsPreferences(next.sports);
+      await this.save(next);
+      this.settings = next;
+      logger.info('Settings reset to defaults');
+      return this.settings;
+    });
+    return this.updateQueue;
   }
 }
 

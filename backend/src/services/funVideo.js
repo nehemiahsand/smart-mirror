@@ -616,12 +616,12 @@ class FunVideoService {
     const items = Array.isArray(payload?.items)
       ? payload.items.map((item) => ({
         ...item,
-        embedUrl: buildEmbedUrl(item.videoId),
+        embedUrl: item.videoId ? buildEmbedUrl(item.videoId) : null,
       }))
       : [];
 
     return {
-      provider: DEFAULT_PROVIDER,
+      provider: payload?.provider || DEFAULT_PROVIDER,
       mode: payload?.mode || 'search',
       query: payload?.query || getQuery(),
       date: payload?.date || getDateKey(),
@@ -631,6 +631,10 @@ class FunVideoService {
       stale,
       unavailable,
       message,
+      channelId: payload?.channelId || null,
+      channelTitle: payload?.channelTitle || null,
+      playbackMode: payload?.playbackMode || 'embed',
+      playbackMessage: payload?.playbackMessage || null,
     };
   }
 

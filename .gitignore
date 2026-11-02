@@ -5,3 +5,24 @@ mobile-pwa/.env
 voice/.env
 __pycache__/
 *.pyc
+backend/data/nexus-*.json
+backend/data/clock-history.json
+mosquitto/certs/
+mosquitto/credentials.json
+mosquitto/acl.local
+mosquitto/passwords.local
+mosquitto/clients.local
+esp32-console/include/secrets.h
+agents/config.local.json
+agents/agent-state.json
+mobile-pwa/node_modules/
+backend/node_modules/
+display/node_modules/
+mobile-pwa/dist/
+display/dist/
+mobile-pwa/test-results/
+mobile-pwa/playwright-report/
+
+# Existing Pi-local DNS configuration
+pi-hole/.env
+pi-hole/etc-pihole/

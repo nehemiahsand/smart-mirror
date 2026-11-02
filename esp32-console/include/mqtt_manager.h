@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <PubSubClient.h>
-#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 
 class MqttManager {
  public:
@@ -15,7 +15,7 @@ class MqttManager {
   bool publishEvent(const char* type);
 
  private:
-  WiFiClient wifiClient_;
+  WiFiClientSecure wifiClient_;
   PubSubClient client_{wifiClient_};
   unsigned long lastAttemptMs_ = 0;
   String eventTopic_;

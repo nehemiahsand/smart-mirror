@@ -1,253 +1,311 @@
-import React, { useState, useEffect } from 'react';
-import './WiFiSettings.css';
+import React, { useEffect, useRef, useState } from 'react';
+import { Eye, EyeOff, LockKeyhole, RefreshCw, Wifi } from 'lucide-react';
+import { Button, Notice, Surface } from '../components/NexusUI';
 import ConfirmModal from '../components/ConfirmModal';
 import AlertModal from '../components/AlertModal';
 import { apiFetch } from '../api/apiClient';
+import './WiFiSettings.css';
+
+async function wifiRequest(path, options) {
+    const response = await apiFetch(path, options);
+    const data = await response.json();
+    if (!response.ok)
+        throw new Error(data.error || data.message || 'Wi-Fi request failed');
+    return data;
+}
 
 export default function WiFiSettings() {
-  const [networks, setNetworks] = useState([]);
-  const [currentNetwork, setCurrentNetwork] = useState(null);
-  const [scanning, setScanning] = useState(false);
-  const [connecting, setConnecting] = useState(false);
-  const [selectedNetwork, setSelectedNetwork] = useState(null);
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [confirmModal, setConfirmModal] = useState(null);
-  const [alertModal, setAlertModal] = useState(null);
+    const [networks, setNetworks] = useState([]);
+    const [currentNetwork, setCurrentNetwork] = useState(null);
+    const [scanning, setScanning] = useState(false);
+    const [connecting, setConnecting] = useState(false);
+    const [selectedNetwork, setSelectedNetwork] = useState(null);
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState('');
+    const [confirmModal, setConfirmModal] = useState(null);
+    const [alertModal, setAlertModal] = useState(null);
+    const mounted = useRef(false);
+    const scanLock = useRef(false);
+    const connectLock = useRef(false);
+    const refreshTimer = useRef(null);
+    const formHeading = useRef(null);
+    const selectionButton = useRef(null);
 
-  useEffect(() => {
-    loadCurrentNetwork();
-    scanNetworks();
-  }, []);
+    useEffect(() => {
+        mounted.current = true;
+        loadCurrentNetwork();
+        scanNetworks();
+        return () => {
+            mounted.current = false;
+            clearTimeout(refreshTimer.current);
+        };
+    }, []);
+    useEffect(() => {
+        if (selectedNetwork) formHeading.current?.focus();
+    }, [selectedNetwork]);
 
-  const loadCurrentNetwork = async () => {
-    try {
-      const response = await apiFetch('/api/wifi/current');
-      const data = await response.json();
-      if (data.ssid) {
-        setCurrentNetwork(data);
-      }
-    } catch (error) {
-      console.error('Failed to load current network:', error);
-    }
-  };
-
-  const scanNetworks = async () => {
-    setScanning(true);
-    try {
-      const response = await apiFetch('/api/wifi/scan');
-      const data = await response.json();
-      setNetworks(data.networks || []);
-    } catch (error) {
-      console.error('Failed to scan networks:', error);
-    } finally {
-      setScanning(false);
-    }
-  };
-
-  const connectToNetwork = async () => {
-    if (!selectedNetwork || connecting) return;
-
-    setConnecting(true);
-    try {
-      const response = await apiFetch('/api/wifi/connect', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ssid: selectedNetwork.ssid,
-          password: password
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        if (data.captivePortal) {
-          const portalUrl = data.portalUrl || 'http://captive.apple.com';
-          setConfirmModal({
-            message: `Connected successfully!\n\nThis network requires captive portal authentication (like campus WiFi).\n\nClick OK to open the login page.`,
-            confirmText: 'Open Login',
-            onConfirm: () => {
-              window.open(portalUrl, '_blank');
-              setConfirmModal(null);
-            }
-          });
-        } else if (data.rebooting) {
-          setAlertModal({
-            type: 'success',
-            message: `Connected successfully!\n\nThe smart mirror will reboot in ${data.rebootDelay / 1000} seconds to apply the new network settings.\n\nYou may need to reconnect your phone to the new network.`
-          });
-        } else {
-          setAlertModal({ type: 'success', message: 'Connected successfully!' });
+    async function loadCurrentNetwork() {
+        try {
+            const data = await wifiRequest('/api/wifi/current');
+            if (mounted.current) setCurrentNetwork(data.ssid ? data : null);
+        } catch (failure) {
+            if (mounted.current) setError(failure.message);
         }
-
+    }
+    async function scanNetworks() {
+        if (scanLock.current) return;
+        scanLock.current = true;
+        setScanning(true);
+        setError('');
+        try {
+            const data = await wifiRequest('/api/wifi/scan');
+            if (mounted.current) setNetworks(data.networks || []);
+        } catch (failure) {
+            if (mounted.current) setError(failure.message);
+        } finally {
+            scanLock.current = false;
+            if (mounted.current) setScanning(false);
+        }
+    }
+    function cancelSelection() {
         setSelectedNetwork(null);
         setPassword('');
-        setTimeout(() => {
-          loadCurrentNetwork();
-        }, 3000);
-      } else {
-        setAlertModal({ type: 'error', message: 'Failed to connect: ' + (data.message || data.error || 'Unknown error') });
-      }
-    } catch (error) {
-      setAlertModal({ type: 'error', message: 'Connection failed: ' + error.message });
-    } finally {
-      setConnecting(false);
+        setShowPassword(false);
+        selectionButton.current?.focus();
     }
-  };
-
-  const getSignalIcon = (signal) => {
-    if (signal > -50) return '📶';
-    if (signal > -60) return '📶';
-    if (signal > -70) return '📡';
-    return '📡';
-  };
-
-  return (
-    <div className="page">
-      <div className="page-header">
-        <h1>WiFi</h1>
-      </div>
-
-      {/* Current Network */}
-      {currentNetwork && (
-        <div className="card">
-          <div className="card-header">
-            <span className="card-icon">✓</span>
-            <h2>Connected Network</h2>
-          </div>
-          <div className="current-network">
-            <div className="network-info">
-              <div className="network-name">{currentNetwork.ssid}</div>
-              <div className="network-details">
-                {currentNetwork.ip && <span>IP: {currentNetwork.ip}</span>}
-                {currentNetwork.signal && <span>Signal: {currentNetwork.signal} dBm</span>}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Available Networks */}
-      <div className="card">
-        <div className="card-header">
-          <span className="card-icon">📡</span>
-          <h2>Available Networks</h2>
-          <button
-            className="btn-scan"
-            onClick={scanNetworks}
-            disabled={scanning}
-          >
-            {scanning ? '⟳' : '🔄'}
-          </button>
-        </div>
-
-        {scanning ? (
-          <div className="scanning">Scanning for networks...</div>
-        ) : (
-          <div className="networks-list">
-            {networks.map((network, index) => (
-              <div
-                key={index}
-                className={`network-item ${selectedNetwork?.ssid === network.ssid ? 'selected' : ''}`}
-                onClick={() => setSelectedNetwork(network)}
-              >
-                <span className="signal-icon">{getSignalIcon(network.signal)}</span>
-                <div className="network-details">
-                  <div className="network-ssid">{network.ssid}</div>
-                  <div className="network-meta">
-                    {network.secured && <span>🔒</span>}
-                    {!network.secured && <span>🔓 Open</span>}
-                    <span>Signal: {network.signal}%</span>
-                  </div>
-                </div>
-                {currentNetwork?.ssid === network.ssid && (
-                  <span className="connected-badge">Connected</span>
-                )}
-              </div>
-            ))}
-            {networks.length === 0 && (
-              <div className="no-data">No networks found</div>
+    async function connectToNetwork(event) {
+        event.preventDefault();
+        if (!selectedNetwork || connectLock.current) return;
+        connectLock.current = true;
+        setConnecting(true);
+        try {
+            const data = await wifiRequest('/api/wifi/connect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ssid: selectedNetwork.ssid, password })
+            });
+            if (!mounted.current) return;
+            if (!data.success)
+                throw new Error(
+                    data.message || data.error || 'Could not connect'
+                );
+            if (data.captivePortal) {
+                setConfirmModal({
+                    message:
+                        'Connected. This network requires sign-in. Open its login page to finish connecting.',
+                    onConfirm: () => {
+                        window.open(
+                            data.portalUrl || 'http://captive.apple.com',
+                            '_blank',
+                            'noopener,noreferrer'
+                        );
+                        setConfirmModal(null);
+                    }
+                });
+            } else {
+                setAlertModal({
+                    type: 'success',
+                    message: data.rebooting
+                        ? `Connected. The mirror will reboot in ${data.rebootDelay / 1000} seconds. You may need to reconnect your phone to the new network.`
+                        : 'Connected successfully!'
+                });
+            }
+            cancelSelection();
+            refreshTimer.current = setTimeout(loadCurrentNetwork, 3000);
+        } catch (failure) {
+            if (mounted.current)
+                setAlertModal({ type: 'error', message: failure.message });
+        } finally {
+            connectLock.current = false;
+            if (mounted.current) setConnecting(false);
+        }
+    }
+    return (
+        <div className="wifi-settings">
+            <h2>Wi-Fi</h2>
+            <p className="hint">
+                Network settings for the mirror host. Connecting may interrupt
+                access to Nexus.
+            </p>
+            <Notice error={error} />
+            {currentNetwork && (
+                <Surface>
+                    <h3>Connected network</h3>
+                    <strong className="wifi-ssid">{currentNetwork.ssid}</strong>
+                    <div className="wifi-meta">
+                        {currentNetwork.ip && (
+                            <span>IP: {currentNetwork.ip}</span>
+                        )}
+                        {Number.isFinite(currentNetwork.signal) && (
+                            <span>Signal: {currentNetwork.signal}%</span>
+                        )}
+                    </div>
+                </Surface>
             )}
-          </div>
-        )}
-      </div>
-
-      {/* Connection Form */}
-      {selectedNetwork && (
-        <div className="card connect-form">
-          <div className="card-header">
-            <span className="card-icon">🔑</span>
-            <h2>Connect to {selectedNetwork.ssid}</h2>
-          </div>
-
-          {!selectedNetwork.secured && (
-            <div className="info-box">
-              <p>ℹ️ This is an open network. If it requires sign-in (like campus WiFi or hotel WiFi), you'll be prompted to authenticate after connecting.</p>
-            </div>
-          )}
-
-          {selectedNetwork.secured && (
-            <div className="form-group">
-              <label>Password</label>
-              <div className="password-input">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter WiFi password"
+            <Surface>
+                <div className="row wifi-heading">
+                    <h3>Available networks</h3>
+                    <Button
+                        onClick={scanNetworks}
+                        disabled={scanning || connecting}
+                        aria-label="Scan Wi-Fi networks"
+                    >
+                        <RefreshCw aria-hidden="true" />{' '}
+                        {scanning ? 'Scanning…' : 'Scan'}
+                    </Button>
+                </div>
+                {scanning ? (
+                    <p className="hint" role="status">
+                        Scanning for networks…
+                    </p>
+                ) : (
+                    <div className="wifi-networks">
+                        {networks.map((network, index) => (
+                            <button
+                                type="button"
+                                key={`${network.ssid}-${index}`}
+                                className="wifi-network"
+                                aria-pressed={
+                                    selectedNetwork?.ssid === network.ssid
+                                }
+                                disabled={connecting}
+                                onClick={(event) => {
+                                    selectionButton.current =
+                                        event.currentTarget;
+                                    setPassword('');
+                                    setShowPassword(false);
+                                    setSelectedNetwork(network);
+                                }}
+                            >
+                                <Wifi aria-hidden="true" />
+                                <span className="wifi-network-details">
+                                    <strong className="wifi-ssid">
+                                        {network.ssid}
+                                    </strong>
+                                    <span className="wifi-meta">
+                                        <span>
+                                            {network.secured ? (
+                                                <>
+                                                    <LockKeyhole aria-hidden="true" />{' '}
+                                                    Secured
+                                                </>
+                                            ) : (
+                                                'Open'
+                                            )}
+                                        </span>
+                                        {Number.isFinite(network.signal) && (
+                                            <span>
+                                                Signal: {network.signal}%
+                                            </span>
+                                        )}
+                                    </span>
+                                </span>
+                                {currentNetwork?.ssid === network.ssid && (
+                                    <span className="wifi-connected">
+                                        Connected
+                                    </span>
+                                )}
+                            </button>
+                        ))}
+                        {!networks.length && !error && (
+                            <p className="hint">
+                                No networks found. Scan again to refresh.
+                            </p>
+                        )}
+                    </div>
+                )}
+            </Surface>
+            {selectedNetwork && (
+                <Surface>
+                    <form onSubmit={connectToNetwork}>
+                        <h3
+                            ref={formHeading}
+                            tabIndex={-1}
+                            className="wifi-ssid"
+                        >
+                            Connect to {selectedNetwork.ssid}
+                        </h3>
+                        {!selectedNetwork.secured && (
+                            <p className="hint">
+                                This is an open network. You may need to sign in
+                                after connecting.
+                            </p>
+                        )}
+                        {selectedNetwork.secured && (
+                            <div className="wifi-password">
+                                <label
+                                    className="field"
+                                    htmlFor="wifi-password"
+                                >
+                                    Wi-Fi password
+                                </label>
+                                <div className="wifi-password-row">
+                                    <input
+                                        id="wifi-password"
+                                        type={
+                                            showPassword ? 'text' : 'password'
+                                        }
+                                        autoComplete="off"
+                                        value={password}
+                                        disabled={connecting}
+                                        onChange={(event) =>
+                                            setPassword(event.target.value)
+                                        }
+                                    />
+                                    <Button
+                                        onClick={() =>
+                                            setShowPassword(!showPassword)
+                                        }
+                                        aria-label={
+                                            showPassword
+                                                ? 'Hide Wi-Fi password'
+                                                : 'Show Wi-Fi password'
+                                        }
+                                        aria-pressed={showPassword}
+                                    >
+                                        {showPassword ? <EyeOff /> : <Eye />}
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                        <div className="button-row">
+                            <Button
+                                onClick={cancelSelection}
+                                disabled={connecting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="submit"
+                                className="primary"
+                                disabled={
+                                    connecting ||
+                                    (selectedNetwork.secured && !password)
+                                }
+                            >
+                                {connecting ? 'Connecting…' : 'Connect'}
+                            </Button>
+                        </div>
+                    </form>
+                </Surface>
+            )}
+            {confirmModal && (
+                <ConfirmModal
+                    title="Network sign-in"
+                    message={confirmModal.message}
+                    confirmText="Open Login"
+                    onConfirm={confirmModal.onConfirm}
+                    onCancel={() => setConfirmModal(null)}
                 />
-                <button
-                  className="btn-toggle-password"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          <div className="form-actions">
-            <button
-              className="btn-secondary"
-              onClick={() => {
-                setSelectedNetwork(null);
-                setPassword('');
-              }}
-            >
-              Cancel
-            </button>
-            <button
-              className="btn-primary"
-              onClick={connectToNetwork}
-              disabled={connecting || (selectedNetwork.security !== 'Open' && !password)}
-            >
-              {connecting ? 'Connecting...' : 'Connect'}
-            </button>
-          </div>
+            )}
+            {alertModal && (
+                <AlertModal
+                    message={alertModal.message}
+                    type={alertModal.type}
+                    onClose={() => setAlertModal(null)}
+                />
+            )}
         </div>
-      )}
-
-      {/* Confirmation Modal */}
-      {confirmModal && (
-        <ConfirmModal
-          title="Confirm Action"
-          message={confirmModal.message}
-          confirmText={confirmModal.confirmText || 'Confirm'}
-          onConfirm={confirmModal.onConfirm}
-          onCancel={() => setConfirmModal(null)}
-          danger={confirmModal.danger}
-        />
-      )}
-
-      {/* Alert Modal */}
-      {alertModal && (
-        <AlertModal
-          message={alertModal.message}
-          type={alertModal.type}
-          onClose={() => setAlertModal(null)}
-        />
-      )}
-    </div>
-  );
+    );
 }

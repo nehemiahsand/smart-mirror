@@ -2,6 +2,7 @@ const mqtt = require('mqtt');
 const logger = require('../utils/logger');
 const settingsService = require('./settings');
 const sceneEngine = require('./sceneEngine');
+const mqttConfig = require('../utils/mqttConfig');
 
 const ALLOWED_EVENT_TYPES = new Set([
   'alarm.dismiss',
@@ -38,24 +39,18 @@ class Esp32InputService {
       return;
     }
 
-    const brokerUrl = process.env.MQTT_BROKER_URL || process.env.MQTT_URL || config.brokerUrl || config.mqttUrl || 'mqtt://mosquitto:1883';
-    const username = process.env.MQTT_USERNAME || config.username || config.mqttUsername || undefined;
-    const password = process.env.MQTT_PASSWORD || config.password || config.mqttPassword || undefined;
     const topicPrefix = config.topicPrefix || 'smartmirror/esp32';
 
     try {
-      this.client = mqtt.connect(brokerUrl, {
-        reconnectPeriod: 5000,
-        username,
-        password,
-      });
+      const connection = mqttConfig();
+      this.client = mqtt.connect(connection.url, { ...connection.options, clientId: `nexus-console-${process.pid}` });
     } catch (error) {
       logger.error('Failed to create MQTT client', { error: error.message });
       return;
     }
 
     this.client.on('connect', () => {
-      logger.info('Connected to MQTT broker', { brokerUrl });
+      logger.info('Connected to MQTT broker over TLS');
       this.client.subscribe(`${topicPrefix}/+/event`);
       this.client.subscribe(`${topicPrefix}/+/status`);
     });
@@ -63,6 +58,7 @@ class Esp32InputService {
     this.client.on('message', (topic, payloadBuffer) => {
       const event = this.parseMessage(topic, payloadBuffer);
       if (event) {
+        require('./devices').consoleEvent(event);
         sceneEngine.processInputEvent(event, { source: `mqtt:${topic}` }).catch((error) => {
           logger.error('Failed to process MQTT event', {
             error: error.message,
@@ -92,6 +88,7 @@ class Esp32InputService {
       const parts = topic.split('/');
       const topicKind = parts[parts.length - 1];
       const deviceId = parts[parts.length - 2] || 'unknown';
+      if (deviceId === 'smart-clock') return null;
       if (!DEVICE_ID_PATTERN.test(deviceId)) {
         logger.warn('Rejected MQTT event with invalid device id', { topic, deviceId });
         return null;

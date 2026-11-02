@@ -47,6 +47,7 @@ const upload = multer({
 
 const router = express.Router();
 const adminAuth = require('../middleware/adminAuth');
+router.use(require('./nexus-routes'));
 
 /** Parsed commute endpoints from env when settings reset but widget stays on */
 function parseTrafficDestinationsFromEnv() {

@@ -1,9 +1,14 @@
+import { Button } from '../components/NexusUI';
 import React, { useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import './Login.css';
 import { apiFetch } from '../api/apiClient';
 
-export default function Login({ sessionChecked = false, authenticated = false, onAuthChange = () => {} }) {
+export default function Login({
+    sessionChecked = false,
+    authenticated = false,
+    onAuthChange = () => {}
+}) {
     const navigate = useNavigate();
     const [password, setPassword] = useState('');
     const [busy, setBusy] = useState(false);
@@ -14,7 +19,7 @@ export default function Login({ sessionChecked = false, authenticated = false, o
     }
 
     if (authenticated) {
-        return <Navigate to="/dashboard" replace />;
+        return <Navigate to="/home" replace />;
     }
 
     const handleSubmit = async (e) => {
@@ -36,7 +41,7 @@ export default function Login({ sessionChecked = false, authenticated = false, o
             }
 
             onAuthChange(true);
-            navigate('/dashboard', { replace: true });
+            navigate('/home', { replace: true });
         } catch (loginError) {
             setError(loginError.message || 'Login failed');
         } finally {
@@ -47,8 +52,8 @@ export default function Login({ sessionChecked = false, authenticated = false, o
     return (
         <div className="login-page">
             <div className="login-card">
-                <h1>Smart Mirror</h1>
-                <p>Sign in to access the dashboard</p>
+                <h1>Nexus</h1>
+                <p>Sign in to your connected setup</p>
 
                 <form onSubmit={handleSubmit}>
                     <input
@@ -57,11 +62,12 @@ export default function Login({ sessionChecked = false, authenticated = false, o
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Admin password"
                         autoComplete="current-password"
+                        aria-label="Admin password"
                     />
                     {error ? <div className="login-error">{error}</div> : null}
-                    <button type="submit" disabled={busy || !password}>
+                    <Button type="submit" disabled={busy || !password}>
                         {busy ? 'Signing In...' : 'Sign In'}
-                    </button>
+                    </Button>
                 </form>
             </div>
         </div>

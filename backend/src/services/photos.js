@@ -13,9 +13,10 @@ const THUMBNAIL_QUALITY = 45;
 
 class PhotosService {
   constructor() {
-    this.photosDir = process.env.PHOTOS_DIR || path.join(__dirname, '../../data/photos');
-    this.thumbnailsDir = process.env.PHOTOS_THUMBNAILS_DIR || path.join(__dirname, '../../data/photos-thumbnails');
-    this.metadataFile = path.join(__dirname, '../../data/photos-metadata.json');
+    const directory = process.env.NEXUS_DATA_DIR || path.join(__dirname, '../../data');
+    this.photosDir = process.env.PHOTOS_DIR || path.join(directory, 'photos');
+    this.thumbnailsDir = process.env.PHOTOS_THUMBNAILS_DIR || path.join(directory, 'photos-thumbnails');
+    this.metadataFile = path.join(directory, 'photos-metadata.json');
     this.photoCache = [];
     this.metadata = [];
     this.lastFetch = null;

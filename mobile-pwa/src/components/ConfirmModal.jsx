@@ -1,5 +1,5 @@
 import React from 'react';
-import './ConfirmModal.css';
+import { Modal } from './NexusUI';
 
 /**
  * ConfirmModal - Reusable confirmation dialog
@@ -21,22 +21,17 @@ export default function ConfirmModal({
     danger = false
 }) {
     return (
-        <div className="modal-overlay" onClick={onCancel}>
-            <div className="modal" onClick={(e) => e.stopPropagation()}>
-                <h3>{title}</h3>
-                <p>{message}</p>
-                <div className="modal-buttons">
-                    <button className="modal-btn cancel" onClick={onCancel}>
-                        {cancelText}
-                    </button>
-                    <button
-                        className={`modal-btn confirm ${danger ? 'danger' : ''}`}
-                        onClick={onConfirm}
-                    >
-                        {confirmText}
-                    </button>
-                </div>
+        <Modal title={title} onClose={onCancel}>
+            <p>{message}</p>
+            <div className="button-row">
+                <button onClick={onCancel}>{cancelText}</button>
+                <button
+                    className={danger ? 'danger' : 'primary'}
+                    onClick={onConfirm}
+                >
+                    {confirmText}
+                </button>
             </div>
-        </div>
+        </Modal>
     );
 }

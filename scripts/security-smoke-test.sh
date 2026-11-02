@@ -22,23 +22,27 @@ pass() {
   echo "PASS: $*"
 }
 
-ADMIN_PASSWORD="$(
+if [[ -z "${ADMIN_PASSWORD:-}" ]]; then
+  ADMIN_PASSWORD="$(
   cd "$ROOT_DIR/backend" &&
   node -e "require('dotenv').config({ path: '.env' }); process.stdout.write(process.env.ADMIN_PASSWORD || '')"
 )"
+fi
 
 if [[ -z "$ADMIN_PASSWORD" ]]; then
   fail "ADMIN_PASSWORD is not configured in backend/.env"
 fi
 
 LOGIN_BODY_FILE="$TMP_DIR/login-body.json"
+export ADMIN_PASSWORD
+node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({password:process.env.ADMIN_PASSWORD}))' "$TMP_DIR/login-request.json"
 LOGIN_STATUS="$(
   curl -sS \
     -c "$COOKIE_JAR" \
     -o "$LOGIN_BODY_FILE" \
     -w '%{http_code}' \
     -H 'Content-Type: application/json' \
-    -d "$(printf '{"password":"%s"}' "$ADMIN_PASSWORD")" \
+    --data-binary "@$TMP_DIR/login-request.json" \
     "$BASE_URL/api/auth/login"
 )"
 [[ "$LOGIN_STATUS" == "200" ]] || fail "Admin login returned HTTP $LOGIN_STATUS"

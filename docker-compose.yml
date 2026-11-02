@@ -9,14 +9,24 @@ services:
         test -n "$$MQTT_USERNAME" &&
         test -n "$$MQTT_PASSWORD" &&
         mosquitto_passwd -b -c /mosquitto/data/mosquitto.passwd "$$MQTT_USERNAME" "$$MQTT_PASSWORD" &&
+        if test -f /mosquitto/config/clients.local; then
+          while IFS=: read -r client_name client_password; do
+            test -z "$$client_name" || mosquitto_passwd -b /mosquitto/data/mosquitto.passwd "$$client_name" "$$client_password";
+          done < /mosquitto/config/clients.local;
+        fi &&
         chown mosquitto:mosquitto /mosquitto/data/mosquitto.passwd &&
         chmod 600 /mosquitto/data/mosquitto.passwd &&
         exec mosquitto -c /mosquitto/config/mosquitto.conf
       '
     ports:
-      - "1883:1883"
+      - "8883:8883"
     volumes:
       - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/certs/ca.pem:/mosquitto/certs/ca.pem:ro
+      - ./mosquitto/certs/server.pem:/mosquitto/certs/server.pem:ro
+      - ./mosquitto/certs/server.key:/mosquitto/certs/server.key:ro
+      - ./mosquitto/acl.local:/mosquitto/config/acl.local:ro
+      - ./mosquitto/clients.local:/mosquitto/config/clients.local:ro
     security_opt:
       - no-new-privileges:true
     tmpfs:
@@ -63,7 +73,8 @@ services:
       - DISPLAY=:0
       - WAYLAND_DISPLAY=wayland-0
       - XDG_RUNTIME_DIR=/run/user/1000
-      - MQTT_BROKER_URL=mqtt://mosquitto:1883
+      - MQTT_BROKER_URL=mqtts://mosquitto:8883
+      - MQTT_CA_FILE=/app/certs/mqtt-ca.pem
     ports:
       - "80:3001"
     user: "1000:1000"
@@ -71,6 +82,7 @@ services:
       - ./backend/data:/app/data
       - ./backend/data/photos:/app/data/photos
       - ./backend/.env:/app/.env:ro
+      - ./mosquitto/certs/ca.pem:/app/certs/mqtt-ca.pem:ro
       - /var/run/dbus:/var/run/dbus
       - /run/NetworkManager:/run/NetworkManager:ro
       - /tmp/.X11-unix:/tmp/.X11-unix:ro
