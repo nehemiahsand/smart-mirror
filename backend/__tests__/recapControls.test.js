@@ -33,3 +33,56 @@ it('starts at the latest game in video mode after selecting another highlight te
   expect(data.videoFeed.selectedClipIndex).toBe(0);
   expect(data.videoFeed.viewMode).toBe('video');
 });
+
+it('uses physical Sports button 5 to switch teams, reset the game, and return from live tracking', async () => {
+  let team = 'gsw';
+  const settings = require('../src/services/settings');
+  sports.preferences.mockImplementation(() => ({ team }));
+  sports.select = jest.fn().mockResolvedValue();
+  settings.update = jest.fn(async (key, value) => { expect(key).toBe('sports.highlightsTeam'); team = value; });
+  const broadcast = jest.spyOn(require('../src/api/websocket'), 'broadcastSettingsUpdate').mockImplementation(() => {});
+  consoleService.state.overlayMode = null;
+  consoleService.runtime.funRecapTeam = 'gsw';
+  consoleService.runtime.funClipIndex = 7;
+  consoleService.runtime.funViewMode = 'boxscore';
+  expect(consoleService.getSoftButtons('sports').button5).toBe('To Auburn');
+  await consoleService.handleEsp32Event({ type: 'ui.action', payload: { pageId: 'sports', buttonId: 'button5', action: 'back' } });
+  expect(team).toBe('auburn');
+  expect(consoleService.runtime.funClipIndex).toBe(0);
+  expect(consoleService.runtime.funViewMode).toBe('video');
+  expect(sports.select).toHaveBeenCalledWith({ mode: 'highlights' });
+  expect(broadcast).toHaveBeenCalled();
+  expect(consoleService.getSoftButtons('sports').button5).toBe('To GSW');
+  await consoleService.handleEsp32Event({ type: 'ui.action', payload: { pageId: 'sports', buttonId: 'button5', action: 'back' } });
+  expect(team).toBe('gsw');
+});
+it('serializes rapid team presses and recovers after a failed preference write', async () => {
+  let team = 'gsw';
+  const settings = require('../src/services/settings');
+  sports.preferences.mockImplementation(() => ({ team }));
+  sports.select = jest.fn().mockResolvedValue();
+  settings.update = jest.fn().mockRejectedValueOnce(new Error('disk unavailable'));
+  const broadcast = jest.spyOn(require('../src/api/websocket'), 'broadcastSettingsUpdate').mockImplementation(() => {});
+  await expect(consoleService.switchHighlightTeam()).rejects.toThrow('disk unavailable');
+  expect(team).toBe('gsw'); expect(broadcast).not.toHaveBeenCalled();
+  settings.update.mockImplementation(async (_, value) => { team = value; });
+  const first = consoleService.switchHighlightTeam(), second = consoleService.switchHighlightTeam();
+  await Promise.all([first, second]);
+  expect(team).toBe('gsw');
+  expect(settings.update.mock.calls.slice(1).map(([, value]) => value)).toEqual(['auburn','gsw']);
+});
+it('keeps Stats available in standby and keeps Back working in the Stats overlay', async () => {
+  const settings = require('../src/services/settings');
+  settings.get.mockImplementation((key) => key === 'display.standbyMode' ? true : undefined);
+  consoleService.state.overlayMode = null;
+  const stats = jest.spyOn(consoleService, 'openStatsOverlay').mockResolvedValue({});
+  expect(consoleService.getSoftButtons('sports', { screenMode: 'standby' }).button5).toBe('Stats');
+  await consoleService.handleFunAction('back', { buttonId: 'button5' });
+  expect(stats).toHaveBeenCalled();
+  consoleService.state.overlayMode = 'stats';
+  const close = jest.spyOn(consoleService, 'closeStatsOverlay').mockResolvedValue({});
+  await consoleService.handleAction('back', { pageId: 'sports', buttonId: 'button5' });
+  expect(close).toHaveBeenCalled();
+  consoleService.state.overlayMode = null;
+  settings.get.mockReset();
+});

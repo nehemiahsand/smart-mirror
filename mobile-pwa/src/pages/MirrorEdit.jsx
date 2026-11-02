@@ -71,8 +71,8 @@ export default function MirrorEdit() {
         else blocker.reset();
     }, [blocker]);
     useEffect(() => {
-        if (data.settings && !draft) setDraft(structuredClone(data.settings));
-    }, [data.settings, draft]);
+        if (data.settings && !dirty) setDraft(structuredClone(data.settings));
+    }, [data.settings, dirty]);
     useEffect(() => {
         request('/api/sports')
             .then((result) => setSports(Array.isArray(result) ? result : result.sports || []))

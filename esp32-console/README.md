@@ -51,31 +51,20 @@ The backend is the source of truth for page state, standby state, and OLED label
 
 ## Current OLED Behavior
 
-Awake pages:
-
-- `Main Page`
-- `Fun`
-- `Spotify`
-- `Stats` overlay
+Awake pages are Main Page, Weather, Sports, and Spotify, plus the Stats overlay.
 
 Buttons:
 
-- button 1 cycles between `Main Page`, `Fun`, and `Spotify`
-- hold button 1 to enter standby
-- on Main Page:
-  - button 2 = `Prev`
-  - button 3 = `Next`
-  - button 4 = `Default`
-- on Fun:
-  - button 2 = `Prev`
-  - button 3 = `Next`
-  - button 4 = `Video` / `Box` toggle
-  - the Fun matchup banner (teams, logos, score, result) remains visible in both modes
-- on Spotify:
-  - button 2 = `Prev`
-  - button 3 = `Next`
-  - button 4 = `Play` or `Stop`
-- button 5 toggles the stats overlay
+- Button 1 cycles enabled pages; holding it enters standby.
+- Main Page: buttons 2/3 change the scoreboard sport; button 4 restores its default.
+- Weather: button 2 refreshes weather.
+- Sports highlights: buttons 2/3 select previous/next games; button 4 switches Video/Box.
+- Sports live tracker: buttons 2/3 select live games; button 4 returns to highlights.
+- **Sports button 5 switches GSW ↔ Auburn.** Its label shows the destination (`To Auburn` / `To GSW`). Each switch saves the highlight team, selects its latest game in video mode, and returns from a live tracker to highlights. Automatic live-game preferences and priority are preserved.
+- Spotify: buttons 2/3 change tracks; button 4 plays/stops.
+- Button 5 opens Stats on the other pages and returns from the Stats overlay.
+
+Team switching uses the existing `ui.action` payload and backend-supplied labels, so no firmware reflash is required. See [Console team switching](../docs/NEXUS_CONSOLE_TEAM_SWITCH.md).
 
 Standby:
 

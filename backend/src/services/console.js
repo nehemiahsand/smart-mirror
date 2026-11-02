@@ -591,7 +591,7 @@ class ConsoleService {
           button2: tracker ? 'Prev game' : 'Prev',
           button3: tracker ? 'Next game' : 'Next',
           button4: tracker ? 'Highlights' : returnToLive ? 'Live' : this.runtime.funViewMode === 'boxscore' ? 'Video' : 'Box',
-          button5: 'Stats',
+          button5: this.getNextHighlightTeam() === 'auburn' ? 'To Auburn' : 'To GSW',
         };
       }
       case 'media':
@@ -1020,7 +1020,32 @@ class ConsoleService {
     return this.getState();
   }
 
-  async handleFunAction(action) {
+  getNextHighlightTeam() {
+    return sportsExperience.preferences().team === 'auburn' ? 'gsw' : 'auburn';
+  }
+
+  switchHighlightTeam() {
+    // Serialize presses so two quick taps select two teams, in order. Keep
+    // each feed update with its selection instead of displaying a stale team.
+    this.highlightTeamChange = (this.highlightTeamChange || Promise.resolve()).catch(() => {}).then(async () => {
+      const team = this.getNextHighlightTeam();
+      await settingsService.update('sports.highlightsTeam', team);
+      this.ensureRecapTeam(team);
+      // A direct request for highlights takes precedence over an active tracker.
+      await sportsExperience.select({ mode: 'highlights' });
+      require('../api/websocket').broadcastSettingsUpdate(settingsService.getAll());
+      this.touchInteraction(`sports:team:${team}`);
+      this.broadcastState();
+      await this.broadcastPageData('sports');
+      return this.getState();
+    });
+    return this.highlightTeamChange;
+  }
+
+  async handleFunAction(action, payload = {}) {
+    if (['back', 'close'].includes(action) && payload.buttonId === 'button5' && !this.isStandbyActive()) {
+      return this.switchHighlightTeam();
+    }
     if (['back', 'close'].includes(action)) {
       return this.openStatsOverlay('sports:stats');
     }
@@ -1169,7 +1194,7 @@ class ConsoleService {
 
     switch (pageId) {
       case 'sports':
-        return this.handleFunAction(normalizedAction);
+        return this.handleFunAction(normalizedAction, payload);
       case 'weather':
         return this.handleWeatherAction(normalizedAction);
       case 'media':
@@ -1210,6 +1235,7 @@ class ConsoleService {
         return this.handleAction(payload.action || payload.command || 'primary', {
           pageId: payload.pageId,
           targetPageId: payload.targetPageId,
+          buttonId: payload.buttonId,
           source: event.source || 'esp32',
         });
       case 'ui.adjust':
