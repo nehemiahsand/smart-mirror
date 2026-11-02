@@ -24,10 +24,12 @@ git fetch origin main
 local_head=$(git rev-parse HEAD)
 remote_head=$(git rev-parse origin/main)
 base_head=$(git merge-base HEAD origin/main)
+marker=${SMART_MIRROR_DEPLOY_MARKER:-$project_dir/backend/data/nexus-deployed-commit}
+deployed_head=$(cat "$marker" 2>/dev/null || true)
 
-if [ "$local_head" = "$remote_head" ]; then
+if [ "$local_head" = "$remote_head" ] && [ "$deployed_head" = "$local_head" ]; then
     echo "System is up to date. No deployment needed."
-elif [ "$local_head" = "$base_head" ]; then
+elif [ "$local_head" = "$remote_head" ] || [ "$local_head" = "$base_head" ]; then
     # The update channel must continue to contain Nexus and its TLS-only broker.
     git cat-file -e origin/main:backend/src/api/nexus-routes.js
     git cat-file -e origin/main:mobile-pwa/src/pages/Home.jsx
@@ -36,7 +38,9 @@ elif [ "$local_head" = "$base_head" ]; then
         exit 1
     fi
     echo "Deploying fast-forward update: $local_head -> $remote_head"
-    git pull --ff-only origin main
+    if [ "$local_head" != "$remote_head" ]; then
+        git pull --ff-only origin main
+    fi
     docker compose config --quiet
     docker compose up -d --build
     healthy=false
@@ -51,6 +55,11 @@ elif [ "$local_head" = "$base_head" ]; then
         echo "Deployment failed health verification. Inspect services; success was not recorded."
         exit 1
     fi
+    # Record success only after health passes. A failed build remains pending
+    # and is retried even when Git already reached origin/main.
+    mkdir -p "$(dirname "$marker")"
+    (umask 077; printf '%s\n' "$remote_head" > "$marker.tmp.$$")
+    mv "$marker.tmp.$$" "$marker"
     echo "Update deployed and health verified."
 elif [ "$remote_head" = "$base_head" ]; then
     echo "Local branch is ahead of origin/main. Skipping auto-deploy."
