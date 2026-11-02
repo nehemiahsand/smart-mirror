@@ -49,8 +49,11 @@ RUN npm ci --omit=dev
 COPY backend/ ./
 COPY --from=pwa-builder /build/mobile-pwa/dist ./public
 
-# Create data directory
-RUN mkdir -p /app/data
+# Git checkouts may inherit a private deployment umask. Runtime code must be
+# readable by UID 1000; mounted secrets/data keep their host permissions.
+RUN chmod a+r /app/package*.json \
+    && chmod -R a+rX /app/src /app/public \
+    && mkdir -p /app/data
 
 EXPOSE 3001
 

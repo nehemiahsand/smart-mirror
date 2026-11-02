@@ -60,7 +60,7 @@ Buttons:
 - Weather: button 2 refreshes weather.
 - Sports highlights: buttons 2/3 select previous/next games; button 4 switches Video/Box.
 - Sports live tracker: buttons 2/3 select live games; button 4 returns to highlights.
-- **Sports button 5 switches GSW ↔ Auburn.** Its label shows the destination (`To Auburn` / `To GSW`). Each switch saves the highlight team, selects its latest game in video mode, and returns from a live tracker to highlights. Automatic live-game preferences and priority are preserved.
+- **Sports button 5 switches GSW ↔ Auburn.** Its label shows the destination (`To AUB` / `To GSW`). Each switch saves the highlight team, selects its latest game in video mode, and returns from a live tracker to highlights. Automatic live-game preferences and priority are preserved.
 - Spotify: buttons 2/3 change tracks; button 4 plays/stops.
 - Button 5 opens Stats on the other pages and returns from the Stats overlay.
 

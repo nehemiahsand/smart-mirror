@@ -591,7 +591,7 @@ class ConsoleService {
           button2: tracker ? 'Prev game' : 'Prev',
           button3: tracker ? 'Next game' : 'Next',
           button4: tracker ? 'Highlights' : returnToLive ? 'Live' : this.runtime.funViewMode === 'boxscore' ? 'Video' : 'Box',
-          button5: this.getNextHighlightTeam() === 'auburn' ? 'To Auburn' : 'To GSW',
+          button5: this.getNextHighlightTeam() === 'auburn' ? 'To AUB' : 'To GSW',
         };
       }
       case 'media':

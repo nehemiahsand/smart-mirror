@@ -45,7 +45,7 @@ it('uses physical Sports button 5 to switch teams, reset the game, and return fr
   consoleService.runtime.funRecapTeam = 'gsw';
   consoleService.runtime.funClipIndex = 7;
   consoleService.runtime.funViewMode = 'boxscore';
-  expect(consoleService.getSoftButtons('sports').button5).toBe('To Auburn');
+  expect(consoleService.getSoftButtons('sports').button5).toBe('To AUB');
   await consoleService.handleEsp32Event({ type: 'ui.action', payload: { pageId: 'sports', buttonId: 'button5', action: 'back' } });
   expect(team).toBe('auburn');
   expect(consoleService.runtime.funClipIndex).toBe(0);

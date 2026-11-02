@@ -2,7 +2,7 @@
 
 On the awake Sports screen, press **button 5**. Its label shows the destination:
 
-- `To Auburn` while viewing GSW highlights.
+- `To AUB` while viewing GSW highlights.
 - `To GSW` while viewing Auburn highlights.
 
 The team preference is saved, the latest game is selected, and video mode is restored. If a live tracker is showing, an explicit team switch returns to highlights using the existing temporary highlights override. Automatic live-game enablement and priority are unchanged.
